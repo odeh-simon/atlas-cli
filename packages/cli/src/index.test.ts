@@ -143,6 +143,15 @@ describe("cli", () => {
     expect(logs).toContain("Repository: acme/atlas");
     expect(logs).toContain("Number: 12");
   });
+
+  it("requires explicit approval for decision records", async () => {
+    const logs = captureLogs();
+
+    const code = await main(["decisions", "record", "--kind", "decision"]);
+
+    expect(code).toBe(2);
+    expect(logs).toContain("atlas decisions record requires --yes");
+  });
 });
 
 function captureLogs(): string[] {

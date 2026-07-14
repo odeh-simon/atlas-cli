@@ -61,6 +61,8 @@ export type FindingStatus =
 
 export type ApprovalType = "contract" | "completion" | "override_disposition";
 
+export type DecisionRecordKind = "decision" | "deviation";
+
 export type MaterialChangeCategory =
   | "scope"
   | "architecture"

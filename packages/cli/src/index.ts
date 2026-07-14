@@ -22,6 +22,7 @@ import {
   importReviewReport,
   pauseSession,
   prepareReviewPackage,
+  recordDecision,
   resumePausedSession,
   unarchiveSession,
   startManualTask
@@ -73,6 +74,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "figma" && subcommand === "inspect") {
       return figmaInspectCommand(rest);
+    }
+
+    if (command === "decisions" && subcommand === "record") {
+      return decisionsRecordCommand(rest);
     }
 
     if (command === "github" && subcommand === "inspect") {
@@ -167,6 +172,7 @@ Usage:
   atlas start --manual --title <title> --objective <objective> [--task-key <key>]
   atlas context import <file>
   atlas context build [--max-files <n>] [--max-bytes <n>]
+  atlas decisions record --kind <decision|deviation> --title <title> --rationale <text> --category <category> --yes
   atlas plan
   atlas contract import <file>
   atlas approve contract --yes
@@ -356,6 +362,33 @@ function githubInspectCommand(args: string[]): number {
   console.log(`Repository: ${reference.owner}/${reference.repo}`);
   console.log(`Number: ${reference.number ?? "(none)"}`);
   console.log(`URL: ${reference.url}`);
+  return 0;
+}
+
+async function decisionsRecordCommand(args: string[]): Promise<number> {
+  if (!args.includes("--yes")) {
+    console.error("atlas decisions record requires --yes");
+    return 2;
+  }
+  const kind = readOption(args, "--kind");
+  const title = readOption(args, "--title");
+  const rationale = readOption(args, "--rationale");
+  const category = readOption(args, "--category");
+  if (
+    (kind !== "decision" && kind !== "deviation") ||
+    title === undefined ||
+    rationale === undefined ||
+    !isMaterialCategory(category)
+  ) {
+    console.error("atlas decisions record requires --kind, --title, --rationale, and valid --category");
+    return 2;
+  }
+
+  const result = await recordDecision({ kind, title, rationale, category });
+  console.log(`Decision: ${result.decisionId}`);
+  console.log(`Artifact: ${result.artifactId}`);
+  console.log(`Kind: ${result.kind}`);
+  console.log(`Session: ${result.sessionId}`);
   return 0;
 }
 
@@ -625,6 +658,20 @@ function labelForCheckStatus(status: "pass" | "fail" | "skip"): string {
     case "skip":
       return "SKIP";
   }
+}
+
+function isMaterialCategory(
+  value: string | undefined
+): value is "scope" | "architecture" | "data_security" | "design_constraints" | "acceptance" | "tests" | "prohibitions" {
+  return (
+    value === "scope" ||
+    value === "architecture" ||
+    value === "data_security" ||
+    value === "design_constraints" ||
+    value === "acceptance" ||
+    value === "tests" ||
+    value === "prohibitions"
+  );
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {

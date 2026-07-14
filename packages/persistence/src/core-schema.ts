@@ -175,5 +175,25 @@ CREATE TABLE finding_dispositions (
 
 CREATE INDEX idx_finding_dispositions_finding ON finding_dispositions(finding_id);
 `
+  },
+  {
+    version: 6,
+    name: "decision_records",
+    sql: `
+CREATE TABLE decision_records (
+  decision_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES sessions(session_id),
+  artifact_id TEXT NOT NULL REFERENCES artifacts(artifact_id),
+  kind TEXT NOT NULL CHECK (kind IN ('decision', 'deviation')),
+  title TEXT NOT NULL,
+  rationale TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('scope', 'architecture', 'data_security', 'design_constraints', 'acceptance', 'tests', 'prohibitions')),
+  approved_by TEXT NOT NULL,
+  approved_at TEXT NOT NULL,
+  supersedes_decision_id TEXT
+);
+
+CREATE INDEX idx_decision_records_session_kind ON decision_records(session_id, kind);
+`
   }
 ] as const;

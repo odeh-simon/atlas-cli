@@ -18,6 +18,7 @@ export const artifactTypeSchema = z.enum([
   "review_report",
   "finding",
   "finding_disposition",
+  "decision_record",
   "completion_report"
 ]);
 
@@ -244,6 +245,18 @@ export const findingDispositionSchema = artifactEnvelopeSchema.extend({
   resolution_evidence: z.array(z.string().min(1)).default([])
 });
 
+export const decisionRecordSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("decision_record"),
+  decision_id: idSchema,
+  kind: z.enum(["decision", "deviation"]),
+  title: z.string().min(1),
+  rationale: z.string().min(1),
+  category: z.enum(["scope", "architecture", "data_security", "design_constraints", "acceptance", "tests", "prohibitions"]),
+  approved_by: z.string().min(1),
+  approved_at: isoDateTimeSchema,
+  supersedes_decision_id: idSchema.optional()
+});
+
 export const completionReportSchema = artifactEnvelopeSchema.extend({
   type: z.literal("completion_report"),
   contract_artifact_id: idSchema,
@@ -269,6 +282,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   reviewReportSchema,
   findingSchema,
   findingDispositionSchema,
+  decisionRecordSchema,
   completionReportSchema
 ]);
 

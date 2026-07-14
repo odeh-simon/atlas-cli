@@ -8,12 +8,14 @@ import {
   appendEvent,
   applyMigrations,
   coreMigrations,
+  createDecisionRecord,
   createRepository,
   createSession,
   findActiveSessionByTask,
   getActiveLock,
   getRepository,
   getSession,
+  listDecisionRecordsForSession,
   listEvents,
   openDatabase,
   releaseLock,
@@ -141,6 +143,60 @@ describe("core session repositories", () => {
         metadata: { from: "intake_ready", to: "context_ready" }
       })
     ]);
+
+    db.close();
+  });
+
+  it("creates and lists decision records", async () => {
+    const root = tempRoot();
+    const { db } = await openMigratedDb(root);
+
+    createRepository(db, { repoId: "repo_1", rootPath: "C:/work/repo", displayName: "Pilot Repo", now });
+    createSession(db, {
+      sessionId: "ses_1",
+      repoId: "repo_1",
+      taskSource: "manual",
+      primaryState: "intake_ready",
+      now
+    });
+    db.run(
+      `INSERT INTO artifacts
+        (artifact_id, session_id, type, schema_version, content_version, storage_uri, sha256, byte_length,
+         media_type, sensitivity, status, producer_type, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        "art_decision",
+        "ses_1",
+        "decision_record",
+        1,
+        1,
+        "ses_1/decision_record/1.json",
+        "0".repeat(64),
+        2,
+        "application/json",
+        "internal",
+        "approved",
+        "user",
+        now
+      ]
+    );
+
+    createDecisionRecord(db, {
+      decisionId: "dec_1",
+      sessionId: "ses_1",
+      artifactId: "art_decision",
+      kind: "decision",
+      title: "Use CLI",
+      rationale: "M3 scope",
+      category: "architecture",
+      approvedBy: "tester",
+      approvedAt: now
+    });
+
+    expect(listDecisionRecordsForSession(db, "ses_1")[0]).toMatchObject({
+      decisionId: "dec_1",
+      category: "architecture"
+    });
 
     db.close();
   });
