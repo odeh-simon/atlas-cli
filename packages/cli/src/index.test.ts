@@ -89,6 +89,15 @@ describe("cli", () => {
       process.chdir(previousCwd);
     }
   });
+
+  it("lists context build in help", async () => {
+    const logs = captureLogs();
+
+    const code = await main(["--help"]);
+
+    expect(code).toBe(0);
+    expect(logs.join("\n")).toContain("atlas context build");
+  });
 });
 
 function captureLogs(): string[] {

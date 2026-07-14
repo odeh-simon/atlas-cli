@@ -10,6 +10,7 @@ import {
   approveContract,
   approveCompletion,
   archiveSession,
+  buildContextManifest,
   cancelSession,
   exportManualAgentPackage,
   disposeFinding,
@@ -87,6 +88,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return contextImportCommand(rest);
     }
 
+    if (command === "context" && subcommand === "build") {
+      return contextBuildCommand(rest);
+    }
+
     if (command === "plan") {
       return planCommand();
     }
@@ -146,6 +151,7 @@ Usage:
   atlas init --yes
   atlas start --manual --title <title> --objective <objective> [--task-key <key>]
   atlas context import <file>
+  atlas context build [--max-files <n>] [--max-bytes <n>]
   atlas plan
   atlas contract import <file>
   atlas approve contract --yes
@@ -342,6 +348,21 @@ async function contextImportCommand(args: string[]): Promise<number> {
   return 0;
 }
 
+async function contextBuildCommand(args: string[]): Promise<number> {
+  const maxFiles = readNumberOption(args, "--max-files");
+  const maxBytes = readNumberOption(args, "--max-bytes");
+  const result = await buildContextManifest({
+    ...(maxFiles === undefined ? {} : { maxFiles }),
+    ...(maxBytes === undefined ? {} : { maxBytes })
+  });
+  console.log(`Built context ${result.contextArtifactId}`);
+  console.log(`Session: ${result.sessionId}`);
+  console.log(`Sources: ${result.includedSourceCount}/${result.sourceCount}`);
+  console.log(`State: ${result.state}`);
+  console.log(`Next: ${result.nextCommand}`);
+  return 0;
+}
+
 async function planCommand(): Promise<number> {
   const result = await exportPlanningPackage();
   console.log(`Planning package: ${result.planningArtifactId}`);
@@ -483,6 +504,13 @@ function readOption(args: string[], name: string, required = true): string | und
   }
 
   return args[index + 1];
+}
+
+function readNumberOption(args: string[], name: string): number | undefined {
+  const value = readOption(args, name, false);
+  if (value === undefined) return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) && Number.isInteger(number) && number > 0 ? number : undefined;
 }
 
 function compact(values: Array<string | undefined>): string[] {

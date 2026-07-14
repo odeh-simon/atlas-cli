@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@atlas/artifacts": "workspace:*",
+    "@atlas/context-discovery": "workspace:*",
     "@atlas/domain": "workspace:*",
     "@atlas/persistence": "workspace:*",
     "@atlas/schemas": "workspace:*",

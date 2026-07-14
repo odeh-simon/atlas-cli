@@ -37,6 +37,9 @@ importers:
       '@atlas/artifacts':
         specifier: workspace:*
         version: link:../artifacts
+      '@atlas/context-discovery':
+        specifier: workspace:*
+        version: link:../context-discovery
       '@atlas/domain':
         specifier: workspace:*
         version: link:../domain

@@ -3,6 +3,7 @@ export * from "./contract-approval.js";
 export * from "./contract-import.js";
 export * from "./checks.js";
 export * from "./completion.js";
+export * from "./context-build.js";
 export * from "./context-import.js";
 export * from "./execution-import.js";
 export * from "./finding-disposition.js";
