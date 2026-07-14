@@ -33,7 +33,7 @@ import {
 import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
 import { getCodexAdapterHealth } from "@atlas/adapters-codex";
 import { fetchFigmaFileSnapshot, getFigmaAdapterHealth, parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
-import { getGitHubAdapterHealth, parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
+import { fetchGitHubRepositorySnapshot, getGitHubAdapterHealth, parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
 import { fetchLinearIssue, getLinearAdapterHealth, isLinearIssueKey, readLinearIssueFixture } from "@atlas/adapters-linear";
 import { scanDesignPolicies } from "@atlas/checks";
 import { AtlasError } from "@atlas/domain";
@@ -124,7 +124,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (command === "github" && subcommand === "inspect") {
-      return githubInspectCommand(rest);
+      return await githubInspectCommand(rest);
     }
 
     if (command === "resume") {
@@ -547,7 +547,7 @@ async function figmaInspectCommand(args: string[]): Promise<number> {
   return 0;
 }
 
-function githubInspectCommand(args: string[]): number {
+async function githubInspectCommand(args: string[]): Promise<number> {
   const input = args[0];
   if (input === undefined) {
     console.error("atlas github inspect requires a GitHub URL or fixture path");
@@ -563,6 +563,16 @@ function githubInspectCommand(args: string[]): number {
   }
 
   const reference = parseGitHubReference(input);
+  const config = readAtlasConfig();
+  const token = getCredentialToken({ alias: config.adapters?.github?.tokenAlias ?? "github.default", provider: "github" });
+  if (token !== undefined) {
+    const snapshot = await fetchGitHubRepositorySnapshot({ token, reference });
+    console.log(`Repository: ${snapshot.owner}/${snapshot.repo}`);
+    console.log(`Default branch: ${snapshot.defaultBranch ?? "(unknown)"}`);
+    console.log(`Pull requests: ${snapshot.pullRequests.length}`);
+    return 0;
+  }
+
   console.log(`Kind: ${reference.kind}`);
   console.log(`Repository: ${reference.owner}/${reference.repo}`);
   console.log(`Number: ${reference.number ?? "(none)"}`);

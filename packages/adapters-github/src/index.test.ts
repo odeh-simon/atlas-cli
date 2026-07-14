@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  fetchGitHubRepositorySnapshot,
   getGitHubAdapterHealth,
   normalizeGitHubRepository,
   parseGitHubReference,
@@ -68,5 +69,42 @@ describe("GitHub adapter", () => {
   it("rejects malformed references and fixtures", () => {
     expect(() => parseGitHubReference("https://example.test/acme/atlas")).toThrow("github.com");
     expect(() => normalizeGitHubRepository({ owner: "acme" })).toThrow("owner and repo");
+  });
+
+  it("fetches repository and pull request metadata from GitHub REST", async () => {
+    const urls: string[] = [];
+    const snapshot = await fetchGitHubRepositorySnapshot({
+      token: "ghp_token",
+      reference: parseGitHubReference("https://github.com/acme/atlas/pull/12"),
+      fetchImpl: (async (url, init) => {
+        urls.push(String(url));
+        expect(init?.headers).toMatchObject({ authorization: "Bearer ghp_token" });
+        if (String(url).endsWith("/pulls/12")) {
+          return new Response(
+            JSON.stringify({
+              number: 12,
+              title: "Improve CLI",
+              state: "open",
+              head: { ref: "feature" },
+              base: { ref: "main" },
+              html_url: "https://github.com/acme/atlas/pull/12"
+            }),
+            { status: 200 }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            default_branch: "main",
+            html_url: "https://github.com/acme/atlas",
+            description: "Atlas"
+          }),
+          { status: 200 }
+        );
+      }) as typeof fetch
+    });
+
+    expect(urls).toHaveLength(2);
+    expect(snapshot).toMatchObject({ owner: "acme", repo: "atlas", defaultBranch: "main" });
+    expect(snapshot.pullRequests[0]).toMatchObject({ number: 12, headRef: "feature", baseRef: "main" });
   });
 });

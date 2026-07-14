@@ -39,6 +39,12 @@ export interface GitHubRepositorySnapshot {
   readonly pullRequests: readonly GitHubPullRequestSnapshot[];
 }
 
+export interface FetchGitHubRepositoryInput {
+  readonly token: string;
+  readonly reference: GitHubReference;
+  readonly fetchImpl?: typeof fetch | undefined;
+}
+
 export function getGitHubAdapterHealth(input: { readonly token?: string | undefined } = {}): GitHubAdapterHealth {
   return {
     provider: "github",
@@ -71,6 +77,44 @@ export function parseGitHubReference(input: string): GitHubReference {
     return { kind: "issue", owner, repo, number, url: url.toString() };
   }
   return { kind: "repository", owner, repo, url: url.toString() };
+}
+
+export async function fetchGitHubRepositorySnapshot(
+  input: FetchGitHubRepositoryInput
+): Promise<GitHubRepositorySnapshot> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const headers = {
+    accept: "application/vnd.github+json",
+    authorization: `Bearer ${input.token}`,
+    "x-github-api-version": "2022-11-28"
+  };
+  const repoResponse = await fetchImpl(`https://api.github.com/repos/${input.reference.owner}/${input.reference.repo}`, {
+    headers
+  });
+  if (!repoResponse.ok) {
+    throw new Error(`GitHub repository request failed: ${repoResponse.status}`);
+  }
+  const repo = (await repoResponse.json()) as Record<string, unknown>;
+  const pullRequests: GitHubPullRequestSnapshot[] = [];
+  if (input.reference.kind === "pull_request" && input.reference.number !== undefined) {
+    const pullResponse = await fetchImpl(
+      `https://api.github.com/repos/${input.reference.owner}/${input.reference.repo}/pulls/${input.reference.number}`,
+      { headers }
+    );
+    if (!pullResponse.ok) {
+      throw new Error(`GitHub pull request failed: ${pullResponse.status}`);
+    }
+    pullRequests.push(normalizePullRequest(await pullResponse.json()));
+  }
+
+  return normalizeGitHubRepository({
+    owner: input.reference.owner,
+    repo: input.reference.repo,
+    defaultBranch: stringValue(repo.default_branch),
+    url: stringValue(repo.html_url),
+    description: stringValue(repo.description),
+    pullRequests
+  });
 }
 
 export function readGitHubFixture(filePath: string): GitHubRepositorySnapshot {
@@ -114,6 +158,28 @@ function normalizePullRequests(raw: unknown): GitHubPullRequestSnapshot[] {
     });
   }
   return pullRequests.sort((a, b) => a.number - b.number);
+}
+
+function normalizePullRequest(raw: unknown): GitHubPullRequestSnapshot {
+  const value = asRecord(raw, "GitHub pull request must be an object");
+  const number = typeof value.number === "number" && Number.isInteger(value.number) ? value.number : undefined;
+  const title = stringValue(value.title);
+  if (number === undefined || title === undefined) {
+    throw new TypeError("GitHub pull request number and title are required");
+  }
+  return {
+    number,
+    title,
+    state: stringValue(value.state),
+    headRef: normalizeRef(value.head),
+    baseRef: normalizeRef(value.base),
+    url: stringValue(value.html_url) ?? stringValue(value.url)
+  };
+}
+
+function normalizeRef(raw: unknown): string | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  return stringValue((raw as Record<string, unknown>).ref);
 }
 
 function numberValue(value: string | undefined): number | undefined {
