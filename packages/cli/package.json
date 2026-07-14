@@ -29,6 +29,7 @@
     "@atlas/adapters-linear": "workspace:*",
     "@atlas/app-services": "workspace:*",
     "@atlas/checks": "workspace:*",
+    "@atlas/diagnostics": "workspace:*",
     "@atlas/domain": "workspace:*",
     "@atlas/git": "workspace:*",
     "@atlas/security": "workspace:*"

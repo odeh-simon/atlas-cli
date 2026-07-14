@@ -37,6 +37,7 @@ import { fetchFigmaFileSnapshot, getFigmaAdapterHealth, parseFigmaReference, rea
 import { fetchGitHubRepositorySnapshot, getGitHubAdapterHealth, parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
 import { fetchLinearIssue, getLinearAdapterHealth, isLinearIssueKey, readLinearIssueFixture } from "@atlas/adapters-linear";
 import { scanDesignPolicies } from "@atlas/checks";
+import { createTelemetryPreview, telemetryEnabled } from "@atlas/diagnostics";
 import { AtlasError } from "@atlas/domain";
 import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
 import {
@@ -98,6 +99,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "adapters" && subcommand === "health") {
       return adaptersHealthCommand();
+    }
+
+    if (command === "telemetry") {
+      return telemetryCommand(compact([subcommand, ...rest]));
     }
 
     if (command === "git" && subcommand === "status") {
@@ -284,6 +289,10 @@ Usage:
   atlas auth list
   atlas auth remove --alias <alias>
   atlas adapters health
+  atlas telemetry status
+  atlas telemetry preview
+  atlas telemetry enable
+  atlas telemetry disable
 `);
 }
 
@@ -452,6 +461,31 @@ function adaptersHealthCommand(): number {
     console.log(`${adapter.provider}: ${configured}${mode}`);
   }
   return health.every((adapter) => adapter.configured) ? 0 : 1;
+}
+
+function telemetryCommand(args: string[]): number {
+  const action = args[0];
+  if (action === "status") {
+    const config = readAtlasConfig();
+    console.log(`Telemetry: ${telemetryEnabled(config.telemetry) ? "enabled" : "disabled"}`);
+    console.log("Mode: local config, content-free operational metadata only");
+    return 0;
+  }
+
+  if (action === "preview") {
+    console.log(JSON.stringify(createTelemetryPreview(version), null, 2));
+    return 0;
+  }
+
+  if (action === "enable" || action === "disable") {
+    const enabled = action === "enable";
+    writeAtlasConfig({ ...readAtlasConfig(), telemetry: { enabled } });
+    console.log(`Telemetry: ${enabled ? "enabled" : "disabled"}`);
+    return 0;
+  }
+
+  console.error("atlas telemetry requires status, preview, enable, or disable");
+  return 2;
 }
 
 function gitStatusCommand(): number {
@@ -912,6 +946,9 @@ function readConfiguredBaseBranch(): string | undefined {
 }
 
 interface AtlasCliConfig {
+  readonly schemaVersion?: number | undefined;
+  readonly project?: { readonly name?: string | undefined; readonly baseBranch?: string | undefined } | undefined;
+  readonly telemetry?: { readonly enabled?: boolean | undefined } | undefined;
   readonly adapters?: {
     readonly figma?: { readonly tokenAlias?: string | undefined } | undefined;
     readonly github?: { readonly tokenAlias?: string | undefined } | undefined;
@@ -929,6 +966,15 @@ function readAtlasConfig(): AtlasCliConfig {
   } catch {
     return {};
   }
+}
+
+function writeAtlasConfig(config: AtlasCliConfig): void {
+  const next: AtlasCliConfig = {
+    ...config,
+    schemaVersion: config.schemaVersion ?? 1,
+    project: config.project ?? { name: "atlas-project", baseBranch: "main" }
+  };
+  writeFileSync(join(process.cwd(), "atlas.config.json"), `${JSON.stringify(next, null, 2)}\n`);
 }
 
 function tokenForConfiguredAlias(alias: string | undefined, provider: CredentialProvider): string | undefined {

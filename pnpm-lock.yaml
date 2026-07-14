@@ -111,6 +111,9 @@ importers:
       '@atlas/checks':
         specifier: workspace:*
         version: link:../checks
+      '@atlas/diagnostics':
+        specifier: workspace:*
+        version: link:../diagnostics
       '@atlas/domain':
         specifier: workspace:*
         version: link:../domain
