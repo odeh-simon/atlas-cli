@@ -63,6 +63,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@atlas/adapters-linear':
+        specifier: workspace:*
+        version: link:../adapters-linear
       '@atlas/app-services':
         specifier: workspace:*
         version: link:../app-services

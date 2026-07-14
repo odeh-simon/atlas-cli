@@ -26,6 +26,7 @@ import {
   unarchiveSession,
   startManualTask
 } from "@atlas/app-services";
+import { readLinearIssueFixture } from "@atlas/adapters-linear";
 import { preflightGitBranch, readGitRepositoryFacts } from "@atlas/git";
 
 const version = "0.0.0";
@@ -62,6 +63,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "git" && subcommand === "preflight") {
       return gitPreflightCommand(rest);
+    }
+
+    if (command === "linear" && subcommand === "inspect") {
+      return linearInspectCommand(rest);
     }
 
     if (command === "resume") {
@@ -170,6 +175,7 @@ Usage:
   atlas cancel --yes --reason <reason>
   atlas git status
   atlas git preflight [--base <branch>] [--target <branch>] [--allow-dirty]
+  atlas linear inspect <fixture.json>
   atlas status
 `);
 }
@@ -274,6 +280,24 @@ function gitPreflightCommand(args: string[]): number {
   }
   console.log(`Result: ${result.passed ? "pass" : "fail"}`);
   return result.passed ? 0 : 1;
+}
+
+function linearInspectCommand(args: string[]): number {
+  const filePath = args[0];
+  if (filePath === undefined) {
+    console.error("atlas linear inspect requires a fixture path");
+    return 2;
+  }
+
+  const issue = readLinearIssueFixture(filePath);
+  console.log(`Issue: ${issue.issueKey}`);
+  console.log(`Title: ${issue.title}`);
+  console.log(`State: ${issue.state ?? "(unknown)"}`);
+  console.log(`Priority: ${issue.priority ?? "(unknown)"}`);
+  console.log(`Labels: ${issue.labels.join(", ") || "(none)"}`);
+  console.log(`Comments: ${issue.comments.length}`);
+  console.log(`Links: ${issue.links.length}`);
+  return 0;
 }
 
 async function pauseCommand(): Promise<number> {

@@ -98,6 +98,23 @@ describe("cli", () => {
     expect(code).toBe(0);
     expect(logs.join("\n")).toContain("atlas context build");
   });
+
+  it("inspects a Linear issue fixture", async () => {
+    const root = tempRoot();
+    const fixturePath = join(root, "linear.json");
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({ identifier: "ENG-42", title: "Build intake", state: { name: "Todo" }, labels: ["atlas"] })
+    );
+    const logs = captureLogs();
+
+    const code = await main(["linear", "inspect", fixturePath]);
+
+    expect(code).toBe(0);
+    expect(logs).toContain("Issue: ENG-42");
+    expect(logs).toContain("Title: Build intake");
+    expect(logs).toContain("Labels: atlas");
+  });
 });
 
 function captureLogs(): string[] {
