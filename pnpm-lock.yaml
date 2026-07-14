@@ -45,6 +45,9 @@ importers:
       '@atlas/artifacts':
         specifier: workspace:*
         version: link:../artifacts
+      '@atlas/checks':
+        specifier: workspace:*
+        version: link:../checks
       '@atlas/context-discovery':
         specifier: workspace:*
         version: link:../context-discovery
@@ -67,7 +70,11 @@ importers:
         specifier: workspace:*
         version: link:../domain
 
-  packages/checks: {}
+  packages/checks:
+    dependencies:
+      '@atlas/process-runner':
+        specifier: workspace:*
+        version: link:../process-runner
 
   packages/cli:
     dependencies:

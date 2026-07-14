@@ -23,6 +23,22 @@
         "enabled": { "type": "boolean" }
       },
       "additionalProperties": false
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "command"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
+          "required": { "type": "boolean" },
+          "command": { "type": "string", "minLength": 1 },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "dependsOn": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" } },
+          "timeoutMs": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

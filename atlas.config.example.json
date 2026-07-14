@@ -7,5 +7,15 @@
   },
   "telemetry": {
     "enabled": false
-  }
+  },
+  "checks": [
+    {
+      "name": "typecheck",
+      "required": true,
+      "command": "pnpm",
+      "args": ["check"],
+      "dependsOn": ["basic-session-integrity"],
+      "timeoutMs": 120000
+    }
+  ]
 }

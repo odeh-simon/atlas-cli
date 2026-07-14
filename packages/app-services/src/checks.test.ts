@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -36,6 +36,7 @@ describe("runBasicCheck", () => {
     closeAtlasRuntime(runtime, false);
 
     expect(result.status).toBe("passed");
+    expect(result.checkCount).toBe(1);
     expect(result.state).toBe("checks_completed");
     expect(status.session?.primaryState).toBe("checks_completed");
     expect(status.nextCommands[0]).toBe("atlas review prepare");
@@ -47,5 +48,31 @@ describe("runBasicCheck", () => {
     const { cwd, env } = await prepareApprovedContract(root);
 
     await expect(runBasicCheck({ cwd, env })).rejects.toThrow("Required check failed");
+  });
+
+  it("runs configured process checks after built-in integrity passes", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    writeFileSync(
+      join(cwd, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        checks: [
+          {
+            name: "node-smoke",
+            required: true,
+            command: process.execPath,
+            args: ["-e", "process.exit(0)"],
+            dependsOn: ["basic-session-integrity"]
+          }
+        ]
+      })
+    );
+
+    const result = await runBasicCheck({ cwd, env });
+
+    expect(result.status).toBe("passed");
+    expect(result.checkCount).toBe(2);
   });
 });

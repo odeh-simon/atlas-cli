@@ -564,6 +564,7 @@ async function checksRunCommand(): Promise<number> {
   const result = await runBasicCheck();
   console.log(`Check result: ${result.checkResultArtifactId}`);
   console.log(`Status: ${result.status}`);
+  console.log(`Checks: ${result.checkCount}`);
   console.log(`State: ${result.state}`);
   console.log(`Next: ${result.nextCommand}`);
   return 0;
