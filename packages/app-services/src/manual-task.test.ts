@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { openAtlasRuntime, startManualTask, closeAtlasRuntime } from "./index.js";
+import { openAtlasRuntime, startLinearIssueTask, startManualTask, closeAtlasRuntime } from "./index.js";
 import { listArtifactsForSession, listEvents } from "@atlas/persistence";
 
 const tempRoots: string[] = [];
@@ -57,5 +57,37 @@ describe("startManualTask", () => {
 
     expect(second.resumedExisting).toBe(true);
     expect(second.session.sessionId).toBe(first.session.sessionId);
+  });
+
+  it("creates a durable Linear task session from a fetched issue", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "atlas-home") };
+
+    const result = await startLinearIssueTask({
+      cwd,
+      env,
+      issue: {
+        provider: "linear",
+        issueKey: "ENG-42",
+        issueId: "lin_42",
+        title: "Build intake",
+        description: "Create the intake flow.",
+        url: "https://linear.app/acme/issue/ENG-42/build-intake",
+        state: "Todo",
+        priority: "High",
+        labels: ["atlas"],
+        comments: [{ body: "Use CLI." }],
+        links: [{ title: "Spec", url: "https://example.test/spec" }]
+      }
+    });
+
+    const runtime = await openAtlasRuntime({ cwd, env });
+    const artifacts = listArtifactsForSession(runtime.db, result.session.sessionId);
+    closeAtlasRuntime(runtime, false);
+
+    expect(result.session.taskSource).toBe("linear");
+    expect(result.session.taskKey).toBe("ENG-42");
+    expect(artifacts[0]?.type).toBe("task_brief");
   });
 });

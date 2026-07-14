@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  fetchLinearIssue,
   getLinearAdapterHealth,
   isLinearIssueKey,
   normalizeLinearIssue,
@@ -74,5 +75,38 @@ describe("Linear adapter", () => {
   it("rejects malformed issue fixtures", () => {
     expect(() => normalizeLinearIssue({ identifier: "bad", title: "Nope" })).toThrow("Linear issue key");
     expect(() => normalizeLinearIssue({ identifier: "ENG-1" })).toThrow("Linear issue title");
+  });
+
+  it("fetches issue snapshots from the Linear GraphQL API", async () => {
+    const calls: unknown[] = [];
+    const snapshot = await fetchLinearIssue({
+      apiKey: "lin_api_key",
+      issueKey: "ENG-42",
+      fetchImpl: (async (_url, init) => {
+        calls.push(init);
+        return new Response(
+          JSON.stringify({
+            data: {
+              issue: {
+                id: "issue-id",
+                identifier: "ENG-42",
+                title: "Build intake",
+                description: "Create the intake flow.",
+                state: { name: "Todo" },
+                priorityLabel: "High",
+                labels: { nodes: [{ name: "atlas" }] },
+                comments: { nodes: [{ id: "c1", body: "Use CLI.", user: { displayName: "Ada" } }] },
+                attachments: { nodes: [{ title: "Spec", url: "https://example.test/spec" }] }
+              }
+            }
+          }),
+          { status: 200 }
+        );
+      }) as typeof fetch
+    });
+
+    expect(snapshot).toMatchObject({ issueKey: "ENG-42", title: "Build intake", priority: "High" });
+    expect(snapshot.labels).toEqual(["atlas"]);
+    expect(calls[0]).toMatchObject({ method: "POST" });
   });
 });

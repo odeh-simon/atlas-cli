@@ -42,6 +42,9 @@ importers:
 
   packages/app-services:
     dependencies:
+      '@atlas/adapters-linear':
+        specifier: workspace:*
+        version: link:../adapters-linear
       '@atlas/artifacts':
         specifier: workspace:*
         version: link:../artifacts

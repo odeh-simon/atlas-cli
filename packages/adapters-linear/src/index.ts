@@ -38,6 +38,12 @@ export interface LinearIssueSnapshot {
   readonly fetchedAt?: string | undefined;
 }
 
+export interface FetchLinearIssueInput {
+  readonly apiKey: string;
+  readonly issueKey: string;
+  readonly fetchImpl?: typeof fetch | undefined;
+}
+
 export function getLinearAdapterHealth(input: { readonly apiKey?: string | undefined } = {}): LinearAdapterHealth {
   return {
     provider: "linear",
@@ -46,6 +52,52 @@ export function getLinearAdapterHealth(input: { readonly apiKey?: string | undef
     capabilities: ["health", "getIssue"],
     mode: typeof input.apiKey === "string" && input.apiKey.length > 0 ? "api-token-present" : "fixture"
   };
+}
+
+export async function fetchLinearIssue(input: FetchLinearIssueInput): Promise<LinearIssueSnapshot> {
+  if (!isLinearIssueKey(input.issueKey)) {
+    throw new TypeError("Linear issue key must look like TEAM-123");
+  }
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const response = await fetchImpl("https://api.linear.app/graphql", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: input.apiKey
+    },
+    body: JSON.stringify({
+      query: `query AtlasIssue($id: String!) {
+        issue(id: $id) {
+          id
+          identifier
+          title
+          description
+          url
+          priorityLabel
+          state { name }
+          assignee { displayName name }
+          labels { nodes { name } }
+          comments { nodes { id body createdAt user { name displayName } } }
+          attachments { nodes { title url } }
+        }
+      }`,
+      variables: { id: input.issueKey }
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`Linear API request failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as {
+    data?: { issue?: unknown };
+    errors?: readonly { message?: string }[];
+  };
+  if (payload.errors !== undefined && payload.errors.length > 0) {
+    throw new Error(`Linear API error: ${payload.errors.map((error) => error.message ?? "unknown").join("; ")}`);
+  }
+  if (payload.data?.issue === undefined || payload.data.issue === null) {
+    throw new Error(`Linear issue not found: ${input.issueKey}`);
+  }
+  return normalizeLinearIssue({ ...(payload.data.issue as Record<string, unknown>), fetchedAt: new Date().toISOString() });
 }
 
 export function readLinearIssueFixture(filePath: string): LinearIssueSnapshot {
@@ -72,11 +124,11 @@ export function normalizeLinearIssue(raw: unknown): LinearIssueSnapshot {
     description: stringValue(value.description) ?? "",
     url: stringValue(value.url),
     state: normalizeName(value.state),
-    priority: normalizeName(value.priority),
-    labels: normalizeLabels(value.labels),
+    priority: normalizeName(value.priority) ?? stringValue(value.priorityLabel),
+    labels: normalizeLabels(nodesOrArray(value.labels)),
     assignee: normalizeName(value.assignee),
-    comments: normalizeComments(value.comments),
-    links: normalizeLinks(value.links ?? value.attachments),
+    comments: normalizeComments(nodesOrArray(value.comments)),
+    links: normalizeLinks(nodesOrArray(value.links ?? value.attachments)),
     fetchedAt: stringValue(value.fetchedAt)
   };
 }
@@ -125,6 +177,13 @@ function normalizeName(raw: unknown): string | undefined {
   if (typeof raw !== "object" || raw === null) return undefined;
   const value = raw as Record<string, unknown>;
   return stringValue(value.name) ?? stringValue(value.label) ?? stringValue(value.displayName);
+}
+
+function nodesOrArray(raw: unknown): unknown {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== "object" || raw === null) return raw;
+  const nodes = (raw as Record<string, unknown>).nodes;
+  return Array.isArray(nodes) ? nodes : raw;
 }
 
 function stringValue(value: unknown): string | undefined {

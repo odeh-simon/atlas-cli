@@ -27,13 +27,14 @@ import {
   recordDecision,
   resumePausedSession,
   unarchiveSession,
+  startLinearIssueTask,
   startManualTask
 } from "@atlas/app-services";
 import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
 import { getCodexAdapterHealth } from "@atlas/adapters-codex";
 import { getFigmaAdapterHealth, parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
 import { getGitHubAdapterHealth, parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
-import { getLinearAdapterHealth, readLinearIssueFixture } from "@atlas/adapters-linear";
+import { fetchLinearIssue, getLinearAdapterHealth, isLinearIssueKey, readLinearIssueFixture } from "@atlas/adapters-linear";
 import { scanDesignPolicies } from "@atlas/checks";
 import { AtlasError } from "@atlas/domain";
 import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
@@ -68,6 +69,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "start" && subcommand === "--manual") {
       return await startManualCommand(rest);
+    }
+
+    if (command === "start" && subcommand !== undefined && isLinearIssueKey(subcommand)) {
+      return await startLinearCommand(subcommand);
     }
 
     if (command === "status") {
@@ -239,6 +244,7 @@ function printHelp(): void {
 Usage:
   atlas init --yes
   atlas start --manual --title <title> --objective <objective> [--task-key <key>]
+  atlas start <LINEAR-ISSUE-KEY>
   atlas context import <file>
   atlas context build [--max-files <n>] [--max-bytes <n>]
   atlas decisions record --kind <decision|deviation> --title <title> --rationale <text> --category <category> --yes
@@ -324,6 +330,26 @@ async function startManualCommand(args: string[]): Promise<number> {
   console.log(
     `${result.resumedExisting ? "Resumed" : "Created"} session ${result.session.sessionId} (${result.session.primaryState})`
   );
+  console.log(`Task brief: ${result.taskBriefArtifactId || "existing"}`);
+  console.log(`Next: ${result.nextCommand}`);
+  return 0;
+}
+
+async function startLinearCommand(issueKey: string): Promise<number> {
+  const config = readAtlasConfig();
+  const tokenAlias = config.adapters?.linear?.tokenAlias ?? "linear.default";
+  const token = getCredentialToken({ alias: tokenAlias, provider: "linear" });
+  if (token === undefined) {
+    console.error(`Linear credential alias is missing: ${tokenAlias}`);
+    console.error(`Next: atlas auth add --provider linear --alias ${tokenAlias} --value-env LINEAR_API_KEY`);
+    return 2;
+  }
+
+  const issue = await fetchLinearIssue({ apiKey: token, issueKey });
+  const result = await startLinearIssueTask({ issue });
+  console.log(`${result.resumedExisting ? "Resumed" : "Created"} Linear session ${result.session.sessionId} (${result.session.primaryState})`);
+  console.log(`Issue: ${issue.issueKey}`);
+  console.log(`Title: ${issue.title}`);
   console.log(`Task brief: ${result.taskBriefArtifactId || "existing"}`);
   console.log(`Next: ${result.nextCommand}`);
   return 0;
