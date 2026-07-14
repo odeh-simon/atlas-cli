@@ -22,6 +22,7 @@ import {
   importReviewReport,
   pauseSession,
   prepareReviewPackage,
+  prepareFixBatch,
   recordDecision,
   resumePausedSession,
   unarchiveSession,
@@ -157,6 +158,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return findingDispositionCommand(rest);
     }
 
+    if (command === "fix" && subcommand === "prepare") {
+      return fixPrepareCommand();
+    }
+
     if (command === "complete" && subcommand === "--check") {
       return completeCheckCommand();
     }
@@ -192,6 +197,7 @@ Usage:
   atlas review prepare
   atlas review import <file>
   atlas findings disposition <id> --resolve --reason <reason>
+  atlas fix prepare
   atlas complete --check
   atlas approve completion --yes
   atlas pause
@@ -622,6 +628,15 @@ async function findingDispositionCommand(args: string[]): Promise<number> {
   const result = await disposeFinding({ findingId, disposition, reason });
   console.log(`Finding: ${result.findingId}`);
   console.log(`Status: ${result.status}`);
+  console.log(`State: ${result.state}`);
+  console.log(`Next: ${result.nextCommand}`);
+  return 0;
+}
+
+async function fixPrepareCommand(): Promise<number> {
+  const result = await prepareFixBatch();
+  console.log(`Fix batch: ${result.fixBatchArtifactId}`);
+  console.log(`Findings: ${result.findingIds.join(", ")}`);
   console.log(`State: ${result.state}`);
   console.log(`Next: ${result.nextCommand}`);
   return 0;

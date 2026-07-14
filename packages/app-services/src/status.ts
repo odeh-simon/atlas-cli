@@ -79,6 +79,8 @@ function commandToCli(command: string): string {
       return "atlas review import <file>";
     case "dispose_findings":
       return "atlas findings disposition <id>";
+    case "prepare_fix_batch":
+      return "atlas fix prepare";
     case "evaluate_completion":
       return "atlas complete --check";
     case "approve_completion":

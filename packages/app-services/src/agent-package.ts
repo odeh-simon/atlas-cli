@@ -4,6 +4,7 @@ import {
   appendEvent,
   createArtifactRecord,
   getArtifactRecord,
+  listArtifactsForSession,
   listSessionsForRepository,
   updateSessionState
 } from "@atlas/persistence";
@@ -36,6 +37,15 @@ export async function exportManualAgentPackage(options: RuntimeOptions = {}): Pr
       throw new ApprovalRequiredError("Agent package export requires an approved contract");
     }
 
+    const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
+    const latestFixBatch = artifacts
+      .filter((artifact) => artifact.type === "fix_batch" && artifact.status === "valid")
+      .at(-1);
+    const mode = session.primaryState === "fix_ready" ? "fix" : "implement";
+    if (mode === "fix" && latestFixBatch === undefined) {
+      throw new StateTransitionError("Fix package export requires a prepared fix batch");
+    }
+
     const now = new Date().toISOString();
     const next = transition({
       state: session.primaryState,
@@ -47,10 +57,12 @@ export async function exportManualAgentPackage(options: RuntimeOptions = {}): Pr
 
 Session: ${session.sessionId}
 Contract: ${contract.artifactId} (${contract.sha256})
+Mode: ${mode}
+${latestFixBatch === undefined ? "" : `Fix batch: ${latestFixBatch.artifactId} (${latestFixBatch.sha256})\n`}
 
 ## Instructions
 
-Implement only the approved contract. Do not perform destructive Git operations. When done, create an execution result JSON for \`atlas execution import <file>\`.
+${mode === "fix" ? "Address only the prepared fix batch against the approved contract." : "Implement only the approved contract."} Do not perform destructive Git operations. When done, create an execution result JSON for \`atlas execution import <file>\`.
 
 ## Completion Report Shape
 
@@ -68,7 +80,7 @@ Implement only the approved contract. Do not perform destructive Git operations.
       sessionId: session.sessionId,
       artifactId,
       type: "agent_implementation_package",
-      contentVersion: 1,
+      contentVersion: artifacts.filter((artifact) => artifact.type === "agent_implementation_package").length + 1,
       mediaType: "text/markdown",
       content: markdown
     });
@@ -77,7 +89,7 @@ Implement only the approved contract. Do not perform destructive Git operations.
       sessionId: session.sessionId,
       type: "agent_implementation_package",
       schemaVersion: 1,
-      contentVersion: 1,
+      contentVersion: artifacts.filter((artifact) => artifact.type === "agent_implementation_package").length + 1,
       storageUri: written.storageUri,
       sha256: written.sha256,
       byteLength: written.byteLength,
@@ -95,7 +107,7 @@ Implement only the approved contract. Do not perform destructive Git operations.
       actorType: "atlas",
       occurredAt: now,
       summary: "Manual agent package exported",
-      metadata: { packageArtifactId: artifactId, contractArtifactId: contract.artifactId }
+      metadata: { packageArtifactId: artifactId, contractArtifactId: contract.artifactId, mode }
     });
 
     return {

@@ -18,6 +18,7 @@ export const transitionCommands = [
   "prepare_review",
   "import_review",
   "dispose_findings",
+  "prepare_fix_batch",
   "evaluate_completion",
   "approve_completion",
   "pause",
@@ -78,11 +79,16 @@ const table: Partial<Record<WorkflowState, Partial<Record<TransitionCommand, Wor
     import_review: "review_imported"
   },
   review_imported: {
-    dispose_findings: "findings_dispositioned"
+    dispose_findings: "findings_dispositioned",
+    prepare_fix_batch: "fix_ready"
   },
   findings_dispositioned: {
     evaluate_completion: "completion_ready",
-    dispose_findings: "findings_dispositioned"
+    dispose_findings: "findings_dispositioned",
+    prepare_fix_batch: "fix_ready"
+  },
+  fix_ready: {
+    export_agent_package: "implementation_ready"
   },
   completion_ready: {
     approve_completion: "completed",

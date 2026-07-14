@@ -8,6 +8,7 @@ export * from "./context-import.js";
 export * from "./decision-record.js";
 export * from "./execution-import.js";
 export * from "./finding-disposition.js";
+export * from "./fix-batch.js";
 export * from "./lifecycle.js";
 export * from "./manual-task.js";
 export * from "./planning.js";

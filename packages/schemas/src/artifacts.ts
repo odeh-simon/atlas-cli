@@ -18,6 +18,7 @@ export const artifactTypeSchema = z.enum([
   "review_report",
   "finding",
   "finding_disposition",
+  "fix_batch",
   "decision_record",
   "completion_report"
 ]);
@@ -245,6 +246,14 @@ export const findingDispositionSchema = artifactEnvelopeSchema.extend({
   resolution_evidence: z.array(z.string().min(1)).default([])
 });
 
+export const fixBatchSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("fix_batch"),
+  contract_artifact_id: idSchema,
+  contract_sha256: sha256Schema,
+  finding_ids: z.array(idSchema).min(1),
+  instructions_markdown: z.string().min(1)
+});
+
 export const decisionRecordSchema = artifactEnvelopeSchema.extend({
   type: z.literal("decision_record"),
   decision_id: idSchema,
@@ -282,6 +291,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   reviewReportSchema,
   findingSchema,
   findingDispositionSchema,
+  fixBatchSchema,
   decisionRecordSchema,
   completionReportSchema
 ]);
