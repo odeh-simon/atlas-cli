@@ -20,7 +20,11 @@ importers:
 
   packages/adapter-contracts: {}
 
-  packages/adapters-claude-code: {}
+  packages/adapters-claude-code:
+    dependencies:
+      '@atlas/process-runner':
+        specifier: workspace:*
+        version: link:../process-runner
 
   packages/adapters-codex:
     dependencies:
