@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { assertGitRootMatches, discoverGitRepository, preflightGitBranch, readGitRepositoryFacts } from "./index.js";
+import {
+  assertGitRootMatches,
+  discoverGitRepository,
+  preflightGitBranch,
+  readGitRepositoryFacts,
+  summarizeGitDiffSafeguards
+} from "./index.js";
 
 const tempRoots: string[] = [];
 const gitAvailable = commandSucceeds(["--version"]);
@@ -98,6 +104,50 @@ describe.skipIf(!gitAvailable)("git repository facts", () => {
 
     expect(result.passed).toBe(true);
     expect(result.checks.find((check) => check.name === "working_tree")).toMatchObject({ status: "pass" });
+  });
+
+  it("summarizes reviewable text diffs", () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, "README.md"), "hello\nworld\n");
+
+    const result = summarizeGitDiffSafeguards({ cwd: repo });
+
+    expect(result.reviewable).toBe(true);
+    expect(result.totalFiles).toBe(1);
+    expect(result.paths[0]).toMatchObject({ path: "README.md", binary: false, secretRisk: false });
+  });
+
+  it("flags secret-risk and binary diff paths", () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, ".env"), "TOKEN=secret\n");
+    writeFileSync(join(repo, "image.bin"), Buffer.from([0, 1, 2, 3]));
+    git(repo, ["add", ".env", "image.bin"]);
+    git(repo, ["commit", "-m", "add sensitive fixtures"]);
+    writeFileSync(join(repo, ".env"), "TOKEN=changed\n");
+    writeFileSync(join(repo, "image.bin"), Buffer.from([0, 1, 9, 3]));
+
+    const result = summarizeGitDiffSafeguards({ cwd: repo });
+
+    expect(result.reviewable).toBe(false);
+    expect(result.hasSecretRisk).toBe(true);
+    expect(result.hasBinary).toBe(true);
+  });
+
+  it("marks large file counts as truncated", () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, "a.txt"), "a\n");
+    writeFileSync(join(repo, "b.txt"), "b\n");
+    git(repo, ["add", "a.txt", "b.txt"]);
+    git(repo, ["commit", "-m", "add diff fixtures"]);
+    writeFileSync(join(repo, "a.txt"), "a changed\n");
+    writeFileSync(join(repo, "b.txt"), "b changed\n");
+
+    const result = summarizeGitDiffSafeguards({ cwd: repo, maxFiles: 1 });
+
+    expect(result.truncated).toBe(true);
+    expect(result.reviewable).toBe(false);
+    expect(result.totalFiles).toBe(2);
+    expect(result.paths).toHaveLength(1);
   });
 });
 

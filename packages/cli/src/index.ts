@@ -30,7 +30,7 @@ import {
 import { parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
 import { parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
 import { readLinearIssueFixture } from "@atlas/adapters-linear";
-import { preflightGitBranch, readGitRepositoryFacts } from "@atlas/git";
+import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
 
 const version = "0.0.0";
 
@@ -66,6 +66,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "git" && subcommand === "preflight") {
       return gitPreflightCommand(rest);
+    }
+
+    if (command === "git" && subcommand === "diff-safeguards") {
+      return gitDiffSafeguardsCommand(rest);
     }
 
     if (command === "linear" && subcommand === "inspect") {
@@ -191,6 +195,7 @@ Usage:
   atlas cancel --yes --reason <reason>
   atlas git status
   atlas git preflight [--base <branch>] [--target <branch>] [--allow-dirty]
+  atlas git diff-safeguards [--base <ref>]
   atlas figma inspect <figma-url|fixture.json>
   atlas github inspect <github-url|fixture.json>
   atlas linear inspect <fixture.json>
@@ -298,6 +303,20 @@ function gitPreflightCommand(args: string[]): number {
   }
   console.log(`Result: ${result.passed ? "pass" : "fail"}`);
   return result.passed ? 0 : 1;
+}
+
+function gitDiffSafeguardsCommand(args: string[]): number {
+  const result = summarizeGitDiffSafeguards({
+    baseRef: readOption(args, "--base", false)
+  });
+  console.log(`Base: ${result.baseRef}`);
+  console.log(`Files: ${result.totalFiles}`);
+  console.log(`Line changes: ${result.totalLineChanges}`);
+  console.log(`Binary: ${result.hasBinary ? "yes" : "no"}`);
+  console.log(`Secret risk: ${result.hasSecretRisk ? "yes" : "no"}`);
+  console.log(`Truncated: ${result.truncated ? "yes" : "no"}`);
+  console.log(`Reviewable: ${result.reviewable ? "yes" : "no"}`);
+  return result.reviewable ? 0 : 1;
 }
 
 function linearInspectCommand(args: string[]): number {

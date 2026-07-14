@@ -65,6 +65,31 @@ export interface GitBranchPreflightResult {
   readonly failures: readonly GitPreflightCheck[];
 }
 
+export interface GitDiffSafeguardOptions extends GitAdapterOptions {
+  readonly baseRef?: string | undefined;
+  readonly maxFiles?: number | undefined;
+  readonly maxLineChanges?: number | undefined;
+}
+
+export interface GitDiffPathSummary {
+  readonly path: string;
+  readonly additions: number | undefined;
+  readonly deletions: number | undefined;
+  readonly binary: boolean;
+  readonly secretRisk: boolean;
+}
+
+export interface GitDiffSafeguardResult {
+  readonly baseRef: string;
+  readonly paths: readonly GitDiffPathSummary[];
+  readonly totalFiles: number;
+  readonly totalLineChanges: number;
+  readonly hasBinary: boolean;
+  readonly hasSecretRisk: boolean;
+  readonly truncated: boolean;
+  readonly reviewable: boolean;
+}
+
 export function discoverGitRepository(options: GitAdapterOptions = {}): GitRepositoryLocation | undefined {
   const cwd = resolve(options.cwd ?? process.cwd());
   const gitPath = options.gitPath ?? "git";
@@ -191,6 +216,36 @@ export function preflightGitBranch(options: GitBranchPreflightOptions = {}): Git
   return { passed: failures.length === 0, facts, checks, failures };
 }
 
+export function summarizeGitDiffSafeguards(options: GitDiffSafeguardOptions = {}): GitDiffSafeguardResult {
+  const cwd = resolve(options.cwd ?? process.cwd());
+  const gitPath = options.gitPath ?? "git";
+  const baseRef = options.baseRef ?? "HEAD";
+  const maxFiles = options.maxFiles ?? 100;
+  const maxLineChanges = options.maxLineChanges ?? 10_000;
+  const output = runRequiredGit({
+    gitPath,
+    cwd,
+    args: ["diff", "--numstat", baseRef, "--"]
+  });
+  const allPaths = parseNumstat(output);
+  const paths = allPaths.slice(0, maxFiles);
+  const totalLineChanges = paths.reduce((sum, path) => sum + (path.additions ?? 0) + (path.deletions ?? 0), 0);
+  const hasBinary = paths.some((path) => path.binary);
+  const hasSecretRisk = paths.some((path) => path.secretRisk);
+  const truncated = allPaths.length > maxFiles || totalLineChanges > maxLineChanges;
+
+  return {
+    baseRef,
+    paths,
+    totalFiles: allPaths.length,
+    totalLineChanges,
+    hasBinary,
+    hasSecretRisk,
+    truncated,
+    reviewable: !hasBinary && !hasSecretRisk && !truncated
+  };
+}
+
 function readBranch(input: { readonly gitPath: string; readonly cwd: string }): string | undefined {
   const branch = runGit({
     ...input,
@@ -242,6 +297,28 @@ function parsePorcelainStatus(output: string): GitStatusEntry[] {
     }
   }
   return entries;
+}
+
+function parseNumstat(output: string): GitDiffPathSummary[] {
+  return output
+    .split(/\r?\n/)
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const [additionsRaw, deletionsRaw, pathRaw] = line.split("\t");
+      const binary = additionsRaw === "-" || deletionsRaw === "-";
+      const path = pathRaw ?? "";
+      return {
+        path,
+        additions: binary ? undefined : Number(additionsRaw),
+        deletions: binary ? undefined : Number(deletionsRaw),
+        binary,
+        secretRisk: isSecretRiskPath(path)
+      };
+    });
+}
+
+function isSecretRiskPath(path: string): boolean {
+  return /(^|[/\\])(\.env|\.npmrc|\.pypirc|id_rsa|id_dsa|id_ed25519|credentials|secrets?)(\.|$|[/\\])/i.test(path);
 }
 
 function runRequiredGit(input: {
