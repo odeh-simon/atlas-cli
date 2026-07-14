@@ -27,6 +27,7 @@ import {
   startManualTask
 } from "@atlas/app-services";
 import { parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
+import { parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
 import { readLinearIssueFixture } from "@atlas/adapters-linear";
 import { preflightGitBranch, readGitRepositoryFacts } from "@atlas/git";
 
@@ -72,6 +73,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "figma" && subcommand === "inspect") {
       return figmaInspectCommand(rest);
+    }
+
+    if (command === "github" && subcommand === "inspect") {
+      return githubInspectCommand(rest);
     }
 
     if (command === "resume") {
@@ -181,6 +186,7 @@ Usage:
   atlas git status
   atlas git preflight [--base <branch>] [--target <branch>] [--allow-dirty]
   atlas figma inspect <figma-url|fixture.json>
+  atlas github inspect <github-url|fixture.json>
   atlas linear inspect <fixture.json>
   atlas status
 `);
@@ -326,6 +332,29 @@ function figmaInspectCommand(args: string[]): number {
   console.log(`Kind: ${reference.kind}`);
   console.log(`File: ${reference.fileKey}`);
   console.log(`Node: ${reference.nodeId ?? "(none)"}`);
+  console.log(`URL: ${reference.url}`);
+  return 0;
+}
+
+function githubInspectCommand(args: string[]): number {
+  const input = args[0];
+  if (input === undefined) {
+    console.error("atlas github inspect requires a GitHub URL or fixture path");
+    return 2;
+  }
+
+  if (existsSync(input)) {
+    const snapshot = readGitHubFixture(input);
+    console.log(`Repository: ${snapshot.owner}/${snapshot.repo}`);
+    console.log(`Default branch: ${snapshot.defaultBranch ?? "(unknown)"}`);
+    console.log(`Pull requests: ${snapshot.pullRequests.length}`);
+    return 0;
+  }
+
+  const reference = parseGitHubReference(input);
+  console.log(`Kind: ${reference.kind}`);
+  console.log(`Repository: ${reference.owner}/${reference.repo}`);
+  console.log(`Number: ${reference.number ?? "(none)"}`);
   console.log(`URL: ${reference.url}`);
   return 0;
 }

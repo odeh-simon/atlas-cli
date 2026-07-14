@@ -98,6 +98,7 @@ describe("cli", () => {
     expect(code).toBe(0);
     expect(logs.join("\n")).toContain("atlas context build");
     expect(logs.join("\n")).toContain("atlas figma inspect");
+    expect(logs.join("\n")).toContain("atlas github inspect");
   });
 
   it("inspects a Linear issue fixture", async () => {
@@ -130,6 +131,17 @@ describe("cli", () => {
     expect(logs).toContain("Kind: design");
     expect(logs).toContain("File: AbCdEf123456");
     expect(logs).toContain("Node: 10-20");
+  });
+
+  it("inspects a GitHub URL", async () => {
+    const logs = captureLogs();
+
+    const code = await main(["github", "inspect", "https://github.com/acme/atlas/pull/12"]);
+
+    expect(code).toBe(0);
+    expect(logs).toContain("Kind: pull_request");
+    expect(logs).toContain("Repository: acme/atlas");
+    expect(logs).toContain("Number: 12");
   });
 });
 

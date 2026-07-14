@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@atlas/adapters-figma": "workspace:*",
+    "@atlas/adapters-github": "workspace:*",
     "@atlas/adapters-linear": "workspace:*",
     "@atlas/app-services": "workspace:*",
     "@atlas/git": "workspace:*"

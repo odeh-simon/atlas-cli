@@ -66,6 +66,9 @@ importers:
       '@atlas/adapters-figma':
         specifier: workspace:*
         version: link:../adapters-figma
+      '@atlas/adapters-github':
+        specifier: workspace:*
+        version: link:../adapters-github
       '@atlas/adapters-linear':
         specifier: workspace:*
         version: link:../adapters-linear
