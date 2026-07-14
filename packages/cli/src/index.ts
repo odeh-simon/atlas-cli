@@ -15,6 +15,7 @@ import {
   exportManualAgentPackage,
   disposeFinding,
   evaluateCompletion,
+  invokeImplementationAgent,
   runBasicCheck,
   runDoctor,
   importContextManifest,
@@ -171,6 +172,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return await implementExportManualCommand();
     }
 
+    if (command === "implement" && subcommand === "--agent") {
+      return await implementAgentCommand(rest);
+    }
+
     if (command === "execution" && subcommand === "import") {
       return await executionImportCommand(rest);
     }
@@ -252,6 +257,7 @@ Usage:
   atlas contract import <file>
   atlas approve contract --yes
   atlas implement export --manual
+  atlas implement --agent <codex|claude>
   atlas execution import <file>
   atlas checks run
   atlas checks design-scan [--root <path>]
@@ -739,6 +745,25 @@ async function implementExportManualCommand(): Promise<number> {
   console.log(`State: ${result.state}`);
   console.log(`Next: ${result.nextCommand}`);
   return 0;
+}
+
+async function implementAgentCommand(args: string[]): Promise<number> {
+  const provider = args[0];
+  if (provider !== "codex" && provider !== "claude") {
+    console.error("atlas implement --agent requires codex or claude");
+    return 2;
+  }
+
+  const config = readAtlasConfig();
+  const command = provider === "claude" ? config.adapters?.claudeCode?.command : config.adapters?.codex?.command;
+  const result = await invokeImplementationAgent({ provider, command });
+  console.log(`Agent: ${result.provider}`);
+  console.log(`Package: ${result.packageArtifactId}`);
+  console.log(`Execution report: ${result.executionReportArtifactId}`);
+  console.log(`Process: ${result.processStatus}`);
+  console.log(`State: ${result.state}`);
+  console.log(`Next: ${result.nextCommand}`);
+  return result.processStatus === "succeeded" ? 0 : 1;
 }
 
 async function executionImportCommand(args: string[]): Promise<number> {

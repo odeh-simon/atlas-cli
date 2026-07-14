@@ -7,6 +7,8 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
+    { "path": "../adapters-claude-code" },
+    { "path": "../adapters-codex" },
     { "path": "../adapters-linear" },
     { "path": "../artifacts" },
     { "path": "../checks" },

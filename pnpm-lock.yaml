@@ -42,6 +42,12 @@ importers:
 
   packages/app-services:
     dependencies:
+      '@atlas/adapters-claude-code':
+        specifier: workspace:*
+        version: link:../adapters-claude-code
+      '@atlas/adapters-codex':
+        specifier: workspace:*
+        version: link:../adapters-codex
       '@atlas/adapters-linear':
         specifier: workspace:*
         version: link:../adapters-linear

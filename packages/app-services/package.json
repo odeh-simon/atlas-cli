@@ -10,6 +10,8 @@
     "check": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@atlas/adapters-claude-code": "workspace:*",
+    "@atlas/adapters-codex": "workspace:*",
     "@atlas/adapters-linear": "workspace:*",
     "@atlas/artifacts": "workspace:*",
     "@atlas/checks": "workspace:*",
