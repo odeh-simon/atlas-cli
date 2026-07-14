@@ -25,6 +25,7 @@ import {
   unarchiveSession,
   startManualTask
 } from "@atlas/app-services";
+import { readGitRepositoryFacts } from "@atlas/git";
 
 const version = "0.0.0";
 
@@ -52,6 +53,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "status") {
       return statusCommand();
+    }
+
+    if (command === "git" && subcommand === "status") {
+      return gitStatusCommand();
     }
 
     if (command === "resume") {
@@ -153,6 +158,7 @@ Usage:
   atlas archive
   atlas unarchive
   atlas cancel --yes --reason <reason>
+  atlas git status
   atlas status
 `);
 }
@@ -224,6 +230,19 @@ async function statusCommand(): Promise<number> {
   console.log(`Artifacts: ${status.artifactCount}`);
   console.log(`Events: ${status.eventCount}`);
   console.log(`Next: ${status.nextCommands[0] ?? "no next command"}`);
+  return 0;
+}
+
+function gitStatusCommand(): number {
+  const facts = readGitRepositoryFacts();
+  console.log(`Root: ${facts.rootPath}`);
+  console.log(`Branch: ${facts.branch ?? "(detached)"}`);
+  console.log(`HEAD: ${facts.headSha ?? "(unborn)"}`);
+  console.log(`Dirty: ${facts.status.isDirty ? "yes" : "no"}`);
+  console.log(`Changed files: ${facts.status.changedFileCount}`);
+  console.log(`Staged: ${facts.status.hasStagedChanges ? "yes" : "no"}`);
+  console.log(`Unstaged: ${facts.status.hasUnstagedChanges ? "yes" : "no"}`);
+  console.log(`Untracked: ${facts.status.hasUntrackedFiles ? "yes" : "no"}`);
   return 0;
 }
 

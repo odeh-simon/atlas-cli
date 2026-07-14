@@ -63,6 +63,9 @@ importers:
       '@atlas/app-services':
         specifier: workspace:*
         version: link:../app-services
+      '@atlas/git':
+        specifier: workspace:*
+        version: link:../git
 
   packages/config: {}
 
