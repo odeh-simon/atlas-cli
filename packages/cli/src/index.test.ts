@@ -97,6 +97,7 @@ describe("cli", () => {
 
     expect(code).toBe(0);
     expect(logs.join("\n")).toContain("atlas context build");
+    expect(logs.join("\n")).toContain("atlas figma inspect");
   });
 
   it("inspects a Linear issue fixture", async () => {
@@ -114,6 +115,21 @@ describe("cli", () => {
     expect(logs).toContain("Issue: ENG-42");
     expect(logs).toContain("Title: Build intake");
     expect(logs).toContain("Labels: atlas");
+  });
+
+  it("inspects a Figma URL", async () => {
+    const logs = captureLogs();
+
+    const code = await main([
+      "figma",
+      "inspect",
+      "https://www.figma.com/design/AbCdEf123456/Product?node-id=10-20"
+    ]);
+
+    expect(code).toBe(0);
+    expect(logs).toContain("Kind: design");
+    expect(logs).toContain("File: AbCdEf123456");
+    expect(logs).toContain("Node: 10-20");
   });
 });
 

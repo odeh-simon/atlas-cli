@@ -63,6 +63,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@atlas/adapters-figma':
+        specifier: workspace:*
+        version: link:../adapters-figma
       '@atlas/adapters-linear':
         specifier: workspace:*
         version: link:../adapters-linear

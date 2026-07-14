@@ -26,6 +26,7 @@ import {
   unarchiveSession,
   startManualTask
 } from "@atlas/app-services";
+import { parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
 import { readLinearIssueFixture } from "@atlas/adapters-linear";
 import { preflightGitBranch, readGitRepositoryFacts } from "@atlas/git";
 
@@ -67,6 +68,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "linear" && subcommand === "inspect") {
       return linearInspectCommand(rest);
+    }
+
+    if (command === "figma" && subcommand === "inspect") {
+      return figmaInspectCommand(rest);
     }
 
     if (command === "resume") {
@@ -175,6 +180,7 @@ Usage:
   atlas cancel --yes --reason <reason>
   atlas git status
   atlas git preflight [--base <branch>] [--target <branch>] [--allow-dirty]
+  atlas figma inspect <figma-url|fixture.json>
   atlas linear inspect <fixture.json>
   atlas status
 `);
@@ -297,6 +303,30 @@ function linearInspectCommand(args: string[]): number {
   console.log(`Labels: ${issue.labels.join(", ") || "(none)"}`);
   console.log(`Comments: ${issue.comments.length}`);
   console.log(`Links: ${issue.links.length}`);
+  return 0;
+}
+
+function figmaInspectCommand(args: string[]): number {
+  const input = args[0];
+  if (input === undefined) {
+    console.error("atlas figma inspect requires a Figma URL or fixture path");
+    return 2;
+  }
+
+  if (existsSync(input)) {
+    const snapshot = readFigmaFixture(input);
+    console.log(`File: ${snapshot.fileKey}`);
+    console.log(`Name: ${snapshot.name ?? "(unknown)"}`);
+    console.log(`Node: ${snapshot.nodeId ?? "(none)"}`);
+    console.log(`Evidence: ${snapshot.evidence.length}`);
+    return 0;
+  }
+
+  const reference = parseFigmaReference(input);
+  console.log(`Kind: ${reference.kind}`);
+  console.log(`File: ${reference.fileKey}`);
+  console.log(`Node: ${reference.nodeId ?? "(none)"}`);
+  console.log(`URL: ${reference.url}`);
   return 0;
 }
 
