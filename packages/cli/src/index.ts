@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import {
   exportPlanningPackage,
@@ -771,6 +771,11 @@ function isMaterialCategory(
   );
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+function isEntrypoint(): boolean {
+  if (process.argv[1] === undefined) return false;
+  return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+}
+
+if (isEntrypoint()) {
   process.exitCode = await main();
 }
