@@ -30,6 +30,7 @@ describe("cli", () => {
 
     expect(code).toBe(0);
     expect(logs.join("\n")).toContain("atlas git status");
+    expect(logs.join("\n")).toContain("atlas git preflight");
   });
 
   it.skipIf(!gitAvailable)("prints read-only Git repository facts", async () => {
@@ -47,6 +48,43 @@ describe("cli", () => {
       expect(logs.some((line) => /^HEAD: [a-f0-9]{40}$/i.test(line))).toBe(true);
       expect(logs).toContain("Dirty: no");
       expect(logs).toContain("Changed files: 0");
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it.skipIf(!gitAvailable)("prints passing Git preflight results", async () => {
+    const repo = createRepo();
+    const previousCwd = process.cwd();
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      const code = await main(["git", "preflight", "--base", "atlas-test", "--target", "atlas-work"]);
+
+      expect(code).toBe(0);
+      expect(logs).toContain("PASS Current branch matches base branch atlas-test");
+      expect(logs).toContain("PASS Working tree is clean");
+      expect(logs).toContain("PASS Target branch is available: atlas-work");
+      expect(logs).toContain("Result: pass");
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it.skipIf(!gitAvailable)("fails Git preflight on a dirty working tree", async () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, "notes.txt"), "scratch\n");
+    const previousCwd = process.cwd();
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      const code = await main(["git", "preflight", "--base", "atlas-test"]);
+
+      expect(code).toBe(1);
+      expect(logs.some((line) => /^FAIL Working tree is dirty with 1 changed file\(s\)$/.test(line))).toBe(true);
+      expect(logs).toContain("Result: fail");
     } finally {
       process.chdir(previousCwd);
     }

@@ -42,6 +42,29 @@ export interface GitRepositoryFacts extends GitRepositoryLocation {
   readonly rootPathHash: string;
 }
 
+export type GitPreflightCheckName = "repository" | "head" | "current_branch" | "working_tree" | "target_branch";
+export type GitPreflightCheckStatus = "pass" | "fail" | "skip";
+
+export interface GitPreflightCheck {
+  readonly name: GitPreflightCheckName;
+  readonly status: GitPreflightCheckStatus;
+  readonly summary: string;
+}
+
+export interface GitBranchPreflightOptions extends GitAdapterOptions {
+  readonly expectedRootPath?: string | undefined;
+  readonly baseBranch?: string | undefined;
+  readonly targetBranch?: string | undefined;
+  readonly requireClean?: boolean | undefined;
+}
+
+export interface GitBranchPreflightResult {
+  readonly passed: boolean;
+  readonly facts: GitRepositoryFacts;
+  readonly checks: readonly GitPreflightCheck[];
+  readonly failures: readonly GitPreflightCheck[];
+}
+
 export function discoverGitRepository(options: GitAdapterOptions = {}): GitRepositoryLocation | undefined {
   const cwd = resolve(options.cwd ?? process.cwd());
   const gitPath = options.gitPath ?? "git";
@@ -88,6 +111,84 @@ export function assertGitRootMatches(facts: GitRepositoryFacts, expectedRootPath
       expectedRootPath: expected
     });
   }
+}
+
+export function preflightGitBranch(options: GitBranchPreflightOptions = {}): GitBranchPreflightResult {
+  const cwd = resolve(options.cwd ?? process.cwd());
+  const gitPath = options.gitPath ?? "git";
+  const facts = readGitRepositoryFacts({ cwd, gitPath });
+  const checks: GitPreflightCheck[] = [];
+
+  if (options.expectedRootPath === undefined) {
+    checks.push({ name: "repository", status: "pass", summary: `Repository root detected: ${facts.rootPath}` });
+  } else {
+    const expectedRootPath = normalizeGitPath(options.expectedRootPath);
+    checks.push(
+      facts.rootPath === expectedRootPath
+        ? { name: "repository", status: "pass", summary: "Repository root matches expected root" }
+        : {
+            name: "repository",
+            status: "fail",
+            summary: `Repository root mismatch: expected ${expectedRootPath}, found ${facts.rootPath}`
+          }
+    );
+  }
+
+  checks.push(
+    facts.headSha === undefined
+      ? { name: "head", status: "fail", summary: "HEAD is unavailable" }
+      : { name: "head", status: "pass", summary: `HEAD is ${facts.headSha}` }
+  );
+
+  if (facts.detachedHead || facts.branch === undefined) {
+    checks.push({ name: "current_branch", status: "fail", summary: "Repository is in detached HEAD state" });
+  } else if (options.baseBranch === undefined) {
+    checks.push({ name: "current_branch", status: "pass", summary: `Current branch is ${facts.branch}` });
+  } else {
+    checks.push(
+      facts.branch === options.baseBranch
+        ? { name: "current_branch", status: "pass", summary: `Current branch matches base branch ${options.baseBranch}` }
+        : {
+            name: "current_branch",
+            status: "fail",
+            summary: `Current branch ${facts.branch} does not match base branch ${options.baseBranch}`
+          }
+    );
+  }
+
+  const requireClean = options.requireClean ?? true;
+  if (!requireClean) {
+    checks.push({
+      name: "working_tree",
+      status: "pass",
+      summary: facts.status.isDirty
+        ? `Working tree has ${facts.status.changedFileCount} changed file(s), allowed by --allow-dirty`
+        : "Working tree is clean"
+    });
+  } else {
+    checks.push(
+      facts.status.isDirty
+        ? {
+            name: "working_tree",
+            status: "fail",
+            summary: `Working tree is dirty with ${facts.status.changedFileCount} changed file(s)`
+          }
+        : { name: "working_tree", status: "pass", summary: "Working tree is clean" }
+    );
+  }
+
+  if (options.targetBranch === undefined) {
+    checks.push({ name: "target_branch", status: "skip", summary: "No target branch requested" });
+  } else if (!isValidBranchName({ gitPath, cwd, branch: options.targetBranch })) {
+    checks.push({ name: "target_branch", status: "fail", summary: `Invalid target branch name: ${options.targetBranch}` });
+  } else if (branchExists({ gitPath, cwd, branch: options.targetBranch })) {
+    checks.push({ name: "target_branch", status: "fail", summary: `Target branch already exists: ${options.targetBranch}` });
+  } else {
+    checks.push({ name: "target_branch", status: "pass", summary: `Target branch is available: ${options.targetBranch}` });
+  }
+
+  const failures = checks.filter((check) => check.status === "fail");
+  return { passed: failures.length === 0, facts, checks, failures };
 }
 
 function readBranch(input: { readonly gitPath: string; readonly cwd: string }): string | undefined {
@@ -173,6 +274,39 @@ function runGit(input: {
       args: input.args,
       cause: error instanceof Error ? error.message : String(error)
     });
+  }
+}
+
+function branchExists(input: { readonly gitPath: string; readonly cwd: string; readonly branch: string }): boolean {
+  return gitCommandSucceeds({
+    gitPath: input.gitPath,
+    cwd: input.cwd,
+    args: ["show-ref", "--verify", "--quiet", `refs/heads/${input.branch}`]
+  });
+}
+
+function isValidBranchName(input: { readonly gitPath: string; readonly cwd: string; readonly branch: string }): boolean {
+  return gitCommandSucceeds({
+    gitPath: input.gitPath,
+    cwd: input.cwd,
+    args: ["check-ref-format", "--branch", input.branch]
+  });
+}
+
+function gitCommandSucceeds(input: {
+  readonly gitPath: string;
+  readonly cwd: string;
+  readonly args: readonly string[];
+}): boolean {
+  try {
+    execFileSync(input.gitPath, input.args, {
+      cwd: input.cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "ignore", "ignore"]
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 

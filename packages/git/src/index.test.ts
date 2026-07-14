@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { assertGitRootMatches, discoverGitRepository, readGitRepositoryFacts } from "./index.js";
+import { assertGitRootMatches, discoverGitRepository, preflightGitBranch, readGitRepositoryFacts } from "./index.js";
 
 const tempRoots: string[] = [];
 const gitAvailable = commandSucceeds(["--version"]);
@@ -63,6 +63,41 @@ describe.skipIf(!gitAvailable)("git repository facts", () => {
     const facts = readGitRepositoryFacts({ cwd: repo });
 
     expect(() => assertGitRootMatches(facts, tempRoot())).toThrow("Git repository root does not match expected root");
+  });
+
+  it("passes branch preflight for clean base branch with an available target branch", () => {
+    const repo = createRepo();
+
+    const result = preflightGitBranch({ cwd: repo, baseBranch: "atlas-test", targetBranch: "atlas-work" });
+
+    expect(result.passed).toBe(true);
+    expect(result.failures).toHaveLength(0);
+    expect(result.checks.map((check) => [check.name, check.status])).toContainEqual(["target_branch", "pass"]);
+  });
+
+  it("fails branch preflight for dirty trees, wrong base branches, and branch collisions", () => {
+    const repo = createRepo();
+    git(repo, ["branch", "atlas-work"]);
+    writeFileSync(join(repo, "notes.txt"), "scratch\n");
+
+    const result = preflightGitBranch({ cwd: repo, baseBranch: "main", targetBranch: "atlas-work" });
+
+    expect(result.passed).toBe(false);
+    expect(result.failures.map((failure) => failure.name).sort()).toEqual([
+      "current_branch",
+      "target_branch",
+      "working_tree"
+    ]);
+  });
+
+  it("can allow dirty trees during branch preflight", () => {
+    const repo = createRepo();
+    writeFileSync(join(repo, "notes.txt"), "scratch\n");
+
+    const result = preflightGitBranch({ cwd: repo, baseBranch: "atlas-test", requireClean: false });
+
+    expect(result.passed).toBe(true);
+    expect(result.checks.find((check) => check.name === "working_tree")).toMatchObject({ status: "pass" });
   });
 });
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -25,7 +25,7 @@ import {
   unarchiveSession,
   startManualTask
 } from "@atlas/app-services";
-import { readGitRepositoryFacts } from "@atlas/git";
+import { preflightGitBranch, readGitRepositoryFacts } from "@atlas/git";
 
 const version = "0.0.0";
 
@@ -57,6 +57,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "git" && subcommand === "status") {
       return gitStatusCommand();
+    }
+
+    if (command === "git" && subcommand === "preflight") {
+      return gitPreflightCommand(rest);
     }
 
     if (command === "resume") {
@@ -159,6 +163,7 @@ Usage:
   atlas unarchive
   atlas cancel --yes --reason <reason>
   atlas git status
+  atlas git preflight [--base <branch>] [--target <branch>] [--allow-dirty]
   atlas status
 `);
 }
@@ -244,6 +249,25 @@ function gitStatusCommand(): number {
   console.log(`Unstaged: ${facts.status.hasUnstagedChanges ? "yes" : "no"}`);
   console.log(`Untracked: ${facts.status.hasUntrackedFiles ? "yes" : "no"}`);
   return 0;
+}
+
+function gitPreflightCommand(args: string[]): number {
+  const baseBranch = readOption(args, "--base", false) ?? readConfiguredBaseBranch();
+  const targetBranch = readOption(args, "--target", false);
+  const result = preflightGitBranch({
+    baseBranch,
+    targetBranch,
+    requireClean: !args.includes("--allow-dirty")
+  });
+
+  console.log(`Repo: ${result.facts.rootPath}`);
+  console.log(`Branch: ${result.facts.branch ?? "(detached)"}`);
+  console.log(`HEAD: ${result.facts.headSha ?? "(unborn)"}`);
+  for (const check of result.checks) {
+    console.log(`${labelForCheckStatus(check.status)} ${check.summary}`);
+  }
+  console.log(`Result: ${result.passed ? "pass" : "fail"}`);
+  return result.passed ? 0 : 1;
 }
 
 async function pauseCommand(): Promise<number> {
@@ -463,6 +487,33 @@ function readOption(args: string[], name: string, required = true): string | und
 
 function compact(values: Array<string | undefined>): string[] {
   return values.filter((value): value is string => value !== undefined);
+}
+
+function readConfiguredBaseBranch(): string | undefined {
+  const configPath = join(process.cwd(), "atlas.config.json");
+  if (!existsSync(configPath)) return undefined;
+
+  try {
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as {
+      project?: { baseBranch?: unknown };
+    };
+    return typeof config.project?.baseBranch === "string" && config.project.baseBranch.length > 0
+      ? config.project.baseBranch
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function labelForCheckStatus(status: "pass" | "fail" | "skip"): string {
+  switch (status) {
+    case "pass":
+      return "PASS";
+    case "fail":
+      return "FAIL";
+    case "skip":
+      return "SKIP";
+  }
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
