@@ -22,7 +22,11 @@ importers:
 
   packages/adapters-claude-code: {}
 
-  packages/adapters-codex: {}
+  packages/adapters-codex:
+    dependencies:
+      '@atlas/process-runner':
+        specifier: workspace:*
+        version: link:../process-runner
 
   packages/adapters-figma: {}
 
