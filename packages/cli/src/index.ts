@@ -32,7 +32,7 @@ import {
 } from "@atlas/app-services";
 import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
 import { getCodexAdapterHealth } from "@atlas/adapters-codex";
-import { getFigmaAdapterHealth, parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
+import { fetchFigmaFileSnapshot, getFigmaAdapterHealth, parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
 import { getGitHubAdapterHealth, parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
 import { fetchLinearIssue, getLinearAdapterHealth, isLinearIssueKey, readLinearIssueFixture } from "@atlas/adapters-linear";
 import { scanDesignPolicies } from "@atlas/checks";
@@ -116,7 +116,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (command === "figma" && subcommand === "inspect") {
-      return figmaInspectCommand(rest);
+      return await figmaInspectCommand(rest);
     }
 
     if (command === "decisions" && subcommand === "record") {
@@ -512,7 +512,7 @@ function linearInspectCommand(args: string[]): number {
   return 0;
 }
 
-function figmaInspectCommand(args: string[]): number {
+async function figmaInspectCommand(args: string[]): Promise<number> {
   const input = args[0];
   if (input === undefined) {
     console.error("atlas figma inspect requires a Figma URL or fixture path");
@@ -529,6 +529,17 @@ function figmaInspectCommand(args: string[]): number {
   }
 
   const reference = parseFigmaReference(input);
+  const config = readAtlasConfig();
+  const token = getCredentialToken({ alias: config.adapters?.figma?.tokenAlias ?? "figma.default", provider: "figma" });
+  if (token !== undefined) {
+    const snapshot = await fetchFigmaFileSnapshot({ apiKey: token, reference });
+    console.log(`File: ${snapshot.fileKey}`);
+    console.log(`Name: ${snapshot.name ?? "(unknown)"}`);
+    console.log(`Node: ${snapshot.nodeId ?? "(none)"}`);
+    console.log(`Evidence: ${snapshot.evidence.length}`);
+    return 0;
+  }
+
   console.log(`Kind: ${reference.kind}`);
   console.log(`File: ${reference.fileKey}`);
   console.log(`Node: ${reference.nodeId ?? "(none)"}`);

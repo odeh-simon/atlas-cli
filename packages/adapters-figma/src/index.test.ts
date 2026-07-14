@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  fetchFigmaFileSnapshot,
   getFigmaAdapterHealth,
   normalizeFigmaSnapshot,
   parseFigmaReference,
@@ -69,5 +70,23 @@ describe("Figma adapter", () => {
   it("rejects malformed references and fixtures", () => {
     expect(() => parseFigmaReference("https://example.test/file/ABC")).toThrow("figma.com");
     expect(() => normalizeFigmaSnapshot({ name: "Missing key" })).toThrow("fileKey");
+  });
+
+  it("fetches file metadata from the Figma REST API", async () => {
+    const reference = parseFigmaReference("https://www.figma.com/design/ABC123/Product?node-id=1-2");
+    const snapshot = await fetchFigmaFileSnapshot({
+      apiKey: "figd_api_key",
+      reference,
+      fetchImpl: (async (url, init) => {
+        expect(String(url)).toContain("ids=1-2");
+        expect(init?.headers).toMatchObject({ "x-figma-token": "figd_api_key" });
+        return new Response(JSON.stringify({ name: "Product", lastModified: "2026-07-14T10:00:00Z", version: "1" }), {
+          status: 200
+        });
+      }) as typeof fetch
+    });
+
+    expect(snapshot).toMatchObject({ fileKey: "ABC123", name: "Product", nodeId: "1-2" });
+    expect(snapshot.evidence.map((evidence) => evidence.title)).toContain("Figma node id");
   });
 });

@@ -35,6 +35,12 @@ export interface FigmaFileSnapshot {
   readonly evidence: readonly FigmaEvidence[];
 }
 
+export interface FetchFigmaFileInput {
+  readonly apiKey: string;
+  readonly reference: FigmaReference;
+  readonly fetchImpl?: typeof fetch | undefined;
+}
+
 export function getFigmaAdapterHealth(input: { readonly apiKey?: string | undefined } = {}): FigmaAdapterHealth {
   return {
     provider: "figma",
@@ -60,6 +66,37 @@ export function parseFigmaReference(input: string): FigmaReference {
 
   const nodeId = url.searchParams.get("node-id") ?? undefined;
   return { kind, fileKey, nodeId, url: url.toString() };
+}
+
+export async function fetchFigmaFileSnapshot(input: FetchFigmaFileInput): Promise<FigmaFileSnapshot> {
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const url = new URL(`https://api.figma.com/v1/files/${encodeURIComponent(input.reference.fileKey)}`);
+  if (input.reference.nodeId !== undefined) {
+    url.searchParams.set("ids", input.reference.nodeId);
+  }
+  const response = await fetchImpl(url, {
+    headers: { "x-figma-token": input.apiKey }
+  });
+  if (!response.ok) {
+    throw new Error(`Figma API request failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as Record<string, unknown>;
+  return normalizeFigmaSnapshot({
+    fileKey: input.reference.fileKey,
+    name: stringValue(payload.name),
+    url: input.reference.url,
+    nodeId: input.reference.nodeId,
+    lastModified: stringValue(payload.lastModified),
+    evidence: [
+      { kind: "metadata", title: "Figma file key", value: input.reference.fileKey },
+      ...(input.reference.nodeId === undefined
+        ? []
+        : [{ kind: "metadata", title: "Figma node id", value: input.reference.nodeId }]),
+      ...(typeof payload.version === "string"
+        ? [{ kind: "metadata", title: "Figma version", value: payload.version }]
+        : [])
+    ]
+  });
 }
 
 export function readFigmaFixture(filePath: string): FigmaFileSnapshot {
