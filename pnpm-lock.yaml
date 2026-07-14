@@ -60,6 +60,9 @@ importers:
       '@atlas/schemas':
         specifier: workspace:*
         version: link:../schemas
+      '@atlas/security':
+        specifier: workspace:*
+        version: link:../security
       '@atlas/workflow-engine':
         specifier: workspace:*
         version: link:../workflow-engine
@@ -78,6 +81,12 @@ importers:
 
   packages/cli:
     dependencies:
+      '@atlas/adapters-claude-code':
+        specifier: workspace:*
+        version: link:../adapters-claude-code
+      '@atlas/adapters-codex':
+        specifier: workspace:*
+        version: link:../adapters-codex
       '@atlas/adapters-figma':
         specifier: workspace:*
         version: link:../adapters-figma
@@ -99,6 +108,9 @@ importers:
       '@atlas/git':
         specifier: workspace:*
         version: link:../git
+      '@atlas/security':
+        specifier: workspace:*
+        version: link:../security
 
   packages/config: {}
 

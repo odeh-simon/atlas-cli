@@ -39,6 +39,47 @@
         },
         "additionalProperties": false
       }
+    },
+    "adapters": {
+      "type": "object",
+      "properties": {
+        "figma": {
+          "type": "object",
+          "properties": {
+            "tokenAlias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" }
+          },
+          "additionalProperties": false
+        },
+        "github": {
+          "type": "object",
+          "properties": {
+            "tokenAlias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" }
+          },
+          "additionalProperties": false
+        },
+        "linear": {
+          "type": "object",
+          "properties": {
+            "tokenAlias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" }
+          },
+          "additionalProperties": false
+        },
+        "codex": {
+          "type": "object",
+          "properties": {
+            "command": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "claudeCode": {
+          "type": "object",
+          "properties": {
+            "command": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

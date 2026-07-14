@@ -9,6 +9,7 @@ import {
   type ArtifactRecord,
   type LockRecord
 } from "@atlas/persistence";
+import { hasCredential, type CredentialProvider } from "@atlas/security";
 
 import { closeAtlasRuntime, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
@@ -46,6 +47,7 @@ export async function runDoctor(options: RuntimeOptions = {}): Promise<DoctorRes
     ]) {
       if (lock !== undefined) issues.push(...inspectLock(lock, new Date()));
     }
+    issues.push(...inspectConfiguredCredentialAliases(runtime.paths.cwd, options.env));
 
     return {
       status: issues.some((issue) => issue.severity === "error") ? "failed" : "passed",
@@ -56,6 +58,28 @@ export async function runDoctor(options: RuntimeOptions = {}): Promise<DoctorRes
   } finally {
     closeAtlasRuntime(runtime, false);
   }
+}
+
+function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv | undefined): DoctorIssue[] {
+  const configPath = join(cwd, "atlas.config.json");
+  if (!existsSync(configPath)) return [];
+  const config = JSON.parse(readFileSync(configPath, "utf8")) as {
+    adapters?: Partial<Record<CredentialProvider, { tokenAlias?: unknown }>>;
+  };
+  const issues: DoctorIssue[] = [];
+  for (const provider of ["figma", "github", "linear"] as const) {
+    const tokenAlias = config.adapters?.[provider]?.tokenAlias;
+    if (typeof tokenAlias !== "string" || tokenAlias.length === 0) continue;
+    if (!hasCredential({ env, alias: tokenAlias, provider })) {
+      issues.push({
+        severity: "warning",
+        code: "credential.missing",
+        summary: `Configured ${provider} credential alias is missing: ${tokenAlias}`,
+        recovery: `Run atlas auth add --provider ${provider} --alias ${tokenAlias} --value-env <ENV_VAR>.`
+      });
+    }
+  }
+  return issues;
 }
 
 function inspectArtifact(artifactRoot: string, artifact: ArtifactRecord): DoctorIssue[] {

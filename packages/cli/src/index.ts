@@ -29,12 +29,21 @@ import {
   unarchiveSession,
   startManualTask
 } from "@atlas/app-services";
-import { parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
-import { parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
-import { readLinearIssueFixture } from "@atlas/adapters-linear";
+import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
+import { getCodexAdapterHealth } from "@atlas/adapters-codex";
+import { getFigmaAdapterHealth, parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
+import { getGitHubAdapterHealth, parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
+import { getLinearAdapterHealth, readLinearIssueFixture } from "@atlas/adapters-linear";
 import { scanDesignPolicies } from "@atlas/checks";
 import { AtlasError } from "@atlas/domain";
 import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
+import {
+  getCredentialToken,
+  listCredentials,
+  removeCredential,
+  storeCredential,
+  type CredentialProvider
+} from "@atlas/security";
 
 const version = "0.0.0";
 
@@ -67,6 +76,22 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "doctor") {
       return await doctorCommand();
+    }
+
+    if (command === "auth" && subcommand === "add") {
+      return authAddCommand(rest);
+    }
+
+    if (command === "auth" && subcommand === "list") {
+      return authListCommand();
+    }
+
+    if (command === "auth" && subcommand === "remove") {
+      return authRemoveCommand(rest);
+    }
+
+    if (command === "adapters" && subcommand === "health") {
+      return adaptersHealthCommand();
     }
 
     if (command === "git" && subcommand === "status") {
@@ -243,6 +268,10 @@ Usage:
   atlas linear inspect <fixture.json>
   atlas status
   atlas doctor
+  atlas auth add --provider <figma|github|linear> --alias <alias> --value-env <ENV_VAR>
+  atlas auth list
+  atlas auth remove --alias <alias>
+  atlas adapters health
 `);
 }
 
@@ -327,6 +356,70 @@ async function doctorCommand(): Promise<number> {
     console.log(`Recovery: ${issue.recovery}`);
   }
   return result.status === "passed" ? 0 : 1;
+}
+
+function authAddCommand(args: string[]): number {
+  const provider = readCredentialProvider(readOption(args, "--provider"));
+  const alias = readOption(args, "--alias");
+  const valueEnv = readOption(args, "--value-env");
+  if (provider === undefined || alias === undefined || valueEnv === undefined) {
+    console.error("atlas auth add requires --provider, --alias, and --value-env");
+    return 2;
+  }
+  const token = process.env[valueEnv];
+  if (token === undefined || token.length === 0) {
+    console.error(`Environment variable is not set or empty: ${valueEnv}`);
+    return 2;
+  }
+
+  const record = storeCredential({ provider, alias, token });
+  console.log(`Credential: ${record.alias}`);
+  console.log(`Provider: ${record.provider}`);
+  console.log(`Token hash: ${record.tokenHash.slice(0, 12)}...`);
+  return 0;
+}
+
+function authListCommand(): number {
+  const credentials = listCredentials();
+  if (credentials.length === 0) {
+    console.log("No credentials stored.");
+    return 0;
+  }
+  for (const credential of credentials) {
+    console.log(`${credential.alias} ${credential.provider} ${credential.tokenHash.slice(0, 12)}...`);
+  }
+  return 0;
+}
+
+function authRemoveCommand(args: string[]): number {
+  const alias = readOption(args, "--alias");
+  if (alias === undefined) {
+    console.error("atlas auth remove requires --alias");
+    return 2;
+  }
+  const removed = removeCredential({ alias });
+  console.log(removed ? `Removed credential: ${alias}` : `Credential not found: ${alias}`);
+  return removed ? 0 : 1;
+}
+
+function adaptersHealthCommand(): number {
+  const config = readAtlasConfig();
+  const figmaToken = tokenForConfiguredAlias(config.adapters?.figma?.tokenAlias, "figma");
+  const githubToken = tokenForConfiguredAlias(config.adapters?.github?.tokenAlias, "github");
+  const linearToken = tokenForConfiguredAlias(config.adapters?.linear?.tokenAlias, "linear");
+  const health = [
+    getFigmaAdapterHealth({ apiKey: figmaToken }),
+    getGitHubAdapterHealth({ token: githubToken }),
+    getLinearAdapterHealth({ apiKey: linearToken }),
+    getCodexAdapterHealth({ command: config.adapters?.codex?.command }),
+    getClaudeCodeAdapterHealth({ command: config.adapters?.claudeCode?.command })
+  ];
+  for (const adapter of health) {
+    const configured = adapter.configured ? "configured" : "not-configured";
+    const mode = "mode" in adapter ? ` ${adapter.mode}` : "";
+    console.log(`${adapter.provider}: ${configured}${mode}`);
+  }
+  return health.every((adapter) => adapter.configured) ? 0 : 1;
 }
 
 function gitStatusCommand(): number {
@@ -744,6 +837,34 @@ function readConfiguredBaseBranch(): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+interface AtlasCliConfig {
+  readonly adapters?: {
+    readonly figma?: { readonly tokenAlias?: string | undefined } | undefined;
+    readonly github?: { readonly tokenAlias?: string | undefined } | undefined;
+    readonly linear?: { readonly tokenAlias?: string | undefined } | undefined;
+    readonly codex?: { readonly command?: string | undefined } | undefined;
+    readonly claudeCode?: { readonly command?: string | undefined } | undefined;
+  } | undefined;
+}
+
+function readAtlasConfig(): AtlasCliConfig {
+  const configPath = join(process.cwd(), "atlas.config.json");
+  if (!existsSync(configPath)) return {};
+  try {
+    return JSON.parse(readFileSync(configPath, "utf8")) as AtlasCliConfig;
+  } catch {
+    return {};
+  }
+}
+
+function tokenForConfiguredAlias(alias: string | undefined, provider: CredentialProvider): string | undefined {
+  return alias === undefined ? undefined : getCredentialToken({ alias, provider });
+}
+
+function readCredentialProvider(value: string | undefined): CredentialProvider | undefined {
+  return value === "figma" || value === "github" || value === "linear" ? value : undefined;
 }
 
 function labelForCheckStatus(status: "pass" | "fail" | "skip"): string {

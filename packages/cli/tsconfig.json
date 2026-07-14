@@ -7,12 +7,15 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
+    { "path": "../adapters-claude-code" },
+    { "path": "../adapters-codex" },
     { "path": "../adapters-figma" },
     { "path": "../adapters-github" },
     { "path": "../adapters-linear" },
     { "path": "../app-services" },
     { "path": "../checks" },
     { "path": "../domain" },
-    { "path": "../git" }
+    { "path": "../git" },
+    { "path": "../security" }
   ]
 }

@@ -15,6 +15,7 @@
     "@atlas/context-discovery": "workspace:*",
     "@atlas/domain": "workspace:*",
     "@atlas/persistence": "workspace:*",
+    "@atlas/security": "workspace:*",
     "@atlas/schemas": "workspace:*",
     "@atlas/workflow-engine": "workspace:*"
   }

@@ -17,5 +17,22 @@
       "dependsOn": ["basic-session-integrity"],
       "timeoutMs": 120000
     }
-  ]
+  ],
+  "adapters": {
+    "figma": {
+      "tokenAlias": "figma.default"
+    },
+    "github": {
+      "tokenAlias": "github.default"
+    },
+    "linear": {
+      "tokenAlias": "linear.default"
+    },
+    "codex": {
+      "command": "codex"
+    },
+    "claudeCode": {
+      "command": "claude"
+    }
+  }
 }

@@ -141,6 +141,87 @@ describe("cli", () => {
     }
   });
 
+  it("stores credential aliases from environment variables without printing secrets", async () => {
+    const root = tempRoot();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousToken = process.env.ATLAS_TEST_FIGMA_TOKEN;
+    const logs = captureLogs();
+
+    try {
+      process.env.ATLAS_HOME = join(root, "home");
+      process.env.ATLAS_TEST_FIGMA_TOKEN = "figd_test_secret_token";
+
+      const addCode = await main([
+        "auth",
+        "add",
+        "--provider",
+        "figma",
+        "--alias",
+        "figma.default",
+        "--value-env",
+        "ATLAS_TEST_FIGMA_TOKEN"
+      ]);
+      const listCode = await main(["auth", "list"]);
+
+      expect(addCode).toBe(0);
+      expect(listCode).toBe(0);
+      expect(logs.join("\n")).toContain("figma.default figma");
+      expect(logs.join("\n")).not.toContain("figd_test_secret_token");
+    } finally {
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("ATLAS_TEST_FIGMA_TOKEN", previousToken);
+    }
+  });
+
+  it("reports adapter health from configured aliases and commands", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        adapters: {
+          figma: { tokenAlias: "figma.default" },
+          codex: { command: "codex" },
+          claudeCode: { command: "claude" }
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousToken = process.env.ATLAS_TEST_FIGMA_TOKEN;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      process.env.ATLAS_TEST_FIGMA_TOKEN = "figd_test_secret_token";
+      await main([
+        "auth",
+        "add",
+        "--provider",
+        "figma",
+        "--alias",
+        "figma.default",
+        "--value-env",
+        "ATLAS_TEST_FIGMA_TOKEN"
+      ]);
+
+      const code = await main(["adapters", "health"]);
+
+      expect(code).toBe(1);
+      expect(logs).toContain("figma: configured api-token-present");
+      expect(logs).toContain("github: not-configured fixture");
+      expect(logs).toContain("codex: configured");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("ATLAS_TEST_FIGMA_TOKEN", previousToken);
+    }
+  });
+
   it("inspects a Linear issue fixture", async () => {
     const root = tempRoot();
     const fixturePath = join(root, "linear.json");
@@ -232,5 +313,13 @@ function commandSucceeds(args: readonly string[]): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
   }
 }

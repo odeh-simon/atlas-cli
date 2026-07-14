@@ -12,6 +12,7 @@
     { "path": "../context-discovery" },
     { "path": "../domain" },
     { "path": "../persistence" },
+    { "path": "../security" },
     { "path": "../schemas" },
     { "path": "../workflow-engine" }
   ]
