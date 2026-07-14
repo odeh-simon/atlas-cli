@@ -6,6 +6,7 @@ export * from "./completion.js";
 export * from "./context-build.js";
 export * from "./context-import.js";
 export * from "./decision-record.js";
+export * from "./doctor.js";
 export * from "./execution-import.js";
 export * from "./finding-disposition.js";
 export * from "./fix-batch.js";

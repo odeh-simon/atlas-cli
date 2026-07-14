@@ -16,6 +16,7 @@ import {
   disposeFinding,
   evaluateCompletion,
   runBasicCheck,
+  runDoctor,
   importContextManifest,
   importContract,
   importExecutionResult,
@@ -60,6 +61,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "status") {
       return statusCommand();
+    }
+
+    if (command === "doctor") {
+      return doctorCommand();
     }
 
     if (command === "git" && subcommand === "status") {
@@ -212,6 +217,7 @@ Usage:
   atlas github inspect <github-url|fixture.json>
   atlas linear inspect <fixture.json>
   atlas status
+  atlas doctor
 `);
 }
 
@@ -283,6 +289,19 @@ async function statusCommand(): Promise<number> {
   console.log(`Events: ${status.eventCount}`);
   console.log(`Next: ${status.nextCommands[0] ?? "no next command"}`);
   return 0;
+}
+
+async function doctorCommand(): Promise<number> {
+  const result = await runDoctor();
+  console.log(`Doctor: ${result.status}`);
+  console.log(`Session: ${result.sessionId ?? "(none)"}`);
+  console.log(`Artifacts: ${result.artifactCount}`);
+  console.log(`Issues: ${result.issues.length}`);
+  for (const issue of result.issues) {
+    console.log(`${issue.severity.toUpperCase()} ${issue.code}: ${issue.summary}`);
+    console.log(`Recovery: ${issue.recovery}`);
+  }
+  return result.status === "passed" ? 0 : 1;
 }
 
 function gitStatusCommand(): number {
