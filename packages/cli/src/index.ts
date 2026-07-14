@@ -30,6 +30,7 @@ import {
 import { parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
 import { parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
 import { readLinearIssueFixture } from "@atlas/adapters-linear";
+import { scanDesignPolicies } from "@atlas/checks";
 import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
 
 const version = "0.0.0";
@@ -140,6 +141,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return checksRunCommand();
     }
 
+    if (command === "checks" && subcommand === "design-scan") {
+      return checksDesignScanCommand(rest);
+    }
+
     if (command === "review" && subcommand === "prepare") {
       return reviewPrepareCommand();
     }
@@ -183,6 +188,7 @@ Usage:
   atlas implement export --manual
   atlas execution import <file>
   atlas checks run
+  atlas checks design-scan [--root <path>]
   atlas review prepare
   atlas review import <file>
   atlas findings disposition <id> --resolve --reason <reason>
@@ -568,6 +574,18 @@ async function checksRunCommand(): Promise<number> {
   console.log(`State: ${result.state}`);
   console.log(`Next: ${result.nextCommand}`);
   return 0;
+}
+
+function checksDesignScanCommand(args: string[]): number {
+  const rootDir = readOption(args, "--root", false) ?? process.cwd();
+  const result = scanDesignPolicies({ rootDir });
+  console.log(`Design scan: ${result.status}`);
+  console.log(`Files: ${result.scannedFiles}`);
+  console.log(`Violations: ${result.violations.length}`);
+  for (const violation of result.violations.slice(0, 20)) {
+    console.log(`${violation.filePath}:${violation.line}:${violation.column} ${violation.ruleId} ${violation.description}`);
+  }
+  return result.status === "passed" ? 0 : 1;
 }
 
 async function reviewPrepareCommand(): Promise<number> {

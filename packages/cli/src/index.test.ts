@@ -100,6 +100,7 @@ describe("cli", () => {
     expect(logs.join("\n")).toContain("atlas figma inspect");
     expect(logs.join("\n")).toContain("atlas github inspect");
     expect(logs.join("\n")).toContain("atlas git diff-safeguards");
+    expect(logs.join("\n")).toContain("atlas checks design-scan");
   });
 
   it("inspects a Linear issue fixture", async () => {

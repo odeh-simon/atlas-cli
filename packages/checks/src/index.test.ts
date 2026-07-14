@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { runCheckSet } from "./index.js";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach } from "vitest";
+
+import { runCheckSet, scanDesignPolicies } from "./index.js";
+
+const tempRoots: string[] = [];
+
+afterEach(() => {
+  for (const root of tempRoots.splice(0)) {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function tempRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), "atlas-design-scan-"));
+  tempRoots.push(root);
+  return root;
+}
 
 describe("runCheckSet", () => {
   it("runs required built-in and command checks in dependency order", async () => {
@@ -40,5 +59,20 @@ describe("runCheckSet", () => {
         builtIns: []
       })
     ).rejects.toThrow("Check dependency cycle");
+  });
+
+  it("scans design policy violations deterministically", () => {
+    const root = tempRoot();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src", "view.tsx"), '<div className="bg-[#123456] tracking-[-0.02em]" />\n');
+
+    const result = scanDesignPolicies({ rootDir: root });
+
+    expect(result.status).toBe("failed");
+    expect(result.scannedFiles).toBe(1);
+    expect(result.violations.map((violation) => violation.ruleId)).toEqual([
+      "atlas/no-tailwind-arbitrary-colors",
+      "atlas/no-negative-letter-spacing"
+    ]);
   });
 });
