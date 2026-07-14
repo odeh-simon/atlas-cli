@@ -1,0 +1,11 @@
+{
+  "$schema": "./atlas.config.schema.json",
+  "schemaVersion": 1,
+  "project": {
+    "name": "atlas-project",
+    "baseBranch": "main"
+  },
+  "telemetry": {
+    "enabled": false
+  }
+}

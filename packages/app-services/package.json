@@ -1,0 +1,19 @@
+{
+  "name": "@atlas/app-services",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "check": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@atlas/artifacts": "workspace:*",
+    "@atlas/domain": "workspace:*",
+    "@atlas/persistence": "workspace:*",
+    "@atlas/schemas": "workspace:*",
+    "@atlas/workflow-engine": "workspace:*"
+  }
+}

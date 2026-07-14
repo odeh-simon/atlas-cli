@@ -1,0 +1,89 @@
+{
+  "status": "valid",
+  "objective": {
+    "heading": "Objective",
+    "body_markdown": "Validate the Atlas walking skeleton by continuing the manual CLI flow from planning into an approved implementation contract."
+  },
+  "scope": {
+    "in_scope": [
+      "Import a valid implementation contract",
+      "Approve the contract",
+      "Export a manual implementation package",
+      "Continue the local walking-skeleton workflow"
+    ],
+    "out_of_scope": [
+      "Real Linear integration",
+      "Real ChatGPT/Codex planning adapter execution",
+      "Real implementing-agent code changes",
+      "Production packaging or installer behavior"
+    ]
+  },
+  "approved_decisions": [
+    {
+      "id": "decision_1",
+      "decision": "Use the local manual CLI path for this test run.",
+      "rationale": "The current M1 walking skeleton supports manual artifacts before external adapters are connected."
+    },
+    {
+      "id": "decision_2",
+      "decision": "Treat this contract as a test artifact, not a production task contract.",
+      "rationale": "The goal is to exercise state transitions and artifact persistence."
+    }
+  ],
+  "technical_approach": {
+    "heading": "Technical Approach",
+    "body_markdown": "Use the existing Atlas CLI commands to import this contract, record explicit approval, and produce the manual implementation package artifact. No source-code changes are required for this test contract."
+  },
+  "affected_subsystems": [
+    "cli",
+    "app-services",
+    "persistence",
+    "artifacts",
+    "workflow-engine"
+  ],
+  "reuse": [
+    "Existing context manifest",
+    "Existing planning package",
+    "Existing contract import schema",
+    "Existing approval workflow"
+  ],
+  "constraints": [
+    "Do not delete or rewrite repository files during this test.",
+    "Do not require external app adapters.",
+    "Keep all state local to the configured Atlas data directory."
+  ],
+  "data_state_permissions": {
+    "heading": "Data State Permissions",
+    "body_markdown": "Atlas may write local artifacts, events, approvals, and session state into its local data store. It must not push to Git remotes or call external services for this test."
+  },
+  "required_states": [
+    "loading",
+    "success",
+    "error"
+  ],
+  "accessibility_observability": {
+    "heading": "Accessibility Observability",
+    "body_markdown": "The CLI should print the created artifact id, session id, resulting workflow state, and next suggested command."
+  },
+  "edge_cases": [
+    "Invalid contract JSON should be rejected.",
+    "Contract approval should require an explicit --yes flag.",
+    "A paused, archived, or cancelled session should block forward progress."
+  ],
+  "acceptance_criteria": [
+    "Contract import advances the session to contract_draft.",
+    "Contract approval advances the session to contract_approved.",
+    "Status reports the next implementation export command after approval."
+  ],
+  "tests_and_validation": [
+    "Run atlas contract import sample-implementation-contract.json.",
+    "Run atlas approve contract --yes.",
+    "Run atlas status and confirm the next command is atlas implement export --manual."
+  ],
+  "unresolved_questions": [],
+  "prohibitions": [
+    "Do not start real implementation-agent execution from this sample.",
+    "Do not access external services.",
+    "Do not modify Git history."
+  ]
+}
