@@ -72,7 +72,11 @@ importers:
 
   packages/domain: {}
 
-  packages/git: {}
+  packages/git:
+    dependencies:
+      '@atlas/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/persistence:
     dependencies:
