@@ -3,8 +3,17 @@
   "version": "0.0.0",
   "type": "module",
   "private": true,
+  "description": "Atlas local-first workflow orchestration CLI",
   "bin": {
     "atlas": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

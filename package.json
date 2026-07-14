@@ -4,13 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "description": "Atlas local-first CLI workflow orchestrator",
+  "bin": {
+    "atlas": "./packages/cli/dist/index.js"
+  },
   "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
+    "atlas": "node packages/cli/dist/index.js",
     "build": "tsc -b",
     "check": "tsc -b --pretty false",
+    "release:check": "pnpm check && pnpm test && node packages/cli/dist/index.js --version",
     "test": "vitest run",
     "test:watch": "vitest"
   },
