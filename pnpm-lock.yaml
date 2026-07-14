@@ -123,6 +123,9 @@ importers:
       '@atlas/domain':
         specifier: workspace:*
         version: link:../domain
+      '@atlas/schemas':
+        specifier: workspace:*
+        version: link:../schemas
 
 packages:
 
