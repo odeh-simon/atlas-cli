@@ -105,6 +105,42 @@ describe("cli", () => {
     expect(logs.join("\n")).toContain("atlas doctor");
   });
 
+  it("accepts pnpm-style leading argument separator", async () => {
+    const logs = captureLogs();
+
+    const code = await main(["--", "--help"]);
+
+    expect(code).toBe(0);
+    expect(logs.join("\n")).toContain("Atlas 0.0.0");
+  });
+
+  it("prints Atlas async errors without leaking stack traces", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+
+      const code = await main(["checks", "run"]);
+
+      expect(code).toBe(4);
+      expect(logs).toContain("No active session found for checks");
+      expect(logs.join("\n")).not.toContain("at runBasicCheck");
+    } finally {
+      process.chdir(previousCwd);
+      if (previousAtlasHome === undefined) {
+        delete process.env.ATLAS_HOME;
+      } else {
+        process.env.ATLAS_HOME = previousAtlasHome;
+      }
+    }
+  });
+
   it("inspects a Linear issue fixture", async () => {
     const root = tempRoot();
     const fixturePath = join(root, "linear.json");

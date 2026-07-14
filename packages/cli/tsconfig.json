@@ -12,6 +12,7 @@
     { "path": "../adapters-linear" },
     { "path": "../app-services" },
     { "path": "../checks" },
+    { "path": "../domain" },
     { "path": "../git" }
   ]
 }

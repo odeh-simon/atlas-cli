@@ -33,12 +33,14 @@ import { parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
 import { parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
 import { readLinearIssueFixture } from "@atlas/adapters-linear";
 import { scanDesignPolicies } from "@atlas/checks";
+import { AtlasError } from "@atlas/domain";
 import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
 
 const version = "0.0.0";
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   try {
+    argv = normalizeArgv(argv);
     const [command, subcommand, ...rest] = argv;
 
     if (command === undefined || command === "--help" || command === "-h") {
@@ -56,15 +58,15 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (command === "start" && subcommand === "--manual") {
-      return startManualCommand(rest);
+      return await startManualCommand(rest);
     }
 
     if (command === "status") {
-      return statusCommand();
+      return await statusCommand();
     }
 
     if (command === "doctor") {
-      return doctorCommand();
+      return await doctorCommand();
     }
 
     if (command === "git" && subcommand === "status") {
@@ -88,7 +90,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (command === "decisions" && subcommand === "record") {
-      return decisionsRecordCommand(rest);
+      return await decisionsRecordCommand(rest);
     }
 
     if (command === "github" && subcommand === "inspect") {
@@ -96,55 +98,55 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (command === "resume") {
-      return resumeCommand();
+      return await resumeCommand();
     }
 
     if (command === "pause") {
-      return pauseCommand();
+      return await pauseCommand();
     }
 
     if (command === "archive") {
-      return archiveCommand();
+      return await archiveCommand();
     }
 
     if (command === "unarchive") {
-      return unarchiveCommand();
+      return await unarchiveCommand();
     }
 
     if (command === "cancel") {
-      return cancelCommand(compact([subcommand, ...rest]));
+      return await cancelCommand(compact([subcommand, ...rest]));
     }
 
     if (command === "context" && subcommand === "import") {
-      return contextImportCommand(rest);
+      return await contextImportCommand(rest);
     }
 
     if (command === "context" && subcommand === "build") {
-      return contextBuildCommand(rest);
+      return await contextBuildCommand(rest);
     }
 
     if (command === "plan") {
-      return planCommand();
+      return await planCommand();
     }
 
     if (command === "contract" && subcommand === "import") {
-      return contractImportCommand(rest);
+      return await contractImportCommand(rest);
     }
 
     if (command === "approve" && subcommand === "contract") {
-      return approveContractCommand(rest);
+      return await approveContractCommand(rest);
     }
 
     if (command === "implement" && subcommand === "export" && rest.includes("--manual")) {
-      return implementExportManualCommand();
+      return await implementExportManualCommand();
     }
 
     if (command === "execution" && subcommand === "import") {
-      return executionImportCommand(rest);
+      return await executionImportCommand(rest);
     }
 
     if (command === "checks" && subcommand === "run") {
-      return checksRunCommand();
+      return await checksRunCommand();
     }
 
     if (command === "checks" && subcommand === "design-scan") {
@@ -152,35 +154,58 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (command === "review" && subcommand === "prepare") {
-      return reviewPrepareCommand();
+      return await reviewPrepareCommand();
     }
 
     if (command === "review" && subcommand === "import") {
-      return reviewImportCommand(rest);
+      return await reviewImportCommand(rest);
     }
 
     if (command === "findings" && subcommand === "disposition") {
-      return findingDispositionCommand(rest);
+      return await findingDispositionCommand(rest);
     }
 
     if (command === "fix" && subcommand === "prepare") {
-      return fixPrepareCommand();
+      return await fixPrepareCommand();
     }
 
     if (command === "complete" && subcommand === "--check") {
-      return completeCheckCommand();
+      return await completeCheckCommand();
     }
 
     if (command === "approve" && subcommand === "completion") {
-      return approveCompletionCommand(rest);
+      return await approveCompletionCommand(rest);
     }
 
     console.error(`Unknown command: ${argv.join(" ")}`);
     return 2;
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    return 1;
+    return reportCliError(error);
   }
+}
+
+function normalizeArgv(argv: string[]): string[] {
+  return argv[0] === "--" ? argv.slice(1) : argv;
+}
+
+function reportCliError(error: unknown): number {
+  if (error instanceof AtlasError) {
+    console.error(error.message);
+    if (error.details !== undefined) {
+      const failures = error.details.failures;
+      if (Array.isArray(failures)) {
+        for (const failure of failures) console.error(`- ${String(failure)}`);
+      }
+      const checkResultArtifactId = error.details.checkResultArtifactId;
+      if (typeof checkResultArtifactId === "string") {
+        console.error(`Check result: ${checkResultArtifactId}`);
+      }
+    }
+    return error.exitCode;
+  }
+
+  console.error(error instanceof Error ? error.message : String(error));
+  return 1;
 }
 
 function printHelp(): void {

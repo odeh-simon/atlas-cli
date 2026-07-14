@@ -93,6 +93,9 @@ importers:
       '@atlas/checks':
         specifier: workspace:*
         version: link:../checks
+      '@atlas/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@atlas/git':
         specifier: workspace:*
         version: link:../git

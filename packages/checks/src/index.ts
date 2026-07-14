@@ -274,6 +274,7 @@ function listScannableFiles(rootDir: string, maxFiles: number): string[] {
 }
 
 function isDesignFile(path: string): boolean {
+  if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path)) return false;
   return [".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".html"].some((extension) => path.endsWith(extension));
 }
 
