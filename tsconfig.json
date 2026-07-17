@@ -17,6 +17,7 @@
     { "path": "./packages/diagnostics" },
     { "path": "./packages/domain" },
     { "path": "./packages/git" },
+    { "path": "./packages/llm" },
     { "path": "./packages/persistence" },
     { "path": "./packages/process-runner" },
     { "path": "./packages/schemas" },

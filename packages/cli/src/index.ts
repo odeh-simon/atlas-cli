@@ -41,6 +41,12 @@ import { createTelemetryPreview, telemetryEnabled } from "@atlas/diagnostics";
 import { AtlasError } from "@atlas/domain";
 import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
 import {
+  defaultOllamaProvider,
+  getAiProviderHealth,
+  listAiModels,
+  type AiProviderConfig
+} from "@atlas/llm";
+import {
   getCredentialToken,
   listCredentials,
   removeCredential,
@@ -99,6 +105,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "adapters" && subcommand === "health") {
       return adaptersHealthCommand();
+    }
+
+    if (command === "ai") {
+      return await aiCommand(compact([subcommand, ...rest]));
     }
 
     if (command === "telemetry") {
@@ -289,6 +299,8 @@ Usage:
   atlas auth list
   atlas auth remove --alias <alias>
   atlas adapters health
+  atlas ai providers health
+  atlas ai models [--provider <alias>]
   atlas telemetry status
   atlas telemetry preview
   atlas telemetry enable
@@ -461,6 +473,51 @@ function adaptersHealthCommand(): number {
     console.log(`${adapter.provider}: ${configured}${mode}`);
   }
   return health.every((adapter) => adapter.configured) ? 0 : 1;
+}
+
+async function aiCommand(args: string[]): Promise<number> {
+  const [scope, action, ...rest] = args;
+  if (scope === "providers" && action === "health") {
+    return await aiProvidersHealthCommand();
+  }
+  if (scope === "models") {
+    return await aiModelsCommand([action, ...rest].filter((value): value is string => value !== undefined));
+  }
+
+  console.error("atlas ai requires providers health or models");
+  return 2;
+}
+
+async function aiProvidersHealthCommand(): Promise<number> {
+  const providers = readConfiguredAiProviders();
+  if (providers.length === 0) {
+    const defaultProvider = defaultOllamaProvider();
+    console.log(`${defaultProvider.alias}: not-configured ${defaultProvider.provider} add ai.providers to atlas.config.json`);
+    return 1;
+  }
+
+  const health = await Promise.all(providers.map((provider) => getAiProviderHealth(provider)));
+  for (const provider of health) {
+    const configured = provider.configured ? "configured" : "not-configured";
+    console.log(`${provider.alias}: ${configured} ${provider.provider} ${provider.model} ${provider.detail}`);
+  }
+  return health.every((provider) => provider.configured) ? 0 : 1;
+}
+
+async function aiModelsCommand(args: string[]): Promise<number> {
+  const providers = readConfiguredAiProviders();
+  const alias = readOption(args, "--provider", false) ?? readAtlasConfig().ai?.defaultProviderAlias;
+  const provider = alias === undefined ? providers[0] : providers.find((candidate) => candidate.alias === alias);
+  if (provider === undefined) {
+    console.error(alias === undefined ? "No AI provider configured" : `AI provider not configured: ${alias}`);
+    return 2;
+  }
+
+  const models = await listAiModels(provider);
+  for (const model of models) {
+    console.log(`${model.name}${model.modifiedAt === undefined ? "" : ` ${model.modifiedAt}`}`);
+  }
+  return 0;
 }
 
 function telemetryCommand(args: string[]): number {
@@ -949,6 +1006,10 @@ interface AtlasCliConfig {
   readonly schemaVersion?: number | undefined;
   readonly project?: { readonly name?: string | undefined; readonly baseBranch?: string | undefined } | undefined;
   readonly telemetry?: { readonly enabled?: boolean | undefined } | undefined;
+  readonly ai?: {
+    readonly defaultProviderAlias?: string | undefined;
+    readonly providers?: readonly Partial<AiProviderConfig>[] | undefined;
+  } | undefined;
   readonly adapters?: {
     readonly figma?: { readonly tokenAlias?: string | undefined } | undefined;
     readonly github?: { readonly tokenAlias?: string | undefined } | undefined;
@@ -975,6 +1036,30 @@ function writeAtlasConfig(config: AtlasCliConfig): void {
     project: config.project ?? { name: "atlas-project", baseBranch: "main" }
   };
   writeFileSync(join(process.cwd(), "atlas.config.json"), `${JSON.stringify(next, null, 2)}\n`);
+}
+
+function readConfiguredAiProviders(): AiProviderConfig[] {
+  return (readAtlasConfig().ai?.providers ?? []).flatMap((provider) => {
+    if (
+      typeof provider.alias !== "string" ||
+      (provider.provider !== "ollama" && provider.provider !== "openai-compatible") ||
+      typeof provider.baseUrl !== "string" ||
+      typeof provider.model !== "string"
+    ) {
+      return [];
+    }
+
+    const config: AiProviderConfig = {
+      alias: provider.alias,
+      provider: provider.provider,
+      baseUrl: provider.baseUrl,
+      model: provider.model,
+      ...(typeof provider.tokenAlias === "string" ? { tokenAlias: provider.tokenAlias } : {}),
+      ...(typeof provider.timeoutMs === "number" ? { timeoutMs: provider.timeoutMs } : {}),
+      ...(typeof provider.maxInputTokens === "number" ? { maxInputTokens: provider.maxInputTokens } : {})
+    };
+    return [config];
+  });
 }
 
 function tokenForConfiguredAlias(alias: string | undefined, provider: CredentialProvider): string | undefined {

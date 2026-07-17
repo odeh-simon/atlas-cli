@@ -40,6 +40,30 @@
         "additionalProperties": false
       }
     },
+    "ai": {
+      "type": "object",
+      "properties": {
+        "defaultProviderAlias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["alias", "provider", "baseUrl", "model"],
+            "properties": {
+              "alias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
+              "provider": { "type": "string", "enum": ["ollama", "openai-compatible"] },
+              "baseUrl": { "type": "string", "format": "uri" },
+              "model": { "type": "string", "minLength": 1 },
+              "tokenAlias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
+              "timeoutMs": { "type": "integer", "minimum": 1 },
+              "maxInputTokens": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "adapters": {
       "type": "object",
       "properties": {

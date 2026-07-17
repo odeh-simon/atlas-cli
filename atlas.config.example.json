@@ -18,6 +18,19 @@
       "timeoutMs": 120000
     }
   ],
+  "ai": {
+    "defaultProviderAlias": "ollama.local",
+    "providers": [
+      {
+        "alias": "ollama.local",
+        "provider": "ollama",
+        "baseUrl": "http://localhost:11434",
+        "model": "qwen2.5-coder:7b",
+        "timeoutMs": 10000,
+        "maxInputTokens": 12000
+      }
+    ]
+  },
   "adapters": {
     "figma": {
       "tokenAlias": "figma.default"

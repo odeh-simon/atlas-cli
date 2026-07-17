@@ -17,6 +17,7 @@
     { "path": "../diagnostics" },
     { "path": "../domain" },
     { "path": "../git" },
+    { "path": "../llm" },
     { "path": "../security" }
   ]
 }

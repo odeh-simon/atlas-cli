@@ -32,6 +32,7 @@
     "@atlas/diagnostics": "workspace:*",
     "@atlas/domain": "workspace:*",
     "@atlas/git": "workspace:*",
+    "@atlas/llm": "workspace:*",
     "@atlas/security": "workspace:*"
   }
 }

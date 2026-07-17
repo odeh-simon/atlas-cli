@@ -103,6 +103,7 @@ describe("cli", () => {
     expect(logs.join("\n")).toContain("atlas checks design-scan");
     expect(logs.join("\n")).toContain("atlas fix prepare");
     expect(logs.join("\n")).toContain("atlas doctor");
+    expect(logs.join("\n")).toContain("atlas ai providers health");
   });
 
   it("accepts pnpm-style leading argument separator", async () => {
@@ -219,6 +220,91 @@ describe("cli", () => {
       process.chdir(previousCwd);
       restoreEnv("ATLAS_HOME", previousAtlasHome);
       restoreEnv("ATLAS_TEST_FIGMA_TOKEN", previousToken);
+    }
+  });
+
+  it("reports AI provider health from configured Ollama providers", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          defaultProviderAlias: "ollama.local",
+          providers: [
+            {
+              alias: "ollama.local",
+              provider: "ollama",
+              baseUrl: "http://localhost:11434",
+              model: "qwen2.5-coder:7b",
+              timeoutMs: 1000
+            }
+          ]
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousFetch = globalThis.fetch;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ models: [{ name: "qwen2.5-coder:7b" }] }), { status: 200 })) as typeof fetch;
+
+      const code = await main(["ai", "providers", "health"]);
+
+      expect(code).toBe(0);
+      expect(logs).toContain("ollama.local: configured ollama qwen2.5-coder:7b ollama model available");
+    } finally {
+      process.chdir(previousCwd);
+      globalThis.fetch = previousFetch;
+    }
+  });
+
+  it("lists AI models for a configured Ollama provider", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          defaultProviderAlias: "ollama.local",
+          providers: [
+            {
+              alias: "ollama.local",
+              provider: "ollama",
+              baseUrl: "http://localhost:11434",
+              model: "qwen2.5-coder:7b"
+            }
+          ]
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousFetch = globalThis.fetch;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ models: [{ name: "llama3.2:3b" }, { name: "qwen2.5-coder:7b" }] }), {
+          status: 200
+        })) as typeof fetch;
+
+      const code = await main(["ai", "models"]);
+
+      expect(code).toBe(0);
+      expect(logs).toEqual(["llama3.2:3b", "qwen2.5-coder:7b"]);
+    } finally {
+      process.chdir(previousCwd);
+      globalThis.fetch = previousFetch;
     }
   });
 

@@ -120,6 +120,9 @@ importers:
       '@atlas/git':
         specifier: workspace:*
         version: link:../git
+      '@atlas/llm':
+        specifier: workspace:*
+        version: link:../llm
       '@atlas/security':
         specifier: workspace:*
         version: link:../security
@@ -137,6 +140,8 @@ importers:
       '@atlas/domain':
         specifier: workspace:*
         version: link:../domain
+
+  packages/llm: {}
 
   packages/persistence:
     dependencies:
