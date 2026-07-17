@@ -370,6 +370,8 @@ describe("cli", () => {
       expect(startCode).toBe(0);
       expect(contextCode).toBe(0);
       expect(logs.some((line) => line.startsWith("AI recommendation: art_"))).toBe(true);
+      expect(logs.some((line) => line.startsWith("Context quality: "))).toBe(true);
+      expect(logs.some((line) => line.startsWith("Context quality report: art_"))).toBe(true);
       expect(logs).toContain("Sources: 1/4");
       expect(logs).toContain("State: context_ready");
     } finally {

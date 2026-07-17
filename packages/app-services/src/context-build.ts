@@ -13,7 +13,7 @@ import {
   listSessionsForRepository,
   updateSessionContextArtifact
 } from "@atlas/persistence";
-import { aiContextRecommendationSchema, contextManifestSchema } from "@atlas/schemas";
+import { aiContextRecommendationSchema, contextManifestSchema, contextQualityReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
@@ -27,6 +27,8 @@ export interface BuildContextInput extends RuntimeOptions {
 export interface BuildContextResult {
   readonly sessionId: string;
   readonly contextArtifactId: string;
+  readonly contextQualityReportArtifactId: string;
+  readonly contextReadiness: "ready" | "weak" | "blocked";
   readonly state: string;
   readonly sourceCount: number;
   readonly includedSourceCount: number;
@@ -112,6 +114,55 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       createdAt: now
     });
 
+    const qualityArtifactId = newId("art");
+    const qualityReport = contextQualityReportSchema.parse({
+      artifact_id: qualityArtifactId,
+      session_id: session.sessionId,
+      type: "context_quality_report",
+      schema_version: 1,
+      content_version: artifacts.filter((artifact) => artifact.type === "context_quality_report").length + 1,
+      created_at: now,
+      producer: { type: "atlas" },
+      sensitivity: "internal",
+      parents: [artifactId],
+      content_sha256: "0".repeat(64),
+      metadata: {
+        discovery: manifest.metadata.discovery,
+        context_manifest_artifact_id: artifactId
+      },
+      context_manifest_artifact_id: artifactId,
+      ...evaluateContextQuality({ discovery, aiRecommendation })
+    });
+    const qualityWritten = writeImmutableArtifactContent({
+      rootDir: runtime.paths.artifactRoot,
+      sessionId: session.sessionId,
+      artifactId: qualityArtifactId,
+      type: "context_quality_report",
+      contentVersion: qualityReport.content_version,
+      mediaType: "application/json",
+      content: `${JSON.stringify(qualityReport, null, 2)}\n`
+    });
+    createArtifactRecord(runtime.db, {
+      artifactId: qualityArtifactId,
+      sessionId: session.sessionId,
+      type: "context_quality_report",
+      schemaVersion: 1,
+      contentVersion: qualityReport.content_version,
+      storageUri: qualityWritten.storageUri,
+      sha256: qualityWritten.sha256,
+      byteLength: qualityWritten.byteLength,
+      mediaType: "application/json",
+      sensitivity: "internal",
+      status: qualityReport.readiness === "blocked" ? "rejected" : "valid",
+      producerType: "atlas",
+      createdAt: now
+    });
+    addArtifactDependency(runtime.db, {
+      artifactId: qualityArtifactId,
+      dependsOnArtifactId: artifactId,
+      dependencyKind: "input"
+    });
+
     const taskBrief = artifacts.find((artifact) => artifact.type === "task_brief");
     if (taskBrief !== undefined && getArtifactRecord(runtime.db, taskBrief.artifactId) !== undefined) {
       addArtifactDependency(runtime.db, {
@@ -138,6 +189,8 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       summary: "Context manifest built from repository sources",
       metadata: {
         contextArtifactId: artifactId,
+        contextQualityReportArtifactId: qualityArtifactId,
+        contextReadiness: qualityReport.readiness,
         sourceCount: discovery.sources.length,
         includedSourceCount: discovery.sources.filter((source) => source.included).length
       }
@@ -146,6 +199,8 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
     return {
       sessionId: session.sessionId,
       contextArtifactId: artifactId,
+      contextQualityReportArtifactId: qualityArtifactId,
+      contextReadiness: qualityReport.readiness,
       state: next,
       sourceCount: discovery.sources.length,
       includedSourceCount: discovery.sources.filter((source) => source.included).length,
@@ -154,6 +209,49 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
   } finally {
     closeAtlasRuntime(runtime);
   }
+}
+
+function evaluateContextQuality(input: {
+  readonly discovery: ReturnType<typeof discoverContextSources>;
+  readonly aiRecommendation: ReturnType<typeof aiContextRecommendationSchema.parse> | undefined;
+}): {
+  readonly readiness: "ready" | "weak" | "blocked";
+  readonly issues: readonly { readonly code: string; readonly severity: "blocking" | "warning" | "info"; readonly summary: string }[];
+  readonly recommended_next_actions: readonly string[];
+} {
+  const includedSources = input.discovery.sources.filter((source) => source.included);
+  const issues: Array<{ code: string; severity: "blocking" | "warning" | "info"; summary: string }> = [];
+  if (includedSources.length === 0) {
+    issues.push({ code: "no-context-sources", severity: "blocking", summary: "No context sources were included." });
+  }
+  if (!includedSources.some((source) => source.kind === "test")) {
+    issues.push({ code: "no-test-context", severity: "warning", summary: "No test sources were included in context." });
+  }
+  if (input.discovery.freshness === "partial") {
+    issues.push({ code: "partial-context-budget", severity: "warning", summary: "Some candidate sources were excluded by context budgets." });
+  }
+  if (input.aiRecommendation !== undefined && input.aiRecommendation.recommendations.length === 0) {
+    issues.push({ code: "ai-no-recommendations", severity: "warning", summary: "AI scout returned no file recommendations." });
+  }
+  const averageConfidence =
+    input.aiRecommendation === undefined || input.aiRecommendation.recommendations.length === 0
+      ? undefined
+      : input.aiRecommendation.recommendations.reduce((sum, recommendation) => sum + recommendation.confidence, 0) /
+        input.aiRecommendation.recommendations.length;
+  if (averageConfidence !== undefined && averageConfidence < 0.5) {
+    issues.push({ code: "low-ai-confidence", severity: "warning", summary: "AI scout confidence is low." });
+  }
+
+  const readiness = issues.some((issue) => issue.severity === "blocking")
+    ? "blocked"
+    : issues.some((issue) => issue.severity === "warning")
+      ? "weak"
+      : "ready";
+  const recommended_next_actions =
+    readiness === "ready"
+      ? ["Proceed to atlas plan."]
+      : issues.map((issue) => `Review ${issue.code}: ${issue.summary}`);
+  return { readiness, issues, recommended_next_actions };
 }
 
 function loadAiRecommendation(

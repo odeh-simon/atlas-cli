@@ -38,13 +38,19 @@ describe("buildContextManifest", () => {
     const contextArtifacts = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "context_manifest"
     );
+    const qualityArtifacts = listArtifactsForSession(runtime.db, result.sessionId).filter(
+      (artifact) => artifact.type === "context_quality_report"
+    );
     closeAtlasRuntime(runtime, false);
 
     expect(result.state).toBe("context_ready");
+    expect(result.contextReadiness).toBe("weak");
     expect(result.includedSourceCount).toBe(3);
     expect(status.nextCommands[0]).toBe("atlas plan");
     expect(contextArtifacts).toHaveLength(1);
     expect(contextArtifacts[0]?.status).toBe("valid");
+    expect(qualityArtifacts).toHaveLength(1);
+    expect(qualityArtifacts[0]?.artifactId).toBe(result.contextQualityReportArtifactId);
   });
 
   it("builds a hybrid manifest from AI recommendations", async () => {
@@ -98,6 +104,7 @@ describe("buildContextManifest", () => {
       expect(manifest.metadata.ai_recommendation_artifact_id).toBe(scout.recommendationArtifactId);
       expect(manifest.sources.filter((source) => source.included).map((source) => source.uri)).toEqual(["src/target.ts"]);
       expect(manifest.sources[0]?.reason).toContain("AI recommended");
+      expect(result.contextReadiness).toBe("weak");
     } finally {
       closeAtlasRuntime(runtime, false);
     }

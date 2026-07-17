@@ -811,6 +811,8 @@ async function contextBuildCommand(args: string[]): Promise<number> {
     ...(aiRecommendationArtifactId === undefined ? {} : { aiRecommendationArtifactId })
   });
   console.log(`Built context ${result.contextArtifactId}`);
+  console.log(`Context quality: ${result.contextReadiness}`);
+  console.log(`Context quality report: ${result.contextQualityReportArtifactId}`);
   console.log(`Session: ${result.sessionId}`);
   console.log(`Sources: ${result.includedSourceCount}/${result.sourceCount}`);
   console.log(`State: ${result.state}`);
