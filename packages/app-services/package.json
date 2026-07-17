@@ -17,9 +17,11 @@
     "@atlas/checks": "workspace:*",
     "@atlas/context-discovery": "workspace:*",
     "@atlas/domain": "workspace:*",
+    "@atlas/llm": "workspace:*",
     "@atlas/persistence": "workspace:*",
     "@atlas/security": "workspace:*",
     "@atlas/schemas": "workspace:*",
-    "@atlas/workflow-engine": "workspace:*"
+    "@atlas/workflow-engine": "workspace:*",
+    "zod": "^4.4.3"
   }
 }

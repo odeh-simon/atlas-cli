@@ -14,6 +14,7 @@
     { "path": "../checks" },
     { "path": "../context-discovery" },
     { "path": "../domain" },
+    { "path": "../llm" },
     { "path": "../persistence" },
     { "path": "../security" },
     { "path": "../schemas" },

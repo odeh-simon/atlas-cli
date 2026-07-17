@@ -63,6 +63,9 @@ importers:
       '@atlas/domain':
         specifier: workspace:*
         version: link:../domain
+      '@atlas/llm':
+        specifier: workspace:*
+        version: link:../llm
       '@atlas/persistence':
         specifier: workspace:*
         version: link:../persistence
@@ -75,6 +78,9 @@ importers:
       '@atlas/workflow-engine':
         specifier: workspace:*
         version: link:../workflow-engine
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/artifacts:
     dependencies:
