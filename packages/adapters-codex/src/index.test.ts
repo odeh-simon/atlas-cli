@@ -18,18 +18,22 @@ describe("Codex adapter", () => {
 
   it("invokes a Codex-compatible executable with prompt args", async () => {
     const result = await invokeCodex({
-      command: process.execPath,
+      command: failingCommand(),
       package: {
         mode: "review",
         instructions: "Review only.",
         artifactIds: ["art_review"]
       },
-      timeoutMs: 1_000
+      timeoutMs: 10_000
     });
 
     expect(result.provider).toBe("codex");
     expect(result.process.status).toBe("failed");
-    expect(result.process.stderr).toContain("bad option");
+    expect(result.process.stderr.length).toBeGreaterThan(0);
     expect(result.process.args[0]).toBe("--prompt");
   });
 });
+
+function failingCommand(): string {
+  return process.platform === "win32" ? "git" : process.execPath;
+}

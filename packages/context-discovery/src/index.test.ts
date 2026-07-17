@@ -64,6 +64,22 @@ describe("discoverContextSources", () => {
       exclusion_reason: "file budget exceeded"
     });
   });
+
+  it("prioritizes recommended sources before applying budgets", () => {
+    const root = tempRoot();
+    writeFixture(root, "package.json", '{"name":"fixture"}\n');
+    writeFixture(root, "README.md", "# Fixture\n");
+    writeFixture(root, "src/target.ts", "export const target = true;\n");
+
+    const result = discoverContextSources({
+      rootPath: root,
+      budget: { maxFiles: 1, maxBytes: 1_000 },
+      recommendations: [{ uri: "src/target.ts", reason: "Task-specific implementation file", confidence: 0.95 }]
+    });
+
+    expect(result.sources.filter((source) => source.included).map((source) => source.uri)).toEqual(["src/target.ts"]);
+    expect(result.sources.find((source) => source.uri === "src/target.ts")?.reason).toContain("AI recommended");
+  });
 });
 
 function writeFixture(root: string, path: string, content: string): void {

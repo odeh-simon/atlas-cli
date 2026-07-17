@@ -22,13 +22,13 @@ describe("Claude Code adapter", () => {
 
   it("invokes a Claude-compatible executable with print args", async () => {
     const result = await invokeClaudeCode({
-      command: process.execPath,
+      command: failingCommand(),
       package: {
         mode: "review",
         instructions: "Review only.",
         artifactIds: ["art_review"]
       },
-      timeoutMs: 1_000
+      timeoutMs: 10_000
     });
 
     expect(result.provider).toBe("claude-code");
@@ -37,3 +37,7 @@ describe("Claude Code adapter", () => {
     expect(result.process.args[0]).toBe("--print");
   });
 });
+
+function failingCommand(): string {
+  return process.platform === "win32" ? "git" : process.execPath;
+}

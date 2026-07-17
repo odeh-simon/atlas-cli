@@ -308,6 +308,77 @@ describe("cli", () => {
     }
   });
 
+  it("builds AI-assisted context with a configured Ollama provider", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(join(repo, "package.json"), "{\"name\":\"fixture\"}\n");
+    writeFileSync(join(repo, "README.md"), "# Fixture\n");
+    writeFileSync(join(repo, "src", "target.ts"), "export const target = true;\n");
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          defaultProviderAlias: "ollama.local",
+          providers: [
+            {
+              alias: "ollama.local",
+              provider: "ollama",
+              baseUrl: "http://localhost:11434",
+              model: "qwen2.5-coder:7b"
+            }
+          ]
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousFetch = globalThis.fetch;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      globalThis.fetch = (async () =>
+        new Response(
+          JSON.stringify({
+            message: {
+              content: JSON.stringify({
+                recommendations: [{ uri: "src/target.ts", reason: "Task-specific source", confidence: 0.97 }],
+                missing_context: [],
+                questions: []
+              })
+            }
+          }),
+          { status: 200 }
+        )) as typeof fetch;
+
+      const startCode = await main([
+        "start",
+        "--manual",
+        "--title",
+        "Target",
+        "--objective",
+        "Update target source",
+        "--task-key",
+        "manual-target"
+      ]);
+      const contextCode = await main(["context", "build", "--ai", "--max-files", "1", "--max-bytes", "1000"]);
+
+      expect(startCode).toBe(0);
+      expect(contextCode).toBe(0);
+      expect(logs.some((line) => line.startsWith("AI recommendation: art_"))).toBe(true);
+      expect(logs).toContain("Sources: 1/4");
+      expect(logs).toContain("State: context_ready");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      globalThis.fetch = previousFetch;
+    }
+  });
+
   it("reports OpenAI-compatible AI health using an AI credential alias", async () => {
     const root = tempRoot();
     const repo = join(root, "repo");

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { StateTransitionError } from "@atlas/domain";
 import { discoverContextSources } from "@atlas/context-discovery";
@@ -10,7 +13,7 @@ import {
   listSessionsForRepository,
   updateSessionContextArtifact
 } from "@atlas/persistence";
-import { contextManifestSchema } from "@atlas/schemas";
+import { aiContextRecommendationSchema, contextManifestSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
@@ -18,6 +21,7 @@ import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type Runtime
 export interface BuildContextInput extends RuntimeOptions {
   readonly maxFiles?: number | undefined;
   readonly maxBytes?: number | undefined;
+  readonly aiRecommendationArtifactId?: string | undefined;
 }
 
 export interface BuildContextResult {
@@ -38,14 +42,17 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       throw new StateTransitionError("No active session found for context build");
     }
 
+    const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     const now = new Date().toISOString();
     const artifactId = newId("art");
+    const aiRecommendation = loadAiRecommendation(runtime.paths.artifactRoot, artifacts, input.aiRecommendationArtifactId);
     const discovery = discoverContextSources({
       rootPath: runtime.paths.cwd,
       budget: {
         ...(input.maxFiles === undefined ? {} : { maxFiles: input.maxFiles }),
         ...(input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes })
-      }
+      },
+      recommendations: aiRecommendation?.recommendations
     });
     const manifest = contextManifestSchema.parse({
       artifact_id: artifactId,
@@ -58,7 +65,16 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       sensitivity: "confidential",
       parents: [],
       content_sha256: "0".repeat(64),
-      metadata: { discovery: "deterministic-file-scan" },
+      metadata: {
+        discovery: aiRecommendation === undefined ? "deterministic" : "hybrid",
+        ...(aiRecommendation === undefined
+          ? {}
+          : {
+              ai_recommendation_artifact_id: aiRecommendation.artifact_id,
+              ai_provider_alias: aiRecommendation.provider_alias,
+              ai_recommendation_count: aiRecommendation.recommendations.length
+            })
+      },
       sources: discovery.sources,
       budgets: discovery.budgets,
       gaps: [],
@@ -96,11 +112,18 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       createdAt: now
     });
 
-    const taskBrief = listArtifactsForSession(runtime.db, session.sessionId).find((artifact) => artifact.type === "task_brief");
+    const taskBrief = artifacts.find((artifact) => artifact.type === "task_brief");
     if (taskBrief !== undefined && getArtifactRecord(runtime.db, taskBrief.artifactId) !== undefined) {
       addArtifactDependency(runtime.db, {
         artifactId,
         dependsOnArtifactId: taskBrief.artifactId,
+        dependencyKind: "input"
+      });
+    }
+    if (aiRecommendation !== undefined) {
+      addArtifactDependency(runtime.db, {
+        artifactId,
+        dependsOnArtifactId: aiRecommendation.artifact_id,
         dependencyKind: "input"
       });
     }
@@ -131,6 +154,23 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
   } finally {
     closeAtlasRuntime(runtime);
   }
+}
+
+function loadAiRecommendation(
+  artifactRoot: string,
+  artifacts: ReturnType<typeof listArtifactsForSession>,
+  artifactId: string | undefined
+): ReturnType<typeof aiContextRecommendationSchema.parse> | undefined {
+  const record =
+    artifactId === undefined
+      ? artifacts.filter((artifact) => artifact.type === "ai_context_recommendation" && artifact.status === "valid").at(-1)
+      : artifacts.find((artifact) => artifact.artifactId === artifactId);
+  if (record === undefined) return undefined;
+  if (record.type !== "ai_context_recommendation" || record.status !== "valid") {
+    throw new StateTransitionError("AI recommendation artifact is not valid");
+  }
+  const raw = JSON.parse(readFileSync(join(artifactRoot, record.storageUri), "utf8")) as unknown;
+  return aiContextRecommendationSchema.parse(raw);
 }
 
 function nextContextVersion(db: Parameters<typeof listArtifactsForSession>[0], sessionId: string): number {

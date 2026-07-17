@@ -14,6 +14,13 @@ export interface ContextDiscoveryBudget {
 export interface ContextDiscoveryOptions {
   readonly rootPath: string;
   readonly budget?: Partial<ContextDiscoveryBudget> | undefined;
+  readonly recommendations?: readonly ContextDiscoveryRecommendation[] | undefined;
+}
+
+export interface ContextDiscoveryRecommendation {
+  readonly uri: string;
+  readonly reason: string;
+  readonly confidence: number;
 }
 
 export interface DiscoveredContextSource {
@@ -76,10 +83,12 @@ export function discoverContextSources(options: ContextDiscoveryOptions): Contex
     maxFiles: options.budget?.maxFiles ?? defaultBudget.maxFiles,
     maxBytes: options.budget?.maxBytes ?? defaultBudget.maxBytes
   };
+  const recommendations = new Map((options.recommendations ?? []).map((recommendation) => [recommendation.uri, recommendation]));
   const candidates = listCandidateFiles(rootPath)
     .map((absolutePath) => toSource(rootPath, absolutePath))
     .filter((source): source is DiscoveredContextSource => source !== undefined)
-    .sort(compareSources);
+    .map((source) => applyRecommendation(source, recommendations.get(source.uri)))
+    .sort((a, b) => compareSources(a, b, recommendations));
 
   const sources: DiscoveredContextSource[] = [];
   let usedFiles = 0;
@@ -174,9 +183,34 @@ function reasonForPath(path: string): string {
   return "Repository source file";
 }
 
-function compareSources(a: DiscoveredContextSource, b: DiscoveredContextSource): number {
+function applyRecommendation(
+  source: DiscoveredContextSource,
+  recommendation: ContextDiscoveryRecommendation | undefined
+): DiscoveredContextSource {
+  if (recommendation === undefined) return source;
+  return {
+    ...source,
+    reason: `AI recommended: ${recommendation.reason}; deterministic: ${source.reason}`
+  };
+}
+
+function compareSources(
+  a: DiscoveredContextSource,
+  b: DiscoveredContextSource,
+  recommendations: ReadonlyMap<string, ContextDiscoveryRecommendation>
+): number {
+  const aiPriority = recommendationPriority(b, recommendations) - recommendationPriority(a, recommendations);
+  if (aiPriority !== 0) return aiPriority;
   const priority = priorityForPath(a.uri) - priorityForPath(b.uri);
   return priority === 0 ? a.uri.localeCompare(b.uri) : priority;
+}
+
+function recommendationPriority(
+  source: DiscoveredContextSource,
+  recommendations: ReadonlyMap<string, ContextDiscoveryRecommendation>
+): number {
+  const recommendation = recommendations.get(source.uri);
+  return recommendation === undefined ? -1 : Math.round(recommendation.confidence * 1000);
 }
 
 function priorityForPath(path: string): number {

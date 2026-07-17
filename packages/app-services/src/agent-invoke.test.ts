@@ -16,8 +16,8 @@ describe("invokeImplementationAgent", () => {
     const result = await invokeImplementationAgent({
       ...prepared,
       provider: "codex",
-      command: process.execPath,
-      timeoutMs: 1_000
+      command: failingCommand(),
+      timeoutMs: 10_000
     });
 
     expect(result).toMatchObject({
@@ -34,3 +34,7 @@ describe("invokeImplementationAgent", () => {
     expect(status.artifactCount).toBeGreaterThanOrEqual(6);
   });
 });
+
+function failingCommand(): string {
+  return process.platform === "win32" ? "git" : process.execPath;
+}

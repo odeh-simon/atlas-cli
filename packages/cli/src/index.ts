@@ -17,6 +17,7 @@ import {
   evaluateCompletion,
   invokeImplementationAgent,
   runBasicCheck,
+  runAiContextScout,
   runDoctor,
   importContextManifest,
   importContract,
@@ -266,7 +267,7 @@ Usage:
   atlas start --manual --title <title> --objective <objective> [--task-key <key>]
   atlas start <LINEAR-ISSUE-KEY>
   atlas context import <file>
-  atlas context build [--max-files <n>] [--max-bytes <n>]
+  atlas context build [--ai] [--ai-provider <alias>] [--max-files <n>] [--max-bytes <n>]
   atlas decisions record --kind <decision|deviation> --title <title> --rationale <text> --category <category> --yes
   atlas plan
   atlas contract import <file>
@@ -783,9 +784,31 @@ async function contextImportCommand(args: string[]): Promise<number> {
 async function contextBuildCommand(args: string[]): Promise<number> {
   const maxFiles = readNumberOption(args, "--max-files");
   const maxBytes = readNumberOption(args, "--max-bytes");
+  const useAi = args.includes("--ai");
+  const aiProviderAlias = readOption(args, "--ai-provider", false);
+  let aiRecommendationArtifactId: string | undefined;
+  if (useAi) {
+    const providers = readConfiguredAiProviders();
+    const alias = aiProviderAlias ?? readAtlasConfig().ai?.defaultProviderAlias;
+    const provider = alias === undefined ? providers[0] : providers.find((candidate) => candidate.alias === alias);
+    if (provider === undefined) {
+      console.error(alias === undefined ? "No AI provider configured" : `AI provider not configured: ${alias}`);
+      return 2;
+    }
+    const scout = await runAiContextScout({
+      provider,
+      apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai"),
+      ...(maxFiles === undefined ? {} : { maxFiles }),
+      ...(maxBytes === undefined ? {} : { maxBytes })
+    });
+    aiRecommendationArtifactId = scout.recommendationArtifactId;
+    console.log(`AI recommendation: ${scout.recommendationArtifactId}`);
+    console.log(`AI recommendations: ${scout.recommendationCount}`);
+  }
   const result = await buildContextManifest({
     ...(maxFiles === undefined ? {} : { maxFiles }),
-    ...(maxBytes === undefined ? {} : { maxBytes })
+    ...(maxBytes === undefined ? {} : { maxBytes }),
+    ...(aiRecommendationArtifactId === undefined ? {} : { aiRecommendationArtifactId })
   });
   console.log(`Built context ${result.contextArtifactId}`);
   console.log(`Session: ${result.sessionId}`);
