@@ -295,7 +295,7 @@ Usage:
   atlas linear inspect <fixture.json>
   atlas status
   atlas doctor
-  atlas auth add --provider <figma|github|linear> --alias <alias> --value-env <ENV_VAR>
+  atlas auth add --provider <figma|github|linear|ai> --alias <alias> --value-env <ENV_VAR>
   atlas auth list
   atlas auth remove --alias <alias>
   atlas adapters health
@@ -496,7 +496,11 @@ async function aiProvidersHealthCommand(): Promise<number> {
     return 1;
   }
 
-  const health = await Promise.all(providers.map((provider) => getAiProviderHealth(provider)));
+  const health = await Promise.all(
+    providers.map((provider) =>
+      getAiProviderHealth(provider, { apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai") })
+    )
+  );
   for (const provider of health) {
     const configured = provider.configured ? "configured" : "not-configured";
     console.log(`${provider.alias}: ${configured} ${provider.provider} ${provider.model} ${provider.detail}`);
@@ -513,7 +517,7 @@ async function aiModelsCommand(args: string[]): Promise<number> {
     return 2;
   }
 
-  const models = await listAiModels(provider);
+  const models = await listAiModels(provider, { apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai") });
   for (const model of models) {
     console.log(`${model.name}${model.modifiedAt === undefined ? "" : ` ${model.modifiedAt}`}`);
   }
@@ -1067,7 +1071,7 @@ function tokenForConfiguredAlias(alias: string | undefined, provider: Credential
 }
 
 function readCredentialProvider(value: string | undefined): CredentialProvider | undefined {
-  return value === "figma" || value === "github" || value === "linear" ? value : undefined;
+  return value === "figma" || value === "github" || value === "linear" || value === "ai" ? value : undefined;
 }
 
 function labelForCheckStatus(status: "pass" | "fail" | "skip"): string {

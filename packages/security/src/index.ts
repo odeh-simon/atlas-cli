@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 
 export const securityPackage = "@atlas/security";
 
-export type CredentialProvider = "figma" | "github" | "linear";
+export type CredentialProvider = "figma" | "github" | "linear" | "ai";
 
 export interface CredentialStoreOptions {
   readonly env?: NodeJS.ProcessEnv | undefined;
@@ -88,7 +88,7 @@ export function hasCredential(
 }
 
 export function redactSecretText(value: string): string {
-  return value.replace(/(?:pat|ghp|gho|figd|lin)_[A-Za-z0-9_=-]{8,}|[A-Za-z0-9_=-]{24,}/g, "[REDACTED]");
+  return value.replace(/(?:pat|ghp|gho|figd|lin|sk)_[A-Za-z0-9_=-]{8,}|[A-Za-z0-9_=-]{24,}/g, "[REDACTED]");
 }
 
 export function credentialStorePath(options: CredentialStoreOptions = {}): string {
@@ -143,7 +143,7 @@ function isStoredCredentialRecord(value: unknown): value is StoredCredentialReco
   const record = value as Record<string, unknown>;
   return (
     typeof record.alias === "string" &&
-    (record.provider === "figma" || record.provider === "github" || record.provider === "linear") &&
+    (record.provider === "figma" || record.provider === "github" || record.provider === "linear" || record.provider === "ai") &&
     typeof record.tokenHash === "string" &&
     typeof record.tokenBase64 === "string" &&
     typeof record.createdAt === "string" &&

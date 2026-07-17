@@ -37,6 +37,7 @@ export interface AiCompletionRequest {
   readonly messages: readonly AiCompletionMessage[];
   readonly temperature?: number | undefined;
   readonly responseFormat?: "json" | "text" | undefined;
+  readonly apiKey?: string | undefined;
   readonly fetchImpl?: typeof fetch | undefined;
 }
 
@@ -48,6 +49,7 @@ export interface AiCompletionResponse {
 
 export interface AiProviderRuntimeOptions {
   readonly fetchImpl?: typeof fetch | undefined;
+  readonly apiKey?: string | undefined;
 }
 
 export async function getAiProviderHealth(
@@ -67,15 +69,15 @@ export async function getAiProviderHealth(
     };
   }
 
-  if (provider.provider !== "ollama") {
+  if (provider.provider === "openai-compatible" && provider.tokenAlias !== undefined && options.apiKey === undefined) {
     return {
       alias: provider.alias,
       provider: provider.provider,
       configured: false,
       status: "invalid",
       model: provider.model,
-      baseUrl: provider.baseUrl,
-      detail: "Provider is not implemented yet"
+      baseUrl: normalizeBaseUrl(provider.baseUrl),
+      detail: `credential missing: ${provider.tokenAlias}`
     };
   }
 
@@ -89,7 +91,7 @@ export async function getAiProviderHealth(
       status: hasModel ? "configured" : "unreachable",
       model: provider.model,
       baseUrl: normalizeBaseUrl(provider.baseUrl),
-      detail: hasModel ? "ollama model available" : `ollama model not found: ${provider.model}`
+      detail: hasModel ? `${provider.provider} model available` : `${provider.provider} model not found: ${provider.model}`
     };
   } catch (error) {
     return {
@@ -99,7 +101,7 @@ export async function getAiProviderHealth(
       status: "unreachable",
       model: provider.model,
       baseUrl: normalizeBaseUrl(provider.baseUrl),
-      detail: error instanceof Error ? redactSecretText(error.message) : "ollama health check failed"
+      detail: error instanceof Error ? redactSecretText(error.message) : `${provider.provider} health check failed`
     };
   }
 }
@@ -110,6 +112,21 @@ export async function listAiModels(
 ): Promise<readonly AiModel[]> {
   assertSupportedProvider(provider);
   const fetchImpl = options.fetchImpl ?? fetch;
+  if (provider.provider === "openai-compatible") {
+    const response = await fetchWithTimeout(
+      `${normalizeBaseUrl(provider.baseUrl)}/models`,
+      { method: "GET", headers: authHeaders(options.apiKey) },
+      provider.timeoutMs,
+      fetchImpl
+    );
+    if (!response.ok) {
+      throw new Error(`OpenAI-compatible model request failed: ${response.status}`);
+    }
+    const payload = asRecord(await response.json(), "OpenAI-compatible model response must be an object");
+    const models = Array.isArray(payload.data) ? payload.data : [];
+    return models.map(normalizeOpenAiModel).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   const response = await fetchWithTimeout(
     `${normalizeBaseUrl(provider.baseUrl)}/api/tags`,
     { method: "GET" },
@@ -127,6 +144,36 @@ export async function listAiModels(
 export async function createAiCompletion(input: AiCompletionRequest): Promise<AiCompletionResponse> {
   assertSupportedProvider(input.provider);
   const fetchImpl = input.fetchImpl ?? fetch;
+  if (input.provider.provider === "openai-compatible") {
+    const response = await fetchWithTimeout(
+      `${normalizeBaseUrl(input.provider.baseUrl)}/chat/completions`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", ...authHeaders(input.apiKey) },
+        body: JSON.stringify({
+          model: input.provider.model,
+          messages: input.messages,
+          temperature: input.temperature,
+          response_format: input.responseFormat === "json" ? { type: "json_object" } : undefined
+        })
+      },
+      input.provider.timeoutMs,
+      fetchImpl
+    );
+    if (!response.ok) {
+      throw new Error(`OpenAI-compatible completion request failed: ${response.status}`);
+    }
+    const payload = asRecord(await response.json(), "OpenAI-compatible completion response must be an object");
+    const choices = Array.isArray(payload.choices) ? payload.choices : [];
+    const choice = asRecord(choices[0], "OpenAI-compatible completion choice must be an object");
+    const message = asRecord(choice.message, "OpenAI-compatible completion message must be an object");
+    return {
+      providerAlias: input.provider.alias,
+      model: input.provider.model,
+      content: typeof message.content === "string" ? message.content : ""
+    };
+  }
+
   const response = await fetchWithTimeout(
     `${normalizeBaseUrl(input.provider.baseUrl)}/api/chat`,
     {
@@ -188,9 +235,6 @@ function validateProviderConfig(provider: AiProviderConfig): string | undefined 
 function assertSupportedProvider(provider: AiProviderConfig): void {
   const validation = validateProviderConfig(provider);
   if (validation !== undefined) throw new TypeError(validation);
-  if (provider.provider !== "ollama") {
-    throw new TypeError("Only Ollama providers are implemented in this batch");
-  }
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -221,6 +265,17 @@ function normalizeOllamaModel(value: unknown): AiModel {
     name,
     ...(typeof record.modified_at === "string" ? { modifiedAt: record.modified_at } : {})
   };
+}
+
+function normalizeOpenAiModel(value: unknown): AiModel {
+  const record = asRecord(value, "OpenAI-compatible model must be an object");
+  const name = typeof record.id === "string" ? record.id : "";
+  if (name.length === 0) throw new TypeError("OpenAI-compatible model id is required");
+  return { name };
+}
+
+function authHeaders(apiKey: string | undefined): Record<string, string> {
+  return apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
 }
 
 function asRecord(value: unknown, message: string): Record<string, unknown> {

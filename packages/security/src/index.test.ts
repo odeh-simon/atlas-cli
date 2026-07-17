@@ -35,7 +35,19 @@ describe("credential aliases", () => {
     expect(listCredentials({ env })).toEqual([]);
   });
 
+  it("stores AI provider credentials", () => {
+    const env = { ATLAS_HOME: tempRoot() };
+    const token = "sk_example_secret_token";
+
+    const stored = storeCredential({ env, alias: "openrouter.default", provider: "ai", token });
+
+    expect(stored.provider).toBe("ai");
+    expect(getCredentialToken({ env, alias: "openrouter.default", provider: "ai" })).toBe(token);
+    expect(JSON.stringify(listCredentials({ env }))).not.toContain(token);
+  });
+
   it("redacts common token-like text", () => {
     expect(redactSecretText("token figd_example_secret_token")).toBe("token [REDACTED]");
+    expect(redactSecretText("token sk_example_secret_token")).toBe("token [REDACTED]");
   });
 });

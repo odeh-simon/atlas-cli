@@ -64,6 +64,83 @@ describe("LLM provider foundation", () => {
     });
   });
 
+  it("lists OpenAI-compatible models with bearer auth", async () => {
+    const calls: Array<{ readonly url: string; readonly init: RequestInit }> = [];
+    const models = await listAiModels(
+      {
+        alias: "openrouter.default",
+        provider: "openai-compatible",
+        baseUrl: "https://openrouter.ai/api/v1",
+        model: "meta-llama/llama-3.1-8b-instruct:free",
+        tokenAlias: "openrouter.default"
+      },
+      {
+        apiKey: "sk_example_secret_token",
+        fetchImpl: (async (url, init) => {
+          calls.push({ url: String(url), init: init ?? {} });
+          return new Response(JSON.stringify({ data: [{ id: "zeta" }, { id: "alpha" }] }), { status: 200 });
+        }) as typeof fetch
+      }
+    );
+
+    expect(models).toEqual([{ name: "alpha" }, { name: "zeta" }]);
+    expect(calls[0]?.url).toBe("https://openrouter.ai/api/v1/models");
+    expect(calls[0]?.init.headers).toMatchObject({ authorization: "Bearer sk_example_secret_token" });
+  });
+
+  it("creates OpenAI-compatible chat completions", async () => {
+    const calls: Array<{ readonly body: unknown }> = [];
+    const response = await createAiCompletion({
+      provider: {
+        alias: "cloud.default",
+        provider: "openai-compatible",
+        baseUrl: "https://example.test/v1",
+        model: "free-model"
+      },
+      apiKey: "sk_example_secret_token",
+      messages: [{ role: "user", content: "Rank files" }],
+      responseFormat: "json",
+      fetchImpl: (async (_url, init) => {
+        calls.push({ body: JSON.parse(String(init?.body)) });
+        return new Response(JSON.stringify({ choices: [{ message: { content: "{\"files\":[]}" } }] }), {
+          status: 200
+        });
+      }) as typeof fetch
+    });
+
+    expect(response).toMatchObject({ providerAlias: "cloud.default", model: "free-model", content: "{\"files\":[]}" });
+    expect(calls[0]?.body).toMatchObject({
+      model: "free-model",
+      response_format: { type: "json_object" }
+    });
+  });
+
+  it("reports missing cloud credentials before making network calls", async () => {
+    let called = false;
+    const health = await getAiProviderHealth(
+      {
+        alias: "cloud.default",
+        provider: "openai-compatible",
+        baseUrl: "https://example.test/v1",
+        model: "free-model",
+        tokenAlias: "cloud.default"
+      },
+      {
+        fetchImpl: (async () => {
+          called = true;
+          return new Response("{}");
+        }) as typeof fetch
+      }
+    );
+
+    expect(called).toBe(false);
+    expect(health).toMatchObject({
+      configured: false,
+      status: "invalid",
+      detail: "credential missing: cloud.default"
+    });
+  });
+
   it("redacts long secret-like text", () => {
     expect(redactSecretText("Bearer abcdefghijklmnopqrstuvwxyz1234567890")).toBe("[REDACTED]");
   });

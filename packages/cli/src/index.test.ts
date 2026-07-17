@@ -308,6 +308,57 @@ describe("cli", () => {
     }
   });
 
+  it("reports OpenAI-compatible AI health using an AI credential alias", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          providers: [
+            {
+              alias: "cloud.default",
+              provider: "openai-compatible",
+              baseUrl: "https://example.test/v1",
+              model: "free-model",
+              tokenAlias: "cloud.default"
+            }
+          ]
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousToken = process.env.ATLAS_TEST_AI_TOKEN;
+    const previousFetch = globalThis.fetch;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      process.env.ATLAS_TEST_AI_TOKEN = "sk_example_secret_token";
+      await main(["auth", "add", "--provider", "ai", "--alias", "cloud.default", "--value-env", "ATLAS_TEST_AI_TOKEN"]);
+      globalThis.fetch = (async (_url, init) => {
+        expect(init?.headers).toMatchObject({ authorization: "Bearer sk_example_secret_token" });
+        return new Response(JSON.stringify({ data: [{ id: "free-model" }] }), { status: 200 });
+      }) as typeof fetch;
+
+      const code = await main(["ai", "providers", "health"]);
+
+      expect(code).toBe(0);
+      expect(logs).toContain("cloud.default: configured openai-compatible free-model openai-compatible model available");
+      expect(logs.join("\n")).not.toContain("sk_example_secret_token");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("ATLAS_TEST_AI_TOKEN", previousToken);
+      globalThis.fetch = previousFetch;
+    }
+  });
+
   it("inspects a Linear issue fixture", async () => {
     const root = tempRoot();
     const fixturePath = join(root, "linear.json");
