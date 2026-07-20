@@ -12,6 +12,7 @@ export * from "./doctor.js";
 export * from "./execution-import.js";
 export * from "./finding-disposition.js";
 export * from "./fix-batch.js";
+export * from "./git-safeguards.js";
 export * from "./lifecycle.js";
 export * from "./manual-task.js";
 export * from "./planning.js";

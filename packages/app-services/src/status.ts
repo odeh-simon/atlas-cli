@@ -54,7 +54,36 @@ function nextCommandsForSession(session: SessionRecord): readonly string[] {
     return ["atlas resume"];
   }
 
-  return allowedCommands(session.primaryState).map(commandToCli);
+  return [...allowedCommands(session.primaryState)]
+    .sort((left, right) => commandPriority(session.primaryState, left) - commandPriority(session.primaryState, right))
+    .map(commandToCli);
+}
+
+function commandPriority(state: string, command: string): number {
+  if (state === "planning_ready") {
+    if (command === "import_contract") return 0;
+    if (command === "export_plan") return 1;
+  }
+
+  switch (command) {
+    case "prepare_review":
+    case "evaluate_completion":
+    case "approve_completion":
+    case "import_review":
+    case "dispose_findings":
+    case "prepare_fix_batch":
+    case "run_basic_check":
+    case "import_execution_result":
+    case "export_agent_package":
+    case "approve_contract":
+    case "export_plan":
+    case "import_context":
+      return 0;
+    case "import_contract":
+      return 10;
+    default:
+      return 5;
+  }
 }
 
 function commandToCli(command: string): string {

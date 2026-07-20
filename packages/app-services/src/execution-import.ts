@@ -6,6 +6,7 @@ import { appendEvent, createArtifactRecord, listSessionsForRepository, updateSes
 import { executionReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
+import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface ImportExecutionResultInput extends RuntimeOptions {
@@ -31,6 +32,7 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
 
     const now = new Date().toISOString();
     const artifactId = newId("art");
+    const git = readWorkflowGitSnapshot(runtime.paths.cwd);
     const raw = JSON.parse(readFileSync(input.filePath, "utf8")) as Record<string, unknown>;
     const report = executionReportSchema.parse({
       ...raw,
@@ -44,7 +46,14 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
       sensitivity: "confidential",
       parents: [],
       content_sha256: "0".repeat(64),
-      metadata: {},
+      metadata: {
+        ...(git === undefined
+          ? {}
+          : {
+              git,
+              git_fingerprint: git.fingerprint
+            })
+      },
       run_id: raw.run_id ?? newId("run")
     });
     const next = transition({
@@ -87,7 +96,8 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
       metadata: {
         executionReportArtifactId: artifactId,
         processStatus: report.process_status,
-        agentClaimsComplete: report.agent_claims_complete
+        agentClaimsComplete: report.agent_claims_complete,
+        gitFingerprint: git?.fingerprint
       }
     });
 

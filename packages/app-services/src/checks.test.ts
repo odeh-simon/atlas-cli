@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -75,4 +76,37 @@ describe("runBasicCheck", () => {
     expect(result.status).toBe("passed");
     expect(result.checkCount).toBe(2);
   });
+
+  it("records Git fingerprints on check artifacts when the repo is available", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    git(cwd, "init");
+    writeFileSync(join(cwd, "README.md"), "Initial docs\n");
+    git(cwd, "add", "README.md");
+    git(cwd, "-c", "user.email=atlas@example.test", "-c", "user.name=Atlas", "commit", "-m", "Initial");
+
+    const result = await runBasicCheck({ cwd, env });
+    const check = readLatestJsonArtifact(root, result.sessionId, "check_result") as {
+      git_fingerprint?: unknown;
+      metadata?: { git?: { dirty?: unknown } };
+    };
+
+    expect(typeof check.git_fingerprint).toBe("string");
+    expect(check.metadata?.git?.dirty).toBe(false);
+  });
 });
+
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+}
+
+function readLatestJsonArtifact(root: string, sessionId: string, type: string): unknown {
+  const artifactDir = join(root, "home", "artifacts", sessionId, type);
+  const latest = readdirSync(artifactDir).sort().at(-1);
+  if (latest === undefined) throw new Error(`No ${type} artifact found`);
+  return JSON.parse(readFileSync(join(artifactDir, latest), "utf8")) as unknown;
+}

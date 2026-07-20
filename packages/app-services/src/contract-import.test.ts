@@ -1,9 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  approveContract,
+  exportManualAgentPackage,
   exportPlanningPackage,
   getStatus,
   importContextManifest,
@@ -78,7 +80,7 @@ describe("importContract", () => {
 
     expect(result.state).toBe("contract_draft");
     expect(status.session?.primaryState).toBe("contract_draft");
-    expect(status.nextCommands[0]).toBe("atlas contract import <file>");
+    expect(status.nextCommands[0]).toBe("atlas approve contract");
   });
 
   it("stores an invalid contract as rejected without advancing state", async () => {
@@ -101,4 +103,43 @@ describe("importContract", () => {
     expect(status.session?.primaryState).toBe("planning_ready");
     expect(contracts[0]?.status).toBe("rejected");
   });
+
+  it("returns material contract changes to draft so they require reapproval", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await preparePlanning(root);
+    const contractPath = join(root, "contract.json");
+    writeFileSync(contractPath, JSON.stringify(validContract()));
+    await importContract({ cwd, env, filePath: contractPath });
+    await approveContract({ cwd, env, actorId: "tester" });
+
+    const changed = {
+      ...validContract(),
+      acceptance_criteria: ["Contract imports", "Changed acceptance requires approval"]
+    };
+    writeFileSync(contractPath, JSON.stringify(changed));
+    const imported = await importContract({ cwd, env, filePath: contractPath });
+    const status = await getStatus({ cwd, env });
+    const runtime = await openAtlasRuntime({ cwd, env });
+    const contracts = listArtifactsForSession(runtime.db, imported.sessionId).filter(
+      (artifact) => artifact.type === "implementation_contract"
+    );
+    const latest = contracts.at(-1);
+    closeAtlasRuntime(runtime, false);
+
+    expect(imported.state).toBe("contract_draft");
+    expect(status.session?.primaryState).toBe("contract_draft");
+    expect(latest?.status).toBe("valid");
+    expect(readContractRequiresReapproval(root, imported.sessionId)).toBe(true);
+    await expect(exportManualAgentPackage({ cwd, env })).rejects.toThrow("approved contract");
+  });
 });
+
+function readContractRequiresReapproval(root: string, sessionId: string): boolean {
+  const artifactDir = join(root, "home", "artifacts", sessionId, "implementation_contract");
+  const latest = readdirSync(artifactDir).sort().at(-1);
+  if (latest === undefined) throw new Error("No contract artifact found");
+  const parsed = JSON.parse(readFileSync(join(artifactDir, latest), "utf8")) as {
+    metadata?: { contract_diff?: { requires_reapproval?: unknown } };
+  };
+  return parsed.metadata?.contract_diff?.requires_reapproval === true;
+}

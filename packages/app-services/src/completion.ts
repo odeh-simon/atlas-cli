@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { GateFailedError, StateTransitionError } from "@atlas/domain";
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import {
@@ -15,6 +18,7 @@ import {
 import { completionReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
+import { hasStaleGitFingerprint, readWorkflowGitSnapshot, type WorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface EvaluateCompletionResult {
@@ -47,7 +51,9 @@ export async function evaluateCompletion(options: RuntimeOptions = {}): Promise<
     const gates = assertCompletionGates(
       session,
       listArtifactsForSession(runtime.db, session.sessionId),
-      listFindingsForSession(runtime.db, session.sessionId)
+      listFindingsForSession(runtime.db, session.sessionId),
+      runtime.paths.artifactRoot,
+      readWorkflowGitSnapshot(runtime.paths.cwd)
     );
 
     const now = new Date().toISOString();
@@ -86,7 +92,13 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
     }
 
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
-    const gates = assertCompletionGates(session, artifacts, listFindingsForSession(runtime.db, session.sessionId));
+    const gates = assertCompletionGates(
+      session,
+      artifacts,
+      listFindingsForSession(runtime.db, session.sessionId),
+      runtime.paths.artifactRoot,
+      readWorkflowGitSnapshot(runtime.paths.cwd)
+    );
 
     const now = new Date().toISOString();
     const artifactId = newId("art");
@@ -179,9 +191,11 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
 }
 
 function assertCompletionGates(
-  _session: SessionRecord,
+  session: SessionRecord,
   artifacts: readonly ArtifactRecord[],
-  findings: readonly FindingRecord[]
+  findings: readonly FindingRecord[],
+  artifactRoot: string,
+  currentGit: WorkflowGitSnapshot | undefined
 ): {
   readonly contractArtifact: ArtifactRecord;
   readonly checkResultArtifacts: readonly ArtifactRecord[];
@@ -202,6 +216,7 @@ function assertCompletionGates(
   if (checkResultArtifacts.length === 0) {
     failures.push("passing required check result missing");
   }
+  failures.push(...gitFreshnessFailures({ session, artifacts, checkResultArtifacts, artifactRoot, currentGit }));
 
   const unresolvedBlockingFindings = findings.filter(
     (finding) => finding.severity === "blocking" && (finding.status === "open" || finding.status === "reopened")
@@ -220,4 +235,42 @@ function assertCompletionGates(
     unresolvedBlockingFindings,
     failures
   };
+}
+
+function gitFreshnessFailures(input: {
+  readonly session: SessionRecord;
+  readonly artifacts: readonly ArtifactRecord[];
+  readonly checkResultArtifacts: readonly ArtifactRecord[];
+  readonly artifactRoot: string;
+  readonly currentGit: WorkflowGitSnapshot | undefined;
+}): string[] {
+  if (input.currentGit === undefined) return [];
+
+  const failures: string[] = [];
+  const context = input.artifacts.find((artifact) => artifact.artifactId === input.session.currentContextArtifactId);
+  const contextFingerprint = context === undefined ? undefined : readArtifactGitFingerprint(input.artifactRoot, context);
+  if (hasStaleGitFingerprint({ recorded: contextFingerprint, current: input.currentGit.base_fingerprint })) {
+    failures.push("context manifest is stale against current Git HEAD; rerun atlas context build");
+  }
+
+  const latestCheck = input.checkResultArtifacts.at(-1);
+  const checkFingerprint = latestCheck === undefined ? undefined : readArtifactGitFingerprint(input.artifactRoot, latestCheck);
+  if (hasStaleGitFingerprint({ recorded: checkFingerprint, current: input.currentGit.fingerprint })) {
+    failures.push("check result is stale against current Git state; rerun atlas checks run");
+  }
+
+  return failures;
+}
+
+function readArtifactGitFingerprint(artifactRoot: string, artifact: ArtifactRecord): string | undefined {
+  try {
+    const raw = JSON.parse(readFileSync(join(artifactRoot, artifact.storageUri), "utf8")) as {
+      git_fingerprint?: unknown;
+      metadata?: { git_fingerprint?: unknown };
+    };
+    if (typeof raw.git_fingerprint === "string") return raw.git_fingerprint;
+    return typeof raw.metadata?.git_fingerprint === "string" ? raw.metadata.git_fingerprint : undefined;
+  } catch {
+    return undefined;
+  }
 }

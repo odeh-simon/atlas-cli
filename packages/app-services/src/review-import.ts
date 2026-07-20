@@ -13,6 +13,7 @@ import {
 import { findingSchema, reviewReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
+import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface ImportReviewReportInput extends RuntimeOptions {
@@ -43,6 +44,7 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
 
     const now = new Date().toISOString();
     const artifactId = newId("art");
+    const git = readWorkflowGitSnapshot(runtime.paths.cwd);
     const raw = JSON.parse(readFileSync(input.filePath, "utf8")) as {
       summary?: string;
       findings?: Array<Record<string, unknown>>;
@@ -78,7 +80,14 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
       sensitivity: "confidential",
       parents: [reviewPackage.artifactId],
       content_sha256: "0".repeat(64),
-      metadata: {},
+      metadata: {
+        ...(git === undefined
+          ? {}
+          : {
+              git,
+              git_fingerprint: git.fingerprint
+            })
+      },
       review_package_artifact_id: reviewPackage.artifactId,
       review_package_sha256: reviewPackage.sha256,
       summary: raw.summary ?? "Imported review report",
@@ -138,7 +147,11 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
       actorType: "user",
       occurredAt: now,
       summary: "Review report imported",
-      metadata: { reviewReportArtifactId: artifactId, findingIds: report.findings.map((finding) => finding.finding_id) }
+      metadata: {
+        reviewReportArtifactId: artifactId,
+        findingIds: report.findings.map((finding) => finding.finding_id),
+        gitFingerprint: git?.fingerprint
+      }
     });
 
     return {

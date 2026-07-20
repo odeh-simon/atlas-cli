@@ -16,6 +16,7 @@ import {
 import { aiContextRecommendationSchema, contextManifestSchema, contextQualityReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
+import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface BuildContextInput extends RuntimeOptions {
@@ -47,6 +48,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     const now = new Date().toISOString();
     const artifactId = newId("art");
+    const git = readWorkflowGitSnapshot(runtime.paths.cwd);
     const aiRecommendation = loadAiRecommendation(runtime.paths.artifactRoot, artifacts, input.aiRecommendationArtifactId);
     const discovery = discoverContextSources({
       rootPath: runtime.paths.cwd,
@@ -69,6 +71,12 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       content_sha256: "0".repeat(64),
       metadata: {
         discovery: aiRecommendation === undefined ? "deterministic" : "hybrid",
+        ...(git === undefined
+          ? {}
+          : {
+              git,
+              git_fingerprint: git.base_fingerprint
+            }),
         ...(aiRecommendation === undefined
           ? {}
           : {
@@ -128,7 +136,13 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       content_sha256: "0".repeat(64),
       metadata: {
         discovery: manifest.metadata.discovery,
-        context_manifest_artifact_id: artifactId
+        context_manifest_artifact_id: artifactId,
+        ...(git === undefined
+          ? {}
+          : {
+              git,
+              git_fingerprint: git.base_fingerprint
+            })
       },
       context_manifest_artifact_id: artifactId,
       ...evaluateContextQuality({ discovery, aiRecommendation })
@@ -191,6 +205,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
         contextArtifactId: artifactId,
         contextQualityReportArtifactId: qualityArtifactId,
         contextReadiness: qualityReport.readiness,
+        gitFingerprint: git?.base_fingerprint,
         sourceCount: discovery.sources.length,
         includedSourceCount: discovery.sources.filter((source) => source.included).length
       }

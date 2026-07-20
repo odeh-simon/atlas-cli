@@ -14,6 +14,7 @@ import {
 import { checkResultSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
+import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface RunBasicCheckResult {
@@ -35,6 +36,7 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
     }
 
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
+    const git = readWorkflowGitSnapshot(runtime.paths.cwd);
     const configuredChecks = readConfiguredChecks(runtime.paths.cwd);
     const checkSet = await runCheckSet({
       cwd: runtime.paths.cwd,
@@ -68,6 +70,12 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       metadata: {
         check_count: checkSet.results.length,
         failed_required: checkSet.failedRequired,
+        ...(git === undefined
+          ? {}
+          : {
+              git,
+              git_fingerprint: git.fingerprint
+            }),
         results: checkSet.results.map((result) => ({
           name: result.name,
           required: result.required,
@@ -88,7 +96,8 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       check_name: "full-check-set",
       status,
       required: true,
-      summary: status === "passed" ? "All required checks passed" : failures.join("; ")
+      summary: status === "passed" ? "All required checks passed" : failures.join("; "),
+      ...(git === undefined ? {} : { git_fingerprint: git.fingerprint })
     });
     const written = writeImmutableArtifactContent({
       rootDir: runtime.paths.artifactRoot,
@@ -123,7 +132,7 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
         actorType: "atlas",
         occurredAt: now,
         summary: "Required checks failed",
-        metadata: { checkResultArtifactId: artifactId, failures }
+        metadata: { checkResultArtifactId: artifactId, failures, gitFingerprint: git?.fingerprint }
       });
       throw new GateFailedError("Required check failed", { failures, checkResultArtifactId: artifactId });
     }
@@ -141,7 +150,7 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       actorType: "atlas",
       occurredAt: now,
       summary: "Required checks passed",
-      metadata: { checkResultArtifactId: artifactId, checkCount: checkSet.results.length }
+      metadata: { checkResultArtifactId: artifactId, checkCount: checkSet.results.length, gitFingerprint: git?.fingerprint }
     });
 
     return {

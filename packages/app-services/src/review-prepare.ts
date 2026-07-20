@@ -4,6 +4,7 @@ import { appendEvent, createArtifactRecord, listArtifactsForSession, listSession
 import { reviewPackageSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
+import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface PrepareReviewResult {
@@ -27,6 +28,7 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
     if (contract === undefined || execution === undefined || checks.length === 0) {
       throw new GateFailedError("Review package requires approved contract, execution report, and passing check result");
     }
+    const git = readWorkflowGitSnapshot(runtime.paths.cwd);
 
     const now = new Date().toISOString();
     const artifactId = newId("art");
@@ -41,7 +43,14 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       sensitivity: "confidential",
       parents: [contract.artifactId, execution.artifactId, ...checks.map((check) => check.artifactId)],
       content_sha256: "0".repeat(64),
-      metadata: {},
+      metadata: {
+        ...(git === undefined
+          ? {}
+          : {
+              git,
+              git_fingerprint: git.fingerprint
+            })
+      },
       contract_artifact_id: contract.artifactId,
       execution_report_artifact_id: execution.artifactId,
       check_result_artifact_ids: checks.map((check) => check.artifactId),
@@ -86,7 +95,7 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       actorType: "atlas",
       occurredAt: now,
       summary: "Review package prepared",
-      metadata: { reviewPackageArtifactId: artifactId }
+      metadata: { reviewPackageArtifactId: artifactId, gitFingerprint: git?.fingerprint }
     });
 
     return {

@@ -62,35 +62,44 @@ const table: Partial<Record<WorkflowState, Partial<Record<TransitionCommand, Wor
     approve_contract: "contract_approved"
   },
   contract_approved: {
+    import_contract: "contract_draft",
     export_agent_package: "implementation_ready"
   },
   implementation_ready: {
+    import_contract: "contract_draft",
     import_execution_result: "implementation_reconciled"
   },
   implementation_reconciled: {
+    import_contract: "contract_draft",
     run_basic_check: "checks_completed"
   },
   checks_completed: {
+    import_contract: "contract_draft",
     prepare_review: "review_ready",
     evaluate_completion: "completion_ready",
     run_basic_check: "checks_completed"
   },
   review_ready: {
+    import_contract: "contract_draft",
     import_review: "review_imported"
   },
   review_imported: {
+    import_contract: "contract_draft",
     dispose_findings: "findings_dispositioned",
     prepare_fix_batch: "fix_ready"
   },
   findings_dispositioned: {
+    import_contract: "contract_draft",
     evaluate_completion: "completion_ready",
     dispose_findings: "findings_dispositioned",
     prepare_fix_batch: "fix_ready"
   },
   fix_ready: {
+    import_contract: "contract_draft",
     export_agent_package: "implementation_ready"
   },
   completion_ready: {
+    import_contract: "contract_draft",
     approve_completion: "completed",
     evaluate_completion: "completion_ready"
   },

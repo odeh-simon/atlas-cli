@@ -223,6 +223,8 @@ export const agentImplementationPackageSchema = artifactEnvelopeSchema.extend({
 });
 
 const gitSnapshotSchema = z.object({
+  fingerprint: sha256Schema,
+  base_fingerprint: sha256Schema,
   root_path_hash: sha256Schema,
   branch: z.string().min(1).optional(),
   head_sha: z.string().min(1).optional(),
@@ -232,9 +234,21 @@ const gitSnapshotSchema = z.object({
     z.object({
       path: z.string().min(1),
       index: z.string().min(1),
-      working_tree: z.string().min(1)
+      working_tree: z.string().min(1),
+      original_path: z.string().min(1).optional()
     })
-  )
+  ),
+  diff_summary: z
+    .object({
+      base_ref: z.string().min(1),
+      total_files: z.number().int().nonnegative(),
+      total_line_changes: z.number().int().nonnegative(),
+      has_binary: z.boolean(),
+      has_secret_risk: z.boolean(),
+      truncated: z.boolean(),
+      reviewable: z.boolean()
+    })
+    .optional()
 });
 
 export const agentRunLogSchema = artifactEnvelopeSchema.extend({

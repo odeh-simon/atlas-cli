@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { StateTransitionError, ValidationError } from "@atlas/domain";
@@ -10,7 +11,7 @@ import {
   updateSessionContractArtifact
 } from "@atlas/persistence";
 import { implementationContractSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+import { diffImplementationContracts, transition } from "@atlas/workflow-engine";
 
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
@@ -37,6 +38,7 @@ export async function importContract(input: ImportContractInput): Promise<Import
 
     const now = new Date().toISOString();
     const artifactId = newId("art");
+    const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     const rawContent = readFileSync(input.filePath, "utf8");
     const candidate = parseContract(rawContent, session.sessionId, artifactId, now);
     const parsed = implementationContractSchema.safeParse(candidate);
@@ -85,6 +87,32 @@ export async function importContract(input: ImportContractInput): Promise<Import
       command: "import_contract",
       overlay: { paused: session.paused, archived: session.archived, disposition: session.disposition }
     }).to;
+    const approvedContract = loadLatestApprovedContract(runtime.paths.artifactRoot, artifacts);
+    const contractDiff =
+      approvedContract === undefined ? undefined : diffImplementationContracts(approvedContract, parsed.data);
+    const contractDiffMetadata =
+      approvedContract === undefined || contractDiff === undefined
+        ? {}
+        : {
+            previous_approved_contract_artifact_id: approvedContract.artifact_id,
+            contract_diff: {
+              has_changes: contractDiff.hasChanges,
+              requires_reapproval: contractDiff.requiresReapproval,
+              changes: contractDiff.changes.map((change) => ({
+                section: change.section,
+                category: change.category,
+                material: change.material,
+                summary: change.summary
+              }))
+            }
+          };
+    const contractWithMetadata = implementationContractSchema.parse({
+      ...parsed.data,
+      metadata: {
+        ...parsed.data.metadata,
+        ...contractDiffMetadata
+      }
+    });
     const contentVersion = nextContractVersion(runtime.db, session.sessionId);
     const written = writeImmutableArtifactContent({
       rootDir: runtime.paths.artifactRoot,
@@ -93,7 +121,7 @@ export async function importContract(input: ImportContractInput): Promise<Import
       type: "implementation_contract",
       contentVersion,
       mediaType: "application/json",
-      content: `${JSON.stringify(parsed.data, null, 2)}\n`
+      content: `${JSON.stringify(contractWithMetadata, null, 2)}\n`
     });
     createArtifactRecord(runtime.db, {
       artifactId,
@@ -123,7 +151,11 @@ export async function importContract(input: ImportContractInput): Promise<Import
       actorType: "user",
       occurredAt: now,
       summary: "Implementation contract imported",
-      metadata: { contractArtifactId: artifactId }
+      metadata: {
+        contractArtifactId: artifactId,
+        requiresReapproval: contractDiff?.requiresReapproval ?? true,
+        materialChangeSections: contractDiff?.changes.filter((change) => change.material).map((change) => change.section) ?? []
+      }
     });
 
     return {
@@ -136,6 +168,17 @@ export async function importContract(input: ImportContractInput): Promise<Import
   } finally {
     closeAtlasRuntime(runtime);
   }
+}
+
+function loadLatestApprovedContract(
+  artifactRoot: string,
+  artifacts: ReturnType<typeof listArtifactsForSession>
+): ReturnType<typeof implementationContractSchema.parse> | undefined {
+  const approved = artifacts
+    .filter((artifact) => artifact.type === "implementation_contract" && artifact.status === "approved")
+    .at(-1);
+  if (approved === undefined) return undefined;
+  return implementationContractSchema.parse(JSON.parse(readFileSync(join(artifactRoot, approved.storageUri), "utf8")) as unknown);
 }
 
 function nextContractVersion(db: Parameters<typeof listArtifactsForSession>[0], sessionId: string): number {

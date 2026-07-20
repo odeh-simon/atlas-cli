@@ -5,12 +5,12 @@ import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { invokeClaudeCode } from "@atlas/adapters-claude-code";
 import { invokeCodex } from "@atlas/adapters-codex";
 import { StateTransitionError } from "@atlas/domain";
-import { readGitRepositoryFacts, type GitRepositoryFacts, type GitStatusEntry } from "@atlas/git";
 import { appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
 import { type ProcessRunResult } from "@atlas/process-runner";
 import { agentRunLogSchema, executionReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
+import { readWorkflowGitSnapshot, type WorkflowGitChangedFile, type WorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export type ImplementationAgentProvider = "codex" | "claude";
@@ -76,7 +76,7 @@ export async function invokeImplementationAgent(
     const packagePath = join(runtime.paths.artifactRoot, ...implementationPackage.storageUri.split("/"));
     const instructions = readFileSync(packagePath, "utf8");
     const mode = instructions.includes("Mode: fix") ? "fix" : "implement";
-    const gitBefore = readGitFactsSafely(runtime.paths.cwd);
+    const gitBefore = readWorkflowGitSnapshot(runtime.paths.cwd);
     const invocationPackage = {
       mode,
       instructions,
@@ -95,7 +95,7 @@ export async function invokeImplementationAgent(
             package: invocationPackage,
             timeoutMs: input.timeoutMs
           });
-    const gitAfter = readGitFactsSafely(runtime.paths.cwd);
+    const gitAfter = readWorkflowGitSnapshot(runtime.paths.cwd);
     const parsedCompletionReport = parseAgentCompletionReport(invocation.process.stdout, invocation.process.stderr);
     const changedFiles =
       parsedCompletionReport.changedFiles.length > 0
@@ -118,7 +118,9 @@ export async function invokeImplementationAgent(
       metadata: {
         provider: invocation.provider,
         command: invocation.process.command,
-        processStatus: invocation.process.status
+        processStatus: invocation.process.status,
+        gitBeforeFingerprint: gitBefore?.fingerprint,
+        gitAfterFingerprint: gitAfter?.fingerprint
       },
       provider: invocation.provider,
       run_id: invocation.process.runId,
@@ -170,8 +172,10 @@ export async function invokeImplementationAgent(
         command: invocation.process.command,
         exitCode: invocation.process.exitCode,
         agentRunLogArtifactId: runLogArtifactId,
-        gitBeforeHead: gitBefore?.headSha,
-        gitAfterHead: gitAfter?.headSha
+        gitBeforeFingerprint: gitBefore?.fingerprint,
+        gitAfterFingerprint: gitAfter?.fingerprint,
+        gitBeforeHead: gitBefore?.head_sha,
+        gitAfterHead: gitAfter?.head_sha
       },
       run_id: invocation.process.runId,
       process_status: invocation.process.status,
@@ -225,7 +229,9 @@ export async function invokeImplementationAgent(
         runId: invocation.process.runId,
         processStatus: invocation.process.status,
         agentClaimsComplete: report.agent_claims_complete,
-        changedFiles: report.changed_files
+        changedFiles: report.changed_files,
+        gitBeforeFingerprint: gitBefore?.fingerprint,
+        gitAfterFingerprint: gitAfter?.fingerprint
       }
     });
 
@@ -253,14 +259,6 @@ function limitationsForProcess(status: string, stderr: string, parsedLimitations
   return [detail === undefined ? `Agent process ended with status ${status}` : detail.slice(0, 500)];
 }
 
-function readGitFactsSafely(cwd: string): GitRepositoryFacts | undefined {
-  try {
-    return readGitRepositoryFacts({ cwd });
-  } catch {
-    return undefined;
-  }
-}
-
 function processForArtifact(process: ProcessRunResult) {
   return {
     command: process.command,
@@ -280,19 +278,8 @@ function processForArtifact(process: ProcessRunResult) {
   };
 }
 
-function gitSnapshotForArtifact(facts: GitRepositoryFacts) {
-  return {
-    root_path_hash: facts.rootPathHash,
-    ...(facts.branch === undefined ? {} : { branch: facts.branch }),
-    ...(facts.headSha === undefined ? {} : { head_sha: facts.headSha }),
-    dirty: facts.status.isDirty,
-    changed_file_count: facts.status.changedFileCount,
-    changed_files: facts.status.entries.map((entry) => ({
-      path: entry.path,
-      index: entry.index,
-      working_tree: entry.workingTree
-    }))
-  };
+function gitSnapshotForArtifact(snapshot: WorkflowGitSnapshot) {
+  return snapshot;
 }
 
 interface ParsedAgentCompletionReport {
@@ -348,15 +335,15 @@ function parsedCompletionReportForArtifact(report: ParsedAgentCompletionReport) 
   };
 }
 
-function changedFilesIntroduced(before: GitRepositoryFacts | undefined, after: GitRepositoryFacts | undefined): string[] {
+function changedFilesIntroduced(before: WorkflowGitSnapshot | undefined, after: WorkflowGitSnapshot | undefined): string[] {
   if (after === undefined) return [];
-  if (before === undefined) return after.status.entries.map((entry) => entry.path);
-  const beforeEntries = new Map(before.status.entries.map((entry) => [entry.path, statusSignature(entry)]));
-  return after.status.entries
+  if (before === undefined) return after.changed_files.map((entry) => entry.path);
+  const beforeEntries = new Map(before.changed_files.map((entry) => [entry.path, statusSignature(entry)]));
+  return after.changed_files
     .filter((entry) => beforeEntries.get(entry.path) !== statusSignature(entry))
     .map((entry) => entry.path);
 }
 
-function statusSignature(entry: GitStatusEntry): string {
-  return `${entry.index}${entry.workingTree}:${entry.originalPath ?? ""}`;
+function statusSignature(entry: WorkflowGitChangedFile): string {
+  return `${entry.index}${entry.working_tree}:${entry.original_path ?? ""}`;
 }
