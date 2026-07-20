@@ -57,6 +57,7 @@ export async function invokeCodex(input: InvokeCodexInput): Promise<CodexInvocat
     command,
     args: ["--prompt", payload],
     cwd: input.package.cwd,
+    allowedCwdRoot: input.package.cwd,
     timeoutMs: input.timeoutMs
   });
   return { provider: "codex", process };

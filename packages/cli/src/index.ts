@@ -898,8 +898,11 @@ async function implementAgentCommand(args: string[]): Promise<number> {
   const result = await invokeImplementationAgent({ provider, command });
   console.log(`Agent: ${result.provider}`);
   console.log(`Package: ${result.packageArtifactId}`);
+  console.log(`Agent run log: ${result.agentRunLogArtifactId}`);
   console.log(`Execution report: ${result.executionReportArtifactId}`);
   console.log(`Process: ${result.processStatus}`);
+  console.log(`Agent claims complete: ${result.agentClaimsComplete ? "yes" : "no"}`);
+  console.log(`Changed files: ${result.changedFiles.length}`);
   console.log(`State: ${result.state}`);
   console.log(`Next: ${result.nextCommand}`);
   return result.processStatus === "succeeded" ? 0 : 1;

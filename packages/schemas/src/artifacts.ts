@@ -15,6 +15,7 @@ export const artifactTypeSchema = z.enum([
   "implementation_contract",
   "contract_approval",
   "agent_implementation_package",
+  "agent_run_log",
   "execution_report",
   "check_result",
   "review_package",
@@ -221,6 +222,53 @@ export const agentImplementationPackageSchema = artifactEnvelopeSchema.extend({
   report_schema_version: z.number().int().positive()
 });
 
+const gitSnapshotSchema = z.object({
+  root_path_hash: sha256Schema,
+  branch: z.string().min(1).optional(),
+  head_sha: z.string().min(1).optional(),
+  dirty: z.boolean(),
+  changed_file_count: z.number().int().nonnegative(),
+  changed_files: z.array(
+    z.object({
+      path: z.string().min(1),
+      index: z.string().min(1),
+      working_tree: z.string().min(1)
+    })
+  )
+});
+
+export const agentRunLogSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("agent_run_log"),
+  provider: z.enum(["codex", "claude-code"]),
+  run_id: idSchema,
+  package_artifact_id: idSchema,
+  process: z.object({
+    command: z.string().min(1),
+    args: z.array(z.string()),
+    cwd: z.string().min(1).optional(),
+    status: z.enum(["succeeded", "failed", "cancelled", "timeout", "interrupted", "unknown"]),
+    exit_code: z.number().int().optional(),
+    signal: z.string().min(1).optional(),
+    started_at: isoDateTimeSchema,
+    ended_at: isoDateTimeSchema,
+    duration_ms: z.number().int().nonnegative(),
+    stdout: z.string(),
+    stderr: z.string(),
+    stdout_truncated: z.boolean(),
+    stderr_truncated: z.boolean(),
+    redacted: z.boolean()
+  }),
+  git_before: gitSnapshotSchema.optional(),
+  git_after: gitSnapshotSchema.optional(),
+  parsed_completion_report: z
+    .object({
+      agent_claims_complete: z.boolean().optional(),
+      changed_files: z.array(z.string()).default([]),
+      limitations: z.array(z.string()).default([])
+    })
+    .optional()
+});
+
 export const executionReportSchema = artifactEnvelopeSchema.extend({
   type: z.literal("execution_report"),
   run_id: idSchema,
@@ -333,6 +381,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   implementationContractSchema,
   contractApprovalSchema,
   agentImplementationPackageSchema,
+  agentRunLogSchema,
   executionReportSchema,
   checkResultSchema,
   reviewPackageSchema,
@@ -349,4 +398,5 @@ export type AiContextRecommendation = z.infer<typeof aiContextRecommendationSche
 export type ContextQualityReport = z.infer<typeof contextQualityReportSchema>;
 export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;
 export type ImplementationContract = z.infer<typeof implementationContractSchema>;
+export type AgentRunLog = z.infer<typeof agentRunLogSchema>;
 export type WalkingSkeletonArtifact = z.infer<typeof walkingSkeletonArtifactSchema>;

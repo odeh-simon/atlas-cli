@@ -59,6 +59,7 @@ export async function invokeClaudeCode(input: InvokeClaudeCodeInput): Promise<Cl
     command,
     args: ["--print", payload],
     cwd: input.package.cwd,
+    allowedCwdRoot: input.package.cwd,
     timeoutMs: input.timeoutMs
   });
   return { provider: "claude-code", process };

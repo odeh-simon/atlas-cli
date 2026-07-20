@@ -5,8 +5,10 @@ import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { invokeClaudeCode } from "@atlas/adapters-claude-code";
 import { invokeCodex } from "@atlas/adapters-codex";
 import { StateTransitionError } from "@atlas/domain";
+import { readGitRepositoryFacts, type GitRepositoryFacts, type GitStatusEntry } from "@atlas/git";
 import { appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
-import { executionReportSchema } from "@atlas/schemas";
+import { type ProcessRunResult } from "@atlas/process-runner";
+import { agentRunLogSchema, executionReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
@@ -17,17 +19,40 @@ export interface InvokeImplementationAgentInput extends RuntimeOptions {
   readonly provider: ImplementationAgentProvider;
   readonly command?: string | undefined;
   readonly timeoutMs?: number | undefined;
+  readonly agentInvoker?: AgentInvoker | undefined;
 }
 
 export interface InvokeImplementationAgentResult {
   readonly sessionId: string;
   readonly provider: "codex" | "claude-code";
   readonly packageArtifactId: string;
+  readonly agentRunLogArtifactId: string;
   readonly executionReportArtifactId: string;
   readonly processStatus: string;
+  readonly agentClaimsComplete: boolean;
+  readonly changedFiles: readonly string[];
   readonly state: string;
   readonly nextCommand: string;
 }
+
+export interface AgentInvokerInput {
+  readonly provider: ImplementationAgentProvider;
+  readonly command?: string | undefined;
+  readonly package: {
+    readonly mode: "implement" | "fix";
+    readonly instructions: string;
+    readonly artifactIds: readonly string[];
+    readonly cwd: string;
+  };
+  readonly timeoutMs?: number | undefined;
+}
+
+export interface AgentInvocation {
+  readonly provider: "codex" | "claude-code";
+  readonly process: ProcessRunResult;
+}
+
+export type AgentInvoker = (input: AgentInvokerInput) => Promise<AgentInvocation>;
 
 export async function invokeImplementationAgent(
   input: InvokeImplementationAgentInput
@@ -51,6 +76,7 @@ export async function invokeImplementationAgent(
     const packagePath = join(runtime.paths.artifactRoot, ...implementationPackage.storageUri.split("/"));
     const instructions = readFileSync(packagePath, "utf8");
     const mode = instructions.includes("Mode: fix") ? "fix" : "implement";
+    const gitBefore = readGitFactsSafely(runtime.paths.cwd);
     const invocationPackage = {
       mode,
       instructions,
@@ -59,11 +85,74 @@ export async function invokeImplementationAgent(
     } as const;
 
     const invocation =
-      input.provider === "claude"
-        ? await invokeClaudeCode({ command: input.command, package: invocationPackage, timeoutMs: input.timeoutMs })
-        : await invokeCodex({ command: input.command, package: invocationPackage, timeoutMs: input.timeoutMs });
+      input.agentInvoker === undefined
+        ? input.provider === "claude"
+          ? await invokeClaudeCode({ command: input.command, package: invocationPackage, timeoutMs: input.timeoutMs })
+          : await invokeCodex({ command: input.command, package: invocationPackage, timeoutMs: input.timeoutMs })
+        : await input.agentInvoker({
+            provider: input.provider,
+            command: input.command,
+            package: invocationPackage,
+            timeoutMs: input.timeoutMs
+          });
+    const gitAfter = readGitFactsSafely(runtime.paths.cwd);
+    const parsedCompletionReport = parseAgentCompletionReport(invocation.process.stdout, invocation.process.stderr);
+    const changedFiles =
+      parsedCompletionReport.changedFiles.length > 0
+        ? parsedCompletionReport.changedFiles
+        : changedFilesIntroduced(gitBefore, gitAfter);
 
     const now = new Date().toISOString();
+    const runLogArtifactId = newId("art");
+    const runLog = agentRunLogSchema.parse({
+      artifact_id: runLogArtifactId,
+      session_id: session.sessionId,
+      type: "agent_run_log",
+      schema_version: 1,
+      content_version: artifacts.filter((artifact) => artifact.type === "agent_run_log").length + 1,
+      created_at: now,
+      producer: { type: "agent", id: invocation.provider },
+      sensitivity: "confidential",
+      parents: [implementationPackage.artifactId],
+      content_sha256: "0".repeat(64),
+      metadata: {
+        provider: invocation.provider,
+        command: invocation.process.command,
+        processStatus: invocation.process.status
+      },
+      provider: invocation.provider,
+      run_id: invocation.process.runId,
+      package_artifact_id: implementationPackage.artifactId,
+      process: processForArtifact(invocation.process),
+      ...(gitBefore === undefined ? {} : { git_before: gitSnapshotForArtifact(gitBefore) }),
+      ...(gitAfter === undefined ? {} : { git_after: gitSnapshotForArtifact(gitAfter) }),
+      ...(parsedCompletionReport.present ? { parsed_completion_report: parsedCompletionReportForArtifact(parsedCompletionReport) } : {})
+    });
+    const writtenRunLog = writeImmutableArtifactContent({
+      rootDir: runtime.paths.artifactRoot,
+      sessionId: session.sessionId,
+      artifactId: runLogArtifactId,
+      type: "agent_run_log",
+      contentVersion: runLog.content_version,
+      mediaType: "application/json",
+      content: `${JSON.stringify(runLog, null, 2)}\n`
+    });
+    createArtifactRecord(runtime.db, {
+      artifactId: runLogArtifactId,
+      sessionId: session.sessionId,
+      type: "agent_run_log",
+      schemaVersion: 1,
+      contentVersion: runLog.content_version,
+      storageUri: writtenRunLog.storageUri,
+      sha256: writtenRunLog.sha256,
+      byteLength: writtenRunLog.byteLength,
+      mediaType: "application/json",
+      sensitivity: "confidential",
+      status: "valid",
+      producerType: "agent",
+      createdAt: now
+    });
+
     const artifactId = newId("art");
     const report = executionReportSchema.parse({
       artifact_id: artifactId,
@@ -74,18 +163,21 @@ export async function invokeImplementationAgent(
       created_at: now,
       producer: { type: "agent", id: invocation.provider },
       sensitivity: "confidential",
-      parents: [implementationPackage.artifactId],
+      parents: [implementationPackage.artifactId, runLogArtifactId],
       content_sha256: "0".repeat(64),
       metadata: {
         provider: invocation.provider,
         command: invocation.process.command,
-        exitCode: invocation.process.exitCode
+        exitCode: invocation.process.exitCode,
+        agentRunLogArtifactId: runLogArtifactId,
+        gitBeforeHead: gitBefore?.headSha,
+        gitAfterHead: gitAfter?.headSha
       },
-      run_id: newId("run"),
+      run_id: invocation.process.runId,
       process_status: invocation.process.status,
-      agent_claims_complete: false,
-      changed_files: [],
-      limitations: limitationsForProcess(invocation.process.status, invocation.process.stderr)
+      agent_claims_complete: parsedCompletionReport.agentClaimsComplete,
+      changed_files: changedFiles,
+      limitations: limitationsForProcess(invocation.process.status, invocation.process.stderr, parsedCompletionReport.limitations)
     });
     const next = transition({
       state: session.primaryState,
@@ -128,8 +220,12 @@ export async function invokeImplementationAgent(
       metadata: {
         provider: invocation.provider,
         packageArtifactId: implementationPackage.artifactId,
+        agentRunLogArtifactId: runLogArtifactId,
         executionReportArtifactId: artifactId,
-        processStatus: invocation.process.status
+        runId: invocation.process.runId,
+        processStatus: invocation.process.status,
+        agentClaimsComplete: report.agent_claims_complete,
+        changedFiles: report.changed_files
       }
     });
 
@@ -137,8 +233,11 @@ export async function invokeImplementationAgent(
       sessionId: session.sessionId,
       provider: invocation.provider,
       packageArtifactId: implementationPackage.artifactId,
+      agentRunLogArtifactId: runLogArtifactId,
       executionReportArtifactId: artifactId,
       processStatus: invocation.process.status,
+      agentClaimsComplete: report.agent_claims_complete ?? false,
+      changedFiles: report.changed_files,
       state: next,
       nextCommand: "atlas checks run"
     };
@@ -147,8 +246,117 @@ export async function invokeImplementationAgent(
   }
 }
 
-function limitationsForProcess(status: string, stderr: string): string[] {
+function limitationsForProcess(status: string, stderr: string, parsedLimitations: readonly string[]): string[] {
+  if (parsedLimitations.length > 0) return [...parsedLimitations];
   if (status === "succeeded") return [];
   const detail = stderr.trim().split(/\r?\n/).filter(Boolean).at(0);
   return [detail === undefined ? `Agent process ended with status ${status}` : detail.slice(0, 500)];
+}
+
+function readGitFactsSafely(cwd: string): GitRepositoryFacts | undefined {
+  try {
+    return readGitRepositoryFacts({ cwd });
+  } catch {
+    return undefined;
+  }
+}
+
+function processForArtifact(process: ProcessRunResult) {
+  return {
+    command: process.command,
+    args: [...process.args],
+    ...(process.cwd === undefined ? {} : { cwd: process.cwd }),
+    status: process.status,
+    ...(process.exitCode === undefined ? {} : { exit_code: process.exitCode }),
+    ...(process.signal === undefined ? {} : { signal: process.signal }),
+    started_at: process.startedAt,
+    ended_at: process.endedAt,
+    duration_ms: process.durationMs,
+    stdout: process.stdout,
+    stderr: process.stderr,
+    stdout_truncated: process.stdoutTruncated,
+    stderr_truncated: process.stderrTruncated,
+    redacted: process.redacted
+  };
+}
+
+function gitSnapshotForArtifact(facts: GitRepositoryFacts) {
+  return {
+    root_path_hash: facts.rootPathHash,
+    ...(facts.branch === undefined ? {} : { branch: facts.branch }),
+    ...(facts.headSha === undefined ? {} : { head_sha: facts.headSha }),
+    dirty: facts.status.isDirty,
+    changed_file_count: facts.status.changedFileCount,
+    changed_files: facts.status.entries.map((entry) => ({
+      path: entry.path,
+      index: entry.index,
+      working_tree: entry.workingTree
+    }))
+  };
+}
+
+interface ParsedAgentCompletionReport {
+  readonly present: boolean;
+  readonly agentClaimsComplete: boolean;
+  readonly changedFiles: readonly string[];
+  readonly limitations: readonly string[];
+}
+
+function parseAgentCompletionReport(stdout: string, stderr: string): ParsedAgentCompletionReport {
+  const marker = "ATLAS_EXECUTION_REPORT_JSON:";
+  const line = `${stdout}\n${stderr}`
+    .split(/\r?\n/)
+    .map((candidate) => candidate.trim())
+    .find((candidate) => candidate.startsWith(marker));
+  if (line === undefined) {
+    return { present: false, agentClaimsComplete: false, changedFiles: [], limitations: [] };
+  }
+
+  try {
+    const parsed = JSON.parse(line.slice(marker.length).trim()) as {
+      agent_claims_complete?: unknown;
+      changed_files?: unknown;
+      limitations?: unknown;
+    };
+    const changedFiles = Array.isArray(parsed.changed_files)
+      ? parsed.changed_files.filter((value): value is string => typeof value === "string" && value.length > 0)
+      : [];
+    const limitations = Array.isArray(parsed.limitations)
+      ? parsed.limitations.filter((value): value is string => typeof value === "string" && value.length > 0)
+      : [];
+    return {
+      present: true,
+      agentClaimsComplete: parsed.agent_claims_complete === true,
+      changedFiles,
+      limitations
+    };
+  } catch {
+    return {
+      present: true,
+      agentClaimsComplete: false,
+      changedFiles: [],
+      limitations: ["Agent emitted malformed ATLAS_EXECUTION_REPORT_JSON"]
+    };
+  }
+}
+
+function parsedCompletionReportForArtifact(report: ParsedAgentCompletionReport) {
+  return {
+    agent_claims_complete: report.agentClaimsComplete,
+    changed_files: [...report.changedFiles],
+    limitations: [...report.limitations]
+  };
+}
+
+function changedFilesIntroduced(before: GitRepositoryFacts | undefined, after: GitRepositoryFacts | undefined): string[] {
+  if (after === undefined) return [];
+  if (before === undefined) return after.status.entries.map((entry) => entry.path);
+  const beforeEntries = new Map(before.status.entries.map((entry) => [entry.path, statusSignature(entry)]));
+  return after.status.entries
+    .filter((entry) => beforeEntries.get(entry.path) !== statusSignature(entry))
+    .map((entry) => entry.path);
+}
+
+function statusSignature(entry: GitStatusEntry): string {
+  return `${entry.index}${entry.workingTree}:${entry.originalPath ?? ""}`;
 }
