@@ -118,6 +118,41 @@ describe("runAiContextScout", () => {
     ).rejects.toThrow("AI context scout returned malformed JSON");
   });
 
+  it("accepts fenced JSON and ignores invented recommendation paths", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(join(cwd, "src"), { recursive: true });
+    writeFileSync(join(cwd, "package.json"), "{\"name\":\"fixture\"}\n");
+    writeFileSync(join(cwd, "src", "table-cells.tsx"), "export function TableCells() { return null; }\n");
+    await startManualTask({
+      cwd,
+      env,
+      title: "Reusable table value components",
+      objective: "Create reusable table cell values.",
+      taskKey: "CLI-103"
+    });
+
+    const result = await runAiContextScout({
+      cwd,
+      env,
+      provider: {
+        alias: "openrouter.free",
+        provider: "openai-compatible",
+        baseUrl: "https://openrouter.ai/api/v1",
+        model: "openrouter/free"
+      },
+      completionImpl: async () => ({
+        providerAlias: "openrouter.free",
+        model: "openrouter/free",
+        content:
+          "Here is the JSON:\n```json\n{\"recommendations\":[{\"uri\":\"src/table-cells.tsx\",\"reason\":\"Task component\",\"confidence\":0.91},{\"uri\":\"src/invented.tsx\",\"reason\":\"Not provided\",\"confidence\":0.99}],\"missing_context\":[],\"questions\":[]}\n```"
+      })
+    });
+
+    expect(result.recommendationCount).toBe(1);
+  });
+
   it("limits candidate snippets by provider input budget", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");

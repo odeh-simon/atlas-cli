@@ -80,6 +80,26 @@ describe("discoverContextSources", () => {
     expect(result.sources.filter((source) => source.included).map((source) => source.uri)).toEqual(["src/target.ts"]);
     expect(result.sources.find((source) => source.uri === "src/target.ts")?.reason).toContain("AI recommended");
   });
+
+  it("prioritizes task-relevant source files before generic docs when task text is available", () => {
+    const root = tempRoot();
+    writeFixture(root, "package.json", '{"name":"fixture"}\n');
+    writeFixture(root, "README.md", "# Fixture\n");
+    writeFixture(root, "docs/product.md", "Generic docs\n");
+    writeFixture(root, "app/dashboard/applications/application-table.tsx", "export function ApplicationTable() { return null; }\n");
+    writeFixture(root, "app/dashboard/users/user-table.tsx", "export function UserTable() { return null; }\n");
+
+    const result = discoverContextSources({
+      rootPath: root,
+      budget: { maxFiles: 2, maxBytes: 10_000 },
+      taskText: "Build reusable table value components for application and user table cells."
+    });
+
+    expect(result.sources.filter((source) => source.included).map((source) => source.uri)).toEqual([
+      "app/dashboard/applications/application-table.tsx",
+      "app/dashboard/users/user-table.tsx"
+    ]);
+  });
 });
 
 function writeFixture(root: string, path: string, content: string): void {

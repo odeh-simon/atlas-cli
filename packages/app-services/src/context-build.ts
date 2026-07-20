@@ -50,13 +50,17 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
     const artifactId = newId("art");
     const git = readWorkflowGitSnapshot(runtime.paths.cwd);
     const aiRecommendation = loadAiRecommendation(runtime.paths.artifactRoot, artifacts, input.aiRecommendationArtifactId);
+    const taskBrief = artifacts.find((artifact) => artifact.type === "task_brief");
+    const taskBriefText =
+      taskBrief === undefined ? undefined : readFileSync(join(runtime.paths.artifactRoot, taskBrief.storageUri), "utf8");
     const discovery = discoverContextSources({
       rootPath: runtime.paths.cwd,
       budget: {
         ...(input.maxFiles === undefined ? {} : { maxFiles: input.maxFiles }),
         ...(input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes })
       },
-      recommendations: aiRecommendation?.recommendations
+      recommendations: aiRecommendation?.recommendations,
+      taskText: taskBriefText
     });
     const manifest = contextManifestSchema.parse({
       artifact_id: artifactId,
@@ -177,7 +181,6 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       dependencyKind: "input"
     });
 
-    const taskBrief = artifacts.find((artifact) => artifact.type === "task_brief");
     if (taskBrief !== undefined && getArtifactRecord(runtime.db, taskBrief.artifactId) !== undefined) {
       addArtifactDependency(runtime.db, {
         artifactId,

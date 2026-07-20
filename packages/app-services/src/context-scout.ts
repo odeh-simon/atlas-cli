@@ -67,7 +67,8 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       budget: {
         ...(input.maxFiles === undefined ? {} : { maxFiles: input.maxFiles }),
         ...(input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes })
-      }
+      },
+      taskText: taskBriefText
     });
     const promptSources = buildPromptSources({
       rootPath: runtime.paths.cwd,
@@ -98,7 +99,7 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
             temperature: 0
           })
         : await input.completionImpl(prompt);
-    const parsed = parseScoutResponse(completion.content);
+    const parsed = parseScoutResponse(completion.content, new Set(promptSources.map((source) => source.uri)));
     const now = new Date().toISOString();
     const artifactId = newId("art");
     const recommendation = aiContextRecommendationSchema.parse({
@@ -192,7 +193,7 @@ function buildScoutPrompt(input: {
   return JSON.stringify(
     {
       instruction:
-        "Rank the files needed for an implementation-planning agent. Use only provided candidate URIs. Do not invent files.",
+        "Rank the files needed for an implementation-planning agent. Use only provided candidate URIs. Do not invent files. Return only a JSON object, with no markdown fences or explanatory text.",
       response_shape: {
         recommendations: [{ uri: "path", reason: "why this source matters", confidence: 0.8 }],
         missing_context: ["important missing source or ambiguity"],
@@ -254,14 +255,57 @@ function buildPromptSources(input: {
   return promptSources;
 }
 
-function parseScoutResponse(content: string): z.infer<typeof scoutResponseSchema> {
+function parseScoutResponse(content: string, candidateUris: ReadonlySet<string>): z.infer<typeof scoutResponseSchema> {
   try {
-    return scoutResponseSchema.parse(JSON.parse(content));
+    const parsed = scoutResponseSchema.parse(JSON.parse(extractJsonObject(content)));
+    return {
+      ...parsed,
+      recommendations: parsed.recommendations.filter((recommendation) => candidateUris.has(recommendation.uri))
+    };
   } catch (error) {
     throw new ValidationError("AI context scout returned malformed JSON", {
       cause: error instanceof Error ? error.message : String(error)
     });
   }
+}
+
+function extractJsonObject(content: string): string {
+  const trimmed = content.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed;
+
+  const fenced = /```(?:json)?\s*([\s\S]*?)\s*```/i.exec(trimmed);
+  if (fenced?.[1] !== undefined) {
+    const fencedContent = fenced[1].trim();
+    if (fencedContent.startsWith("{") && fencedContent.endsWith("}")) return fencedContent;
+  }
+
+  const start = trimmed.indexOf("{");
+  if (start < 0) return trimmed;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < trimmed.length; index += 1) {
+    const char = trimmed[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === "\"") {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return trimmed.slice(start, index + 1);
+    }
+  }
+  return trimmed;
 }
 
 function readSafeSnippet(rootPath: string, uri: string, maxChars = 4_000): string {

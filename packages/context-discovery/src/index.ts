@@ -15,6 +15,7 @@ export interface ContextDiscoveryOptions {
   readonly rootPath: string;
   readonly budget?: Partial<ContextDiscoveryBudget> | undefined;
   readonly recommendations?: readonly ContextDiscoveryRecommendation[] | undefined;
+  readonly taskText?: string | undefined;
 }
 
 export interface ContextDiscoveryRecommendation {
@@ -84,11 +85,12 @@ export function discoverContextSources(options: ContextDiscoveryOptions): Contex
     maxBytes: options.budget?.maxBytes ?? defaultBudget.maxBytes
   };
   const recommendations = new Map((options.recommendations ?? []).map((recommendation) => [recommendation.uri, recommendation]));
+  const taskTerms = extractTaskTerms(options.taskText ?? "");
   const candidates = listCandidateFiles(rootPath)
     .map((absolutePath) => toSource(rootPath, absolutePath))
     .filter((source): source is DiscoveredContextSource => source !== undefined)
     .map((source) => applyRecommendation(source, recommendations.get(source.uri)))
-    .sort((a, b) => compareSources(a, b, recommendations));
+    .sort((a, b) => compareSources(a, b, recommendations, taskTerms));
 
   const sources: DiscoveredContextSource[] = [];
   let usedFiles = 0;
@@ -197,10 +199,13 @@ function applyRecommendation(
 function compareSources(
   a: DiscoveredContextSource,
   b: DiscoveredContextSource,
-  recommendations: ReadonlyMap<string, ContextDiscoveryRecommendation>
+  recommendations: ReadonlyMap<string, ContextDiscoveryRecommendation>,
+  taskTerms: ReadonlySet<string>
 ): number {
   const aiPriority = recommendationPriority(b, recommendations) - recommendationPriority(a, recommendations);
   if (aiPriority !== 0) return aiPriority;
+  const taskPriority = taskRelevanceForPath(b.uri, taskTerms) - taskRelevanceForPath(a.uri, taskTerms);
+  if (taskPriority !== 0) return taskPriority;
   const priority = priorityForPath(a.uri) - priorityForPath(b.uri);
   return priority === 0 ? a.uri.localeCompare(b.uri) : priority;
 }
@@ -221,6 +226,70 @@ function priorityForPath(path: string): number {
   if (lower.includes(".test.") || lower.includes(".spec.")) return 3;
   if (lower.startsWith("packages/")) return 4;
   return 5;
+}
+
+function extractTaskTerms(taskText: string): ReadonlySet<string> {
+  const stopWords = new Set([
+    "about",
+    "after",
+    "also",
+    "and",
+    "are",
+    "because",
+    "been",
+    "before",
+    "build",
+    "can",
+    "create",
+    "does",
+    "for",
+    "from",
+    "has",
+    "have",
+    "into",
+    "its",
+    "new",
+    "not",
+    "our",
+    "should",
+    "that",
+    "the",
+    "their",
+    "this",
+    "use",
+    "using",
+    "with"
+  ]);
+  const normalized = taskText
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .filter((term) => term.length >= 3 && !stopWords.has(term));
+  const terms = new Set<string>();
+  for (const term of normalized) {
+    terms.add(term);
+    if (term.endsWith("s") && term.length > 4) terms.add(term.slice(0, -1));
+    if (term.endsWith("ies") && term.length > 5) terms.add(`${term.slice(0, -3)}y`);
+  }
+  return terms;
+}
+
+function taskRelevanceForPath(path: string, taskTerms: ReadonlySet<string>): number {
+  if (taskTerms.size === 0) return 0;
+  const lower = path.toLowerCase();
+  const pathTerms = new Set(lower.split(/[^a-z0-9]+/g).filter((term) => term.length > 0));
+  let score = 0;
+  for (const term of taskTerms) {
+    if (pathTerms.has(term)) score += 6;
+    else if (lower.includes(term)) score += 2;
+  }
+  if (score > 0 && (lower.endsWith(".tsx") || lower.endsWith(".ts") || lower.endsWith(".jsx") || lower.endsWith(".js"))) {
+    score += 2;
+  }
+  if (score > 0 && (lower.includes(".test.") || lower.includes(".spec.") || lower.includes("__tests__/"))) {
+    score += 1;
+  }
+  return score;
 }
 
 function safeReadDir(path: string): Dirent[] {
