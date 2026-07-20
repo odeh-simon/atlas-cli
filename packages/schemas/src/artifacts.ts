@@ -10,6 +10,7 @@ export const artifactTypeSchema = z.enum([
   "ai_context_recommendation",
   "context_manifest",
   "context_quality_report",
+  "ai_planning_draft",
   "planning_package_metadata",
   "implementation_contract",
   "contract_approval",
@@ -132,6 +133,18 @@ export const contextQualityReportSchema = artifactEnvelopeSchema.extend({
     })
   ),
   recommended_next_actions: z.array(z.string().min(1)).default([])
+});
+
+export const aiPlanningDraftSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("ai_planning_draft"),
+  provider_alias: idSchema,
+  model: z.string().min(1),
+  task_artifact_id: idSchema,
+  task_artifact_sha256: sha256Schema,
+  context_manifest_artifact_id: idSchema,
+  context_manifest_sha256: sha256Schema,
+  draft_markdown: z.string().min(1),
+  ready_label: z.enum(["draft", "blocked"])
 });
 
 export const planningPackageMetadataSchema = artifactEnvelopeSchema.extend({
@@ -315,6 +328,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   taskBriefSchema,
   contextManifestSchema,
   contextQualityReportSchema,
+  aiPlanningDraftSchema,
   planningPackageMetadataSchema,
   implementationContractSchema,
   contractApprovalSchema,
@@ -333,5 +347,6 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
 export type ArtifactEnvelope = z.infer<typeof artifactEnvelopeSchema>;
 export type AiContextRecommendation = z.infer<typeof aiContextRecommendationSchema>;
 export type ContextQualityReport = z.infer<typeof contextQualityReportSchema>;
+export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;
 export type ImplementationContract = z.infer<typeof implementationContractSchema>;
 export type WalkingSkeletonArtifact = z.infer<typeof walkingSkeletonArtifactSchema>;

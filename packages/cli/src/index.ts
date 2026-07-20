@@ -173,7 +173,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (command === "plan") {
-      return await planCommand();
+      return await planCommand(compact([subcommand, ...rest]));
     }
 
     if (command === "contract" && subcommand === "import") {
@@ -269,7 +269,7 @@ Usage:
   atlas context import <file>
   atlas context build [--ai] [--ai-provider <alias>] [--max-files <n>] [--max-bytes <n>]
   atlas decisions record --kind <decision|deviation> --title <title> --rationale <text> --category <category> --yes
-  atlas plan
+  atlas plan [--ai] [--ai-provider <alias>]
   atlas contract import <file>
   atlas approve contract --yes
   atlas implement export --manual
@@ -820,9 +820,28 @@ async function contextBuildCommand(args: string[]): Promise<number> {
   return 0;
 }
 
-async function planCommand(): Promise<number> {
-  const result = await exportPlanningPackage();
+async function planCommand(args: string[]): Promise<number> {
+  const useAi = args.includes("--ai");
+  const aiProviderAlias = readOption(args, "--ai-provider", false);
+  const provider = useAi ? readConfiguredAiProvider(aiProviderAlias) : undefined;
+  if (useAi && provider === undefined) {
+    console.error(aiProviderAlias === undefined ? "No AI provider configured" : `AI provider not configured: ${aiProviderAlias}`);
+    return 2;
+  }
+  const result = await exportPlanningPackage({
+    ...(provider === undefined
+      ? {}
+      : {
+          ai: {
+            provider,
+            apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai")
+          }
+        })
+  });
   console.log(`Planning package: ${result.planningArtifactId}`);
+  if (result.aiPlanningDraftArtifactId !== undefined) {
+    console.log(`AI planning draft: ${result.aiPlanningDraftArtifactId}`);
+  }
   console.log(`Session: ${result.sessionId}`);
   console.log(`State: ${result.state}`);
   console.log(`Next: ${result.nextCommand}`);
@@ -1089,6 +1108,12 @@ function readConfiguredAiProviders(): AiProviderConfig[] {
     };
     return [config];
   });
+}
+
+function readConfiguredAiProvider(alias: string | undefined): AiProviderConfig | undefined {
+  const providers = readConfiguredAiProviders();
+  const resolvedAlias = alias ?? readAtlasConfig().ai?.defaultProviderAlias;
+  return resolvedAlias === undefined ? providers[0] : providers.find((provider) => provider.alias === resolvedAlias);
 }
 
 function tokenForConfiguredAlias(alias: string | undefined, provider: CredentialProvider): string | undefined {

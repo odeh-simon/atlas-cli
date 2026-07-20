@@ -1,12 +1,18 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { StateTransitionError } from "@atlas/domain";
+import { createAiCompletion, type AiCompletionResponse, type AiProviderConfig } from "@atlas/llm";
 import {
+  addArtifactDependency,
   appendEvent,
   createArtifactRecord,
   listArtifactsForSession,
   listSessionsForRepository,
   updateSessionState
 } from "@atlas/persistence";
+import { aiPlanningDraftSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
@@ -14,11 +20,23 @@ import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type Runtime
 export interface ExportPlanningPackageResult {
   readonly sessionId: string;
   readonly planningArtifactId: string;
+  readonly aiPlanningDraftArtifactId?: string | undefined;
   readonly state: string;
   readonly nextCommand: string;
 }
 
-export async function exportPlanningPackage(options: RuntimeOptions = {}): Promise<ExportPlanningPackageResult> {
+export interface AiPlanningOptions {
+  readonly provider: AiProviderConfig;
+  readonly apiKey?: string | undefined;
+  readonly fetchImpl?: typeof fetch | undefined;
+  readonly completionImpl?: ((prompt: string) => Promise<AiCompletionResponse>) | undefined;
+}
+
+export interface ExportPlanningPackageInput extends RuntimeOptions {
+  readonly ai?: AiPlanningOptions | undefined;
+}
+
+export async function exportPlanningPackage(options: ExportPlanningPackageInput = {}): Promise<ExportPlanningPackageResult> {
   const runtime = await openAtlasRuntime(options);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
@@ -75,6 +93,94 @@ export async function exportPlanningPackage(options: RuntimeOptions = {}): Promi
       producerType: "atlas",
       createdAt: now
     });
+
+    let aiPlanningDraftArtifactId: string | undefined;
+    if (options.ai !== undefined) {
+      const draftArtifactId = newId("art");
+      const prompt = renderAiPlanningPrompt({
+        taskBrief: readFileSync(join(runtime.paths.artifactRoot, taskBrief.storageUri), "utf8"),
+        contextManifest: readFileSync(join(runtime.paths.artifactRoot, contextManifest.storageUri), "utf8"),
+        taskBriefId: taskBrief.artifactId,
+        taskBriefHash: taskBrief.sha256,
+        contextManifestId: contextManifest.artifactId,
+        contextManifestHash: contextManifest.sha256
+      });
+      const completion =
+        options.ai.completionImpl === undefined
+          ? await createAiCompletion({
+              provider: options.ai.provider,
+              apiKey: options.ai.apiKey,
+              fetchImpl: options.ai.fetchImpl,
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "You are Atlas planning assistant. Produce a concise implementation contract draft in Markdown."
+                },
+                { role: "user", content: prompt }
+              ],
+              temperature: 0,
+              responseFormat: "text"
+            })
+          : await options.ai.completionImpl(prompt);
+      const aiDraft = aiPlanningDraftSchema.parse({
+        artifact_id: draftArtifactId,
+        session_id: session.sessionId,
+        type: "ai_planning_draft",
+        schema_version: 1,
+        content_version: artifacts.filter((artifact) => artifact.type === "ai_planning_draft").length + 1,
+        created_at: now,
+        producer: { type: "atlas" },
+        sensitivity: "confidential",
+        parents: [taskBrief.artifactId, contextManifest.artifactId, artifactId],
+        content_sha256: "0".repeat(64),
+        metadata: {
+          planning_package_artifact_id: artifactId,
+          next_gate: "atlas contract import <file>"
+        },
+        provider_alias: options.ai.provider.alias,
+        model: options.ai.provider.model,
+        task_artifact_id: taskBrief.artifactId,
+        task_artifact_sha256: taskBrief.sha256,
+        context_manifest_artifact_id: contextManifest.artifactId,
+        context_manifest_sha256: contextManifest.sha256,
+        draft_markdown: completion.content.trim(),
+        ready_label: completion.content.trim().length === 0 ? "blocked" : "draft"
+      });
+      const aiWritten = writeImmutableArtifactContent({
+        rootDir: runtime.paths.artifactRoot,
+        sessionId: session.sessionId,
+        artifactId: draftArtifactId,
+        type: "ai_planning_draft",
+        contentVersion: aiDraft.content_version,
+        mediaType: "application/json",
+        content: `${JSON.stringify(aiDraft, null, 2)}\n`
+      });
+      createArtifactRecord(runtime.db, {
+        artifactId: draftArtifactId,
+        sessionId: session.sessionId,
+        type: "ai_planning_draft",
+        schemaVersion: 1,
+        contentVersion: aiDraft.content_version,
+        storageUri: aiWritten.storageUri,
+        sha256: aiWritten.sha256,
+        byteLength: aiWritten.byteLength,
+        mediaType: "application/json",
+        sensitivity: "confidential",
+        status: aiDraft.ready_label === "blocked" ? "rejected" : "valid",
+        producerType: "atlas",
+        createdAt: now
+      });
+      for (const dependsOnArtifactId of [taskBrief.artifactId, contextManifest.artifactId, artifactId]) {
+        addArtifactDependency(runtime.db, {
+          artifactId: draftArtifactId,
+          dependsOnArtifactId,
+          dependencyKind: "input"
+        });
+      }
+      aiPlanningDraftArtifactId = draftArtifactId;
+    }
+
     updateSessionState(runtime.db, { sessionId: session.sessionId, primaryState: next, now });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
@@ -82,19 +188,47 @@ export async function exportPlanningPackage(options: RuntimeOptions = {}): Promi
       eventType: "planning.exported",
       actorType: "atlas",
       occurredAt: now,
-      summary: "Planning package exported",
-      metadata: { planningArtifactId: artifactId }
+      summary: options.ai === undefined ? "Planning package exported" : "AI-assisted planning package exported",
+      metadata: {
+        planningArtifactId: artifactId,
+        ...(aiPlanningDraftArtifactId === undefined ? {} : { aiPlanningDraftArtifactId })
+      }
     });
 
     return {
       sessionId: session.sessionId,
       planningArtifactId: artifactId,
+      ...(aiPlanningDraftArtifactId === undefined ? {} : { aiPlanningDraftArtifactId }),
       state: next,
       nextCommand: "atlas contract import <file>"
     };
   } finally {
     closeAtlasRuntime(runtime);
   }
+}
+
+function renderAiPlanningPrompt(input: {
+  readonly taskBrief: string;
+  readonly contextManifest: string;
+  readonly taskBriefId: string;
+  readonly taskBriefHash: string;
+  readonly contextManifestId: string;
+  readonly contextManifestHash: string;
+}): string {
+  return `Create an implementation contract draft for Atlas.
+
+Hard requirements:
+- Reference task brief ${input.taskBriefId} (${input.taskBriefHash}).
+- Reference context manifest ${input.contextManifestId} (${input.contextManifestHash}).
+- Include objective, scope, technical approach, affected files/subsystems, tests, edge cases, and unresolved questions.
+- Do not claim approval. The developer must still import and approve the final contract.
+
+Task brief JSON:
+${input.taskBrief}
+
+Context manifest JSON:
+${input.contextManifest}
+`;
 }
 
 function renderPlanningMarkdown(input: {

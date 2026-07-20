@@ -381,6 +381,64 @@ describe("cli", () => {
     }
   });
 
+  it("exports AI-assisted planning drafts from the CLI", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          defaultProviderAlias: "ollama.local",
+          providers: [
+            {
+              alias: "ollama.local",
+              provider: "ollama",
+              baseUrl: "http://localhost:11434",
+              model: "qwen2.5-coder:7b"
+            }
+          ]
+        }
+      })
+    );
+    const manifestPath = join(root, "context.json");
+    writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        sources: [{ uri: "README.md", kind: "file", reason: "Context", byte_length: 1, included: true }]
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousFetch = globalThis.fetch;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ message: { content: "## Objective\nShip the planned work." } }), {
+          status: 200
+        })) as typeof fetch;
+
+      await main(["start", "--manual", "--title", "Plan", "--objective", "Plan the work", "--task-key", "manual-plan"]);
+      await main(["context", "import", manifestPath]);
+      const code = await main(["plan", "--ai"]);
+
+      expect(code).toBe(0);
+      expect(logs.some((line) => line.startsWith("Planning package: art_"))).toBe(true);
+      expect(logs.some((line) => line.startsWith("AI planning draft: art_"))).toBe(true);
+      expect(logs).toContain("State: planning_ready");
+      expect(logs).toContain("Next: atlas contract import <file>");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      globalThis.fetch = previousFetch;
+    }
+  });
+
   it("reports OpenAI-compatible AI health using an AI credential alias", async () => {
     const root = tempRoot();
     const repo = join(root, "repo");
