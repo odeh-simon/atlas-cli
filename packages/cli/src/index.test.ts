@@ -442,6 +442,55 @@ describe("cli", () => {
     }
   });
 
+  it("does not invoke AI context scout after context is already ready", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(join(repo, "package.json"), "{\"name\":\"fixture\"}\n");
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          defaultProviderAlias: "openrouter.free",
+          providers: [
+            {
+              alias: "openrouter.free",
+              provider: "openai-compatible",
+              baseUrl: "https://openrouter.ai/api/v1",
+              model: "openrouter/free"
+            }
+          ]
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousFetch = globalThis.fetch;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      globalThis.fetch = (async () => {
+        throw new Error("fetch should not be called");
+      }) as typeof fetch;
+
+      await main(["start", "--manual", "--title", "Target", "--objective", "Update target source"]);
+      await main(["context", "build", "--max-files", "1", "--max-bytes", "1000"]);
+      const code = await main(["context", "build", "--ai", "--max-files", "1", "--max-bytes", "1000"]);
+
+      expect(code).toBe(2);
+      expect(logs).toContain("atlas context build requires state intake_ready; current state is context_ready");
+      expect(logs).toContain("Next: atlas plan");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      globalThis.fetch = previousFetch;
+    }
+  });
+
   it("exports AI-assisted planning drafts from the CLI", async () => {
     const root = tempRoot();
     const repo = join(root, "repo");

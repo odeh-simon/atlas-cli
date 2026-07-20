@@ -69,18 +69,16 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
         ...(input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes })
       }
     });
+    const promptSources = buildPromptSources({
+      rootPath: runtime.paths.cwd,
+      maxInputTokens: input.provider.maxInputTokens,
+      taskBriefText,
+      sources: discovery.sources.filter((source) => source.included)
+    });
     const prompt = buildScoutPrompt({
       taskBriefText,
       repoRoot: runtime.paths.cwd,
-      sources: discovery.sources
-        .filter((source) => source.included)
-        .map((source) => ({
-          uri: source.uri,
-          kind: source.kind,
-          reason: source.reason,
-          byteLength: source.byte_length,
-          snippet: readSafeSnippet(runtime.paths.cwd, source.uri)
-        }))
+      sources: promptSources
     });
     const completion =
       input.completionImpl === undefined
@@ -209,6 +207,53 @@ function buildScoutPrompt(input: {
   );
 }
 
+function buildPromptSources(input: {
+  readonly rootPath: string;
+  readonly maxInputTokens: number | undefined;
+  readonly taskBriefText: string;
+  readonly sources: readonly {
+    readonly uri: string;
+    readonly kind: string;
+    readonly reason: string;
+    readonly byte_length: number;
+  }[];
+}): Array<{
+  readonly uri: string;
+  readonly kind: string;
+  readonly reason: string;
+  readonly byteLength: number;
+  readonly snippet: string;
+}> {
+  const maxPromptChars = (input.maxInputTokens ?? 12_000) * 4;
+  const reservedChars = input.taskBriefText.length + 4_000;
+  const sourceBudget = Math.max(2_000, maxPromptChars - reservedChars);
+  const perSourceCap = Math.max(500, Math.min(4_000, Math.floor(sourceBudget / Math.max(1, input.sources.length))));
+  const promptSources: Array<{
+    uri: string;
+    kind: string;
+    reason: string;
+    byteLength: number;
+    snippet: string;
+  }> = [];
+  let usedChars = 0;
+
+  for (const source of input.sources) {
+    if (usedChars >= sourceBudget) break;
+    const remaining = sourceBudget - usedChars;
+    const snippet = readSafeSnippet(input.rootPath, source.uri, Math.min(perSourceCap, remaining));
+    promptSources.push({
+      uri: source.uri,
+      kind: source.kind,
+      reason: source.reason,
+      byteLength: source.byte_length,
+      snippet
+    });
+    usedChars += snippet.length;
+  }
+
+  return promptSources;
+}
+
 function parseScoutResponse(content: string): z.infer<typeof scoutResponseSchema> {
   try {
     return scoutResponseSchema.parse(JSON.parse(content));
@@ -219,7 +264,7 @@ function parseScoutResponse(content: string): z.infer<typeof scoutResponseSchema
   }
 }
 
-function readSafeSnippet(rootPath: string, uri: string): string {
+function readSafeSnippet(rootPath: string, uri: string, maxChars = 4_000): string {
   const text = readFileSync(join(rootPath, uri), "utf8");
-  return redactSecretText(text).slice(0, 4_000);
+  return redactSecretText(text).slice(0, maxChars);
 }

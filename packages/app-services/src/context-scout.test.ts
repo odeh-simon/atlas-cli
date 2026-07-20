@@ -117,4 +117,40 @@ describe("runAiContextScout", () => {
       })
     ).rejects.toThrow("AI context scout returned malformed JSON");
   });
+
+  it("limits candidate snippets by provider input budget", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(join(cwd, "package.json"), "{\"name\":\"fixture\"}\n");
+    for (let index = 0; index < 8; index += 1) {
+      writeFileSync(join(cwd, `source-${index}.ts`), `export const value${index} = "${"x".repeat(5_000)}";\n`);
+    }
+    const prompts: string[] = [];
+    await startManualTask({ cwd, env, title: "Task", objective: "Objective", taskKey: "TASK-1" });
+
+    await runAiContextScout({
+      cwd,
+      env,
+      maxFiles: 8,
+      provider: {
+        alias: "openrouter.free",
+        provider: "openai-compatible",
+        baseUrl: "https://openrouter.ai/api/v1",
+        model: "openrouter/free",
+        maxInputTokens: 1_000
+      },
+      completionImpl: async (prompt) => {
+        prompts.push(prompt);
+        return {
+          providerAlias: "openrouter.free",
+          model: "openrouter/free",
+          content: JSON.stringify({ recommendations: [], missing_context: [], questions: [] })
+        };
+      }
+    });
+
+    expect(prompts[0]?.length).toBeLessThan(8_000);
+  });
 });

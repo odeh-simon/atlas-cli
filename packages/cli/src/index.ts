@@ -810,6 +810,13 @@ async function contextBuildCommand(args: string[]): Promise<number> {
   const maxBytes = readNumberOption(args, "--max-bytes");
   const useAi = args.includes("--ai");
   const aiProviderAlias = readOption(args, "--ai-provider", false);
+  const status = await getStatus();
+  if (status.session !== undefined && status.session.primaryState !== "intake_ready") {
+    console.error(`atlas context build requires state intake_ready; current state is ${status.session.primaryState}`);
+    console.log(`Next: ${status.nextCommands[0] ?? "no next command"}`);
+    return 2;
+  }
+
   let aiRecommendationArtifactId: string | undefined;
   if (useAi) {
     const providers = readConfiguredAiProviders();
@@ -820,6 +827,7 @@ async function contextBuildCommand(args: string[]): Promise<number> {
       return 2;
     }
     try {
+      console.log(`AI scout: ${provider.alias} ${provider.model}`);
       const scout = await runAiContextScout({
         provider,
         apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai"),
