@@ -32,12 +32,13 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
 
     const now = new Date().toISOString();
     const artifactId = newId("art");
+    const contentVersion = artifacts.filter((artifact) => artifact.type === "review_package").length + 1;
     const reviewPackage = reviewPackageSchema.parse({
       artifact_id: artifactId,
       session_id: session.sessionId,
       type: "review_package",
       schema_version: 1,
-      content_version: 1,
+      content_version: contentVersion,
       created_at: now,
       producer: { type: "atlas" },
       sensitivity: "confidential",
@@ -68,7 +69,7 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       sessionId: session.sessionId,
       artifactId,
       type: "review_package",
-      contentVersion: 1,
+      contentVersion,
       mediaType: "application/json",
       content: `${JSON.stringify(reviewPackage, null, 2)}\n`
     });
@@ -77,7 +78,7 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       sessionId: session.sessionId,
       type: "review_package",
       schemaVersion: 1,
-      contentVersion: 1,
+      contentVersion,
       storageUri: written.storageUri,
       sha256: written.sha256,
       byteLength: written.byteLength,

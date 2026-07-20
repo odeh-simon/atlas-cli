@@ -15,6 +15,7 @@ export * from "./fix-batch.js";
 export * from "./git-safeguards.js";
 export * from "./lifecycle.js";
 export * from "./manual-task.js";
+export * from "./orchestrate.js";
 export * from "./planning.js";
 export * from "./review-import.js";
 export * from "./review-prepare.js";

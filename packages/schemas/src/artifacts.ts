@@ -24,6 +24,7 @@ export const artifactTypeSchema = z.enum([
   "finding",
   "finding_disposition",
   "fix_batch",
+  "orchestration_run",
   "decision_record",
   "completion_report"
 ]);
@@ -393,6 +394,25 @@ export const fixBatchSchema = artifactEnvelopeSchema.extend({
   instructions_markdown: z.string().min(1)
 });
 
+export const orchestrationRunSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("orchestration_run"),
+  run_id: idSchema,
+  until: z.enum(["context_ready", "planning_ready", "checks_completed", "completion_ready"]),
+  status: z.enum(["succeeded", "blocked", "failed"]),
+  iterations: z.number().int().nonnegative(),
+  steps: z.array(
+    z.object({
+      command: z.string().min(1),
+      state_before: z.string().min(1),
+      state_after: z.string().min(1),
+      status: z.enum(["succeeded", "blocked", "failed"]),
+      summary: z.string().min(1),
+      artifact_ids: z.array(idSchema).default([])
+    })
+  ),
+  blocked_reason: z.string().min(1).optional()
+});
+
 export const decisionRecordSchema = artifactEnvelopeSchema.extend({
   type: z.literal("decision_record"),
   decision_id: idSchema,
@@ -436,6 +456,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   findingSchema,
   findingDispositionSchema,
   fixBatchSchema,
+  orchestrationRunSchema,
   decisionRecordSchema,
   completionReportSchema
 ]);
@@ -447,4 +468,5 @@ export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;
 export type ImplementationContract = z.infer<typeof implementationContractSchema>;
 export type AgentRunLog = z.infer<typeof agentRunLogSchema>;
 export type CheckRunLog = z.infer<typeof checkRunLogSchema>;
+export type OrchestrationRun = z.infer<typeof orchestrationRunSchema>;
 export type WalkingSkeletonArtifact = z.infer<typeof walkingSkeletonArtifactSchema>;

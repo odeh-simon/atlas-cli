@@ -17,7 +17,13 @@ import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface ImportReviewReportInput extends RuntimeOptions {
-  readonly filePath: string;
+  readonly filePath?: string | undefined;
+  readonly report?: ImportedReviewReportPayload | undefined;
+}
+
+export interface ImportedReviewReportPayload {
+  readonly summary?: string | undefined;
+  readonly findings?: readonly Record<string, unknown>[] | undefined;
 }
 
 export interface ImportReviewReportResult {
@@ -35,20 +41,17 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
     const session = listSessionsForRepository(runtime.db, repoId)[0];
     if (session === undefined) throw new StateTransitionError("No active session found for review import");
 
-    const reviewPackage = listArtifactsForSession(runtime.db, session.sessionId).find(
-      (artifact) => artifact.type === "review_package"
-    );
+    const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
+    const reviewPackage = artifacts.filter((artifact) => artifact.type === "review_package").at(-1);
     if (reviewPackage === undefined) {
       throw new StateTransitionError("Review import requires a prepared review package");
     }
 
     const now = new Date().toISOString();
     const artifactId = newId("art");
+    const contentVersion = artifacts.filter((artifact) => artifact.type === "review_report").length + 1;
     const git = readWorkflowGitSnapshot(runtime.paths.cwd);
-    const raw = JSON.parse(readFileSync(input.filePath, "utf8")) as {
-      summary?: string;
-      findings?: Array<Record<string, unknown>>;
-    };
+    const raw = readReviewReportPayload(input);
     const findings = (raw.findings ?? []).map((finding, index) =>
       findingSchema.parse({
         ...finding,
@@ -74,7 +77,7 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
       session_id: session.sessionId,
       type: "review_report",
       schema_version: 1,
-      content_version: 1,
+      content_version: contentVersion,
       created_at: now,
       producer: { type: "import" },
       sensitivity: "confidential",
@@ -103,7 +106,7 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
       sessionId: session.sessionId,
       artifactId,
       type: "review_report",
-      contentVersion: 1,
+      contentVersion,
       mediaType: "application/json",
       content: `${JSON.stringify(report, null, 2)}\n`
     });
@@ -112,7 +115,7 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
       sessionId: session.sessionId,
       type: "review_report",
       schemaVersion: 1,
-      contentVersion: 1,
+      contentVersion,
       storageUri: written.storageUri,
       sha256: written.sha256,
       byteLength: written.byteLength,
@@ -169,4 +172,12 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
   } finally {
     closeAtlasRuntime(runtime);
   }
+}
+
+function readReviewReportPayload(input: ImportReviewReportInput): ImportedReviewReportPayload {
+  if (input.report !== undefined) return input.report;
+  if (input.filePath === undefined) {
+    throw new ValidationError("Review report import requires filePath or report");
+  }
+  return JSON.parse(readFileSync(input.filePath, "utf8")) as ImportedReviewReportPayload;
 }

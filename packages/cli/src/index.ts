@@ -23,6 +23,7 @@ import {
   importContract,
   importExecutionResult,
   importReviewReport,
+  orchestrateRun,
   pauseSession,
   prepareReviewPackage,
   prepareFixBatch,
@@ -114,6 +115,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "telemetry") {
       return telemetryCommand(compact([subcommand, ...rest]));
+    }
+
+    if (command === "orchestrate" && subcommand === "run") {
+      return await orchestrateRunCommand(rest);
     }
 
     if (command === "git" && subcommand === "status") {
@@ -302,6 +307,7 @@ Usage:
   atlas adapters health
   atlas ai providers health
   atlas ai models [--provider <alias>]
+  atlas orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
   atlas telemetry status
   atlas telemetry preview
   atlas telemetry enable
@@ -848,6 +854,37 @@ async function planCommand(args: string[]): Promise<number> {
   return 0;
 }
 
+async function orchestrateRunCommand(args: string[]): Promise<number> {
+  const until = readOrchestrateUntil(readOption(args, "--until"));
+  if (until === undefined) {
+    console.error("atlas orchestrate run requires --until <context-ready|planning-ready|checks-completed|completion-ready>");
+    return 2;
+  }
+
+  const config = readAtlasConfig();
+  const agentProvider =
+    config.adapters?.codex?.command !== undefined
+      ? "codex"
+      : config.adapters?.claudeCode?.command !== undefined
+        ? "claude"
+        : undefined;
+  const agentCommand =
+    agentProvider === "codex"
+      ? config.adapters?.codex?.command
+      : agentProvider === "claude"
+        ? config.adapters?.claudeCode?.command
+        : undefined;
+  const result = await orchestrateRun({ until, agentProvider, agentCommand });
+  console.log(`Orchestration: ${result.orchestrationRunArtifactId}`);
+  console.log(`Status: ${result.status}`);
+  console.log(`State: ${result.state}`);
+  console.log(`Steps: ${result.steps.length}`);
+  if (result.blockedReason !== undefined) {
+    console.log(`Blocked: ${result.blockedReason}`);
+  }
+  return result.status === "succeeded" ? 0 : 1;
+}
+
 async function contractImportCommand(args: string[]): Promise<number> {
   const filePath = args[0];
   if (filePath === undefined) {
@@ -1117,6 +1154,12 @@ function readConfiguredAiProvider(alias: string | undefined): AiProviderConfig |
   const providers = readConfiguredAiProviders();
   const resolvedAlias = alias ?? readAtlasConfig().ai?.defaultProviderAlias;
   return resolvedAlias === undefined ? providers[0] : providers.find((provider) => provider.alias === resolvedAlias);
+}
+
+function readOrchestrateUntil(value: string | undefined): "context-ready" | "planning-ready" | "checks-completed" | "completion-ready" | undefined {
+  return value === "context-ready" || value === "planning-ready" || value === "checks-completed" || value === "completion-ready"
+    ? value
+    : undefined;
 }
 
 function tokenForConfiguredAlias(alias: string | undefined, provider: CredentialProvider): string | undefined {
