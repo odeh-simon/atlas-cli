@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  commentGitHubPullRequest,
   fetchGitHubRepositorySnapshot,
   getGitHubAdapterHealth,
   normalizeGitHubRepository,
@@ -106,5 +107,27 @@ describe("GitHub adapter", () => {
     expect(urls).toHaveLength(2);
     expect(snapshot).toMatchObject({ owner: "acme", repo: "atlas", defaultBranch: "main" });
     expect(snapshot.pullRequests[0]).toMatchObject({ number: 12, headRef: "feature", baseRef: "main" });
+  });
+
+  it("writes pull request comments through GitHub REST", async () => {
+    const result = await commentGitHubPullRequest({
+      token: "ghp_token",
+      reference: parseGitHubReference("https://github.com/acme/atlas/pull/12"),
+      body: "Atlas run completed.",
+      fetchImpl: (async (url, init) => {
+        expect(String(url)).toBe("https://api.github.com/repos/acme/atlas/issues/12/comments");
+        expect(init?.method).toBe("POST");
+        expect(init?.headers).toMatchObject({ authorization: "Bearer ghp_token" });
+        return new Response(JSON.stringify({ html_url: "https://github.com/acme/atlas/pull/12#issuecomment-1" }), {
+          status: 201
+        });
+      }) as typeof fetch
+    });
+
+    expect(result).toMatchObject({
+      provider: "github",
+      status: "written",
+      remoteUrl: "https://github.com/acme/atlas/pull/12#issuecomment-1"
+    });
   });
 });

@@ -21,5 +21,8 @@ describe("CLI packaging metadata", () => {
     expect(cliPackage.files).toContain("dist");
     expect(cliPackage.files).toContain("README.md");
     expect(cliPackage.engines?.node).toBe(">=22.0.0");
+    expect(readFileSync(join(process.cwd(), "DOCs", "Atlas_CLI_Install_and_Release.md"), "utf8")).toContain(
+      "Release Smoke Test"
+    );
   });
 });

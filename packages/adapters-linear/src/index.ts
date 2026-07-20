@@ -5,8 +5,8 @@ export const adaptersLinearPackage = "@atlas/adapters-linear";
 export interface LinearAdapterHealth {
   readonly provider: "linear";
   readonly configured: boolean;
-  readonly writable: false;
-  readonly capabilities: readonly ["health", "getIssue"];
+  readonly writable: boolean;
+  readonly capabilities: readonly ["health", "getIssue", "commentIssue"];
   readonly mode: "fixture" | "api-token-present";
 }
 
@@ -44,13 +44,72 @@ export interface FetchLinearIssueInput {
   readonly fetchImpl?: typeof fetch | undefined;
 }
 
+export interface CommentLinearIssueInput {
+  readonly apiKey: string;
+  readonly issueId: string;
+  readonly body: string;
+  readonly fetchImpl?: typeof fetch | undefined;
+}
+
+export interface LinearWritebackResult {
+  readonly provider: "linear";
+  readonly target: string;
+  readonly status: "written";
+  readonly remoteId?: string | undefined;
+}
+
 export function getLinearAdapterHealth(input: { readonly apiKey?: string | undefined } = {}): LinearAdapterHealth {
   return {
     provider: "linear",
     configured: typeof input.apiKey === "string" && input.apiKey.length > 0,
-    writable: false,
-    capabilities: ["health", "getIssue"],
+    writable: typeof input.apiKey === "string" && input.apiKey.length > 0,
+    capabilities: ["health", "getIssue", "commentIssue"],
     mode: typeof input.apiKey === "string" && input.apiKey.length > 0 ? "api-token-present" : "fixture"
+  };
+}
+
+export async function commentLinearIssue(input: CommentLinearIssueInput): Promise<LinearWritebackResult> {
+  if (input.issueId.trim().length === 0) {
+    throw new TypeError("Linear issue id is required for writeback");
+  }
+  if (input.body.trim().length === 0) {
+    throw new TypeError("Linear comment body is required");
+  }
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const response = await fetchImpl("https://api.linear.app/graphql", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: input.apiKey
+    },
+    body: JSON.stringify({
+      query: `mutation AtlasComment($issueId: String!, $body: String!) {
+        commentCreate(input: { issueId: $issueId, body: $body }) {
+          success
+          comment { id }
+        }
+      }`,
+      variables: { issueId: input.issueId, body: input.body }
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`Linear writeback failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as {
+    data?: { commentCreate?: { success?: boolean; comment?: { id?: string } } };
+    errors?: readonly { message?: string }[];
+  };
+  if (payload.errors !== undefined && payload.errors.length > 0) {
+    throw new Error(`Linear API error: ${payload.errors.map((error) => error.message ?? "unknown").join("; ")}`);
+  }
+  if (payload.data?.commentCreate?.success !== true) {
+    throw new Error("Linear writeback was not accepted");
+  }
+  return {
+    provider: "linear",
+    target: input.issueId,
+    status: "written",
+    remoteId: payload.data.commentCreate.comment?.id
   };
 }
 

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  commentLinearIssue,
   fetchLinearIssue,
   getLinearAdapterHealth,
   isLinearIssueKey,
@@ -108,5 +109,24 @@ describe("Linear adapter", () => {
     expect(snapshot).toMatchObject({ issueKey: "ENG-42", title: "Build intake", priority: "High" });
     expect(snapshot.labels).toEqual(["atlas"]);
     expect(calls[0]).toMatchObject({ method: "POST" });
+  });
+
+  it("writes issue comments through the Linear API", async () => {
+    const result = await commentLinearIssue({
+      apiKey: "lin_api_key",
+      issueId: "issue-id",
+      body: "Atlas completed the run.",
+      fetchImpl: (async (_url, init) => {
+        expect(init?.method).toBe("POST");
+        expect(init?.headers).toMatchObject({ authorization: "lin_api_key" });
+        expect(String(init?.body)).toContain("Atlas completed the run.");
+        return new Response(
+          JSON.stringify({ data: { commentCreate: { success: true, comment: { id: "comment-id" } } } }),
+          { status: 200 }
+        );
+      }) as typeof fetch
+    });
+
+    expect(result).toMatchObject({ provider: "linear", target: "issue-id", status: "written", remoteId: "comment-id" });
   });
 });

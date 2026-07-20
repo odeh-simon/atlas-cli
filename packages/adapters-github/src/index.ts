@@ -5,8 +5,8 @@ export const adaptersGithubPackage = "@atlas/adapters-github";
 export interface GitHubAdapterHealth {
   readonly provider: "github";
   readonly configured: boolean;
-  readonly writable: false;
-  readonly capabilities: readonly ["health", "parseReference", "readFixture"];
+  readonly writable: boolean;
+  readonly capabilities: readonly ["health", "parseReference", "readFixture", "commentPullRequest"];
   readonly mode: "fixture" | "api-token-present";
 }
 
@@ -45,13 +45,60 @@ export interface FetchGitHubRepositoryInput {
   readonly fetchImpl?: typeof fetch | undefined;
 }
 
+export interface CommentGitHubPullRequestInput {
+  readonly token: string;
+  readonly reference: GitHubReference;
+  readonly body: string;
+  readonly fetchImpl?: typeof fetch | undefined;
+}
+
+export interface GitHubWritebackResult {
+  readonly provider: "github";
+  readonly target: string;
+  readonly status: "written";
+  readonly remoteUrl?: string | undefined;
+}
+
 export function getGitHubAdapterHealth(input: { readonly token?: string | undefined } = {}): GitHubAdapterHealth {
   return {
     provider: "github",
     configured: typeof input.token === "string" && input.token.length > 0,
-    writable: false,
-    capabilities: ["health", "parseReference", "readFixture"],
+    writable: typeof input.token === "string" && input.token.length > 0,
+    capabilities: ["health", "parseReference", "readFixture", "commentPullRequest"],
     mode: typeof input.token === "string" && input.token.length > 0 ? "api-token-present" : "fixture"
+  };
+}
+
+export async function commentGitHubPullRequest(input: CommentGitHubPullRequestInput): Promise<GitHubWritebackResult> {
+  if (input.reference.kind !== "pull_request" || input.reference.number === undefined) {
+    throw new TypeError("GitHub writeback requires a pull request reference");
+  }
+  if (input.body.trim().length === 0) {
+    throw new TypeError("GitHub comment body is required");
+  }
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const response = await fetchImpl(
+    `https://api.github.com/repos/${input.reference.owner}/${input.reference.repo}/issues/${input.reference.number}/comments`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/vnd.github+json",
+        authorization: `Bearer ${input.token}`,
+        "content-type": "application/json",
+        "x-github-api-version": "2022-11-28"
+      },
+      body: JSON.stringify({ body: input.body })
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`GitHub writeback failed: ${response.status}`);
+  }
+  const payload = (await response.json()) as Record<string, unknown>;
+  return {
+    provider: "github",
+    target: input.reference.url,
+    status: "written",
+    remoteUrl: stringValue(payload.html_url)
   };
 }
 

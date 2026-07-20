@@ -8,6 +8,9 @@
   "telemetry": {
     "enabled": false
   },
+  "writebacks": {
+    "enabled": false
+  },
   "checks": [
     {
       "name": "typecheck",

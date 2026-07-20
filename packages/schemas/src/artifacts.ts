@@ -24,6 +24,7 @@ export const artifactTypeSchema = z.enum([
   "finding",
   "finding_disposition",
   "fix_batch",
+  "adapter_writeback",
   "orchestration_run",
   "decision_record",
   "completion_report"
@@ -436,6 +437,18 @@ export const completionReportSchema = artifactEnvelopeSchema.extend({
   completion_gate_status: z.enum(["passed", "blocked", "overridden"])
 });
 
+export const adapterWritebackSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("adapter_writeback"),
+  provider: z.enum(["linear", "github", "figma"]),
+  mode: z.enum(["dry-run", "write"]),
+  status: z.enum(["prepared", "written", "blocked", "failed"]),
+  target: z.string().min(1),
+  summary: z.string().min(1),
+  remote_id: z.string().min(1).optional(),
+  remote_url: z.string().url().optional(),
+  evidence: z.array(z.string().min(1)).default([])
+});
+
 export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   manualTaskInputSchema,
   aiContextRecommendationSchema,
@@ -458,7 +471,8 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   fixBatchSchema,
   orchestrationRunSchema,
   decisionRecordSchema,
-  completionReportSchema
+  completionReportSchema,
+  adapterWritebackSchema
 ]);
 
 export type ArtifactEnvelope = z.infer<typeof artifactEnvelopeSchema>;
@@ -469,4 +483,5 @@ export type ImplementationContract = z.infer<typeof implementationContractSchema
 export type AgentRunLog = z.infer<typeof agentRunLogSchema>;
 export type CheckRunLog = z.infer<typeof checkRunLogSchema>;
 export type OrchestrationRun = z.infer<typeof orchestrationRunSchema>;
+export type AdapterWriteback = z.infer<typeof adapterWritebackSchema>;
 export type WalkingSkeletonArtifact = z.infer<typeof walkingSkeletonArtifactSchema>;

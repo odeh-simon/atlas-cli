@@ -24,6 +24,13 @@
       },
       "additionalProperties": false
     },
+    "writebacks": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "checks": {
       "type": "array",
       "items": {

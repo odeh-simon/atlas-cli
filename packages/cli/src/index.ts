@@ -28,6 +28,7 @@ import {
   prepareReviewPackage,
   prepareFixBatch,
   recordDecision,
+  recordAdapterWriteback,
   resumePausedSession,
   unarchiveSession,
   startLinearIssueTask,
@@ -36,8 +37,20 @@ import {
 import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
 import { getCodexAdapterHealth } from "@atlas/adapters-codex";
 import { fetchFigmaFileSnapshot, getFigmaAdapterHealth, parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
-import { fetchGitHubRepositorySnapshot, getGitHubAdapterHealth, parseGitHubReference, readGitHubFixture } from "@atlas/adapters-github";
-import { fetchLinearIssue, getLinearAdapterHealth, isLinearIssueKey, readLinearIssueFixture } from "@atlas/adapters-linear";
+import {
+  commentGitHubPullRequest,
+  fetchGitHubRepositorySnapshot,
+  getGitHubAdapterHealth,
+  parseGitHubReference,
+  readGitHubFixture
+} from "@atlas/adapters-github";
+import {
+  commentLinearIssue,
+  fetchLinearIssue,
+  getLinearAdapterHealth,
+  isLinearIssueKey,
+  readLinearIssueFixture
+} from "@atlas/adapters-linear";
 import { scanDesignPolicies } from "@atlas/checks";
 import { createTelemetryPreview, telemetryEnabled } from "@atlas/diagnostics";
 import { AtlasError } from "@atlas/domain";
@@ -119,6 +132,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "orchestrate" && subcommand === "run") {
       return await orchestrateRunCommand(rest);
+    }
+
+    if (command === "writebacks" && subcommand === "run") {
+      return await writebacksRunCommand(rest);
     }
 
     if (command === "git" && subcommand === "status") {
@@ -308,6 +325,7 @@ Usage:
   atlas ai providers health
   atlas ai models [--provider <alias>]
   atlas orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
+  atlas writebacks run --provider <linear|github|figma> --target <id|url> --summary <text> [--dry-run|--yes]
   atlas telemetry status
   atlas telemetry preview
   atlas telemetry enable
@@ -885,6 +903,92 @@ async function orchestrateRunCommand(args: string[]): Promise<number> {
   return result.status === "succeeded" ? 0 : 1;
 }
 
+async function writebacksRunCommand(args: string[]): Promise<number> {
+  const provider = readWritebackProvider(readOption(args, "--provider"));
+  const target = readOption(args, "--target");
+  const summary = readOption(args, "--summary");
+  const dryRun = args.includes("--dry-run");
+  const yes = args.includes("--yes");
+  if (provider === undefined || target === undefined || summary === undefined || (!dryRun && !yes)) {
+    console.error("atlas writebacks run requires --provider, --target, --summary, and --dry-run or --yes");
+    return 2;
+  }
+
+  if (dryRun) {
+    const result = await recordAdapterWriteback({
+      provider,
+      mode: "dry-run",
+      status: "prepared",
+      target,
+      summary,
+      evidence: provider === "figma" ? [target] : []
+    });
+    console.log(`Writeback: ${result.writebackArtifactId}`);
+    console.log(`Provider: ${result.provider}`);
+    console.log("Status: prepared");
+    return 0;
+  }
+
+  const config = readAtlasConfig();
+  if (config.writebacks?.enabled !== true) {
+    console.error("Real adapter writebacks require writebacks.enabled: true in atlas.config.json");
+    return 2;
+  }
+  if (provider === "linear") {
+    const tokenAlias = config.adapters?.linear?.tokenAlias ?? "linear.default";
+    const token = getCredentialToken({ alias: tokenAlias, provider: "linear" });
+    if (token === undefined) {
+      console.error(`Linear credential alias is missing: ${tokenAlias}`);
+      return 2;
+    }
+    const written = await commentLinearIssue({ apiKey: token, issueId: target, body: summary });
+    const result = await recordAdapterWriteback({
+      provider,
+      mode: "write",
+      status: "written",
+      target,
+      summary,
+      remoteId: written.remoteId
+    });
+    console.log(`Writeback: ${result.writebackArtifactId}`);
+    console.log("Status: written");
+    return 0;
+  }
+
+  if (provider === "github") {
+    const tokenAlias = config.adapters?.github?.tokenAlias ?? "github.default";
+    const token = getCredentialToken({ alias: tokenAlias, provider: "github" });
+    if (token === undefined) {
+      console.error(`GitHub credential alias is missing: ${tokenAlias}`);
+      return 2;
+    }
+    const written = await commentGitHubPullRequest({ token, reference: parseGitHubReference(target), body: summary });
+    const result = await recordAdapterWriteback({
+      provider,
+      mode: "write",
+      status: "written",
+      target,
+      summary,
+      remoteUrl: written.remoteUrl
+    });
+    console.log(`Writeback: ${result.writebackArtifactId}`);
+    console.log("Status: written");
+    return 0;
+  }
+
+  const result = await recordAdapterWriteback({
+    provider,
+    mode: "dry-run",
+    status: "prepared",
+    target,
+    summary,
+    evidence: [target]
+  });
+  console.log(`Writeback: ${result.writebackArtifactId}`);
+  console.log("Status: prepared");
+  return 0;
+}
+
 async function contractImportCommand(args: string[]): Promise<number> {
   const filePath = args[0];
   if (filePath === undefined) {
@@ -1094,6 +1198,7 @@ interface AtlasCliConfig {
   readonly schemaVersion?: number | undefined;
   readonly project?: { readonly name?: string | undefined; readonly baseBranch?: string | undefined } | undefined;
   readonly telemetry?: { readonly enabled?: boolean | undefined } | undefined;
+  readonly writebacks?: { readonly enabled?: boolean | undefined } | undefined;
   readonly ai?: {
     readonly defaultProviderAlias?: string | undefined;
     readonly providers?: readonly Partial<AiProviderConfig>[] | undefined;
@@ -1160,6 +1265,10 @@ function readOrchestrateUntil(value: string | undefined): "context-ready" | "pla
   return value === "context-ready" || value === "planning-ready" || value === "checks-completed" || value === "completion-ready"
     ? value
     : undefined;
+}
+
+function readWritebackProvider(value: string | undefined): "linear" | "github" | "figma" | undefined {
+  return value === "linear" || value === "github" || value === "figma" ? value : undefined;
 }
 
 function tokenForConfiguredAlias(alias: string | undefined, provider: CredentialProvider): string | undefined {

@@ -63,9 +63,19 @@ export async function runDoctor(options: RuntimeOptions = {}): Promise<DoctorRes
 function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv | undefined): DoctorIssue[] {
   const configPath = join(cwd, "atlas.config.json");
   if (!existsSync(configPath)) return [];
-  const config = JSON.parse(readFileSync(configPath, "utf8")) as {
-    adapters?: Partial<Record<CredentialProvider, { tokenAlias?: unknown }>>;
-  };
+  let config: DoctorConfig;
+  try {
+    config = JSON.parse(readFileSync(configPath, "utf8")) as DoctorConfig;
+  } catch {
+    return [
+      {
+        severity: "error",
+        code: "config.invalid_json",
+        summary: "atlas.config.json is not valid JSON",
+        recovery: "Fix the JSON syntax or restore atlas.config.json from version control."
+      }
+    ];
+  }
   const issues: DoctorIssue[] = [];
   for (const provider of ["figma", "github", "linear"] as const) {
     const tokenAlias = config.adapters?.[provider]?.tokenAlias;
@@ -79,7 +89,24 @@ function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv 
       });
     }
   }
+  for (const aiProvider of config.ai?.providers ?? []) {
+    const tokenAlias = aiProvider.tokenAlias;
+    if (typeof tokenAlias !== "string" || tokenAlias.length === 0) continue;
+    if (!hasCredential({ env, alias: tokenAlias, provider: "ai" })) {
+      issues.push({
+        severity: "warning",
+        code: "credential.missing",
+        summary: `Configured AI credential alias is missing: ${tokenAlias}`,
+        recovery: `Run atlas auth add --provider ai --alias ${tokenAlias} --value-env <ENV_VAR>.`
+      });
+    }
+  }
   return issues;
+}
+
+interface DoctorConfig {
+  readonly adapters?: Partial<Record<CredentialProvider, { readonly tokenAlias?: unknown }>>;
+  readonly ai?: { readonly providers?: readonly { readonly tokenAlias?: unknown }[] };
 }
 
 function inspectArtifact(artifactRoot: string, artifact: ArtifactRecord): DoctorIssue[] {
