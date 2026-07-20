@@ -1,4 +1,5 @@
 import { runProcess, type ProcessRunResult } from "@atlas/process-runner";
+import { randomUUID } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -9,9 +10,13 @@ export type CheckStatus = "passed" | "failed" | "skipped" | "blocked" | "cancell
 export interface CheckDefinition {
   readonly name: string;
   readonly required: boolean;
+  readonly kind?: "command" | "design-scan" | undefined;
   readonly command?: string | undefined;
   readonly args?: readonly string[] | undefined;
   readonly dependsOn?: readonly string[] | undefined;
+  readonly affected?: readonly string[] | undefined;
+  readonly root?: string | undefined;
+  readonly maxFiles?: number | undefined;
   readonly timeoutMs?: number | undefined;
 }
 
@@ -30,6 +35,8 @@ export interface CheckResult extends CheckExecutionResult {
   readonly name: string;
   readonly required: boolean;
   readonly dependencies: readonly string[];
+  readonly affected: readonly string[];
+  readonly skippedReason?: string | undefined;
 }
 
 export interface RunCheckSetInput {
@@ -37,10 +44,12 @@ export interface RunCheckSetInput {
   readonly env?: NodeJS.ProcessEnv | undefined;
   readonly checks: readonly CheckDefinition[];
   readonly builtIns?: readonly BuiltInCheck[] | undefined;
+  readonly changedFiles?: readonly string[] | undefined;
   readonly maxOutputBytes?: number | undefined;
 }
 
 export interface CheckSetResult {
+  readonly runId: string;
   readonly status: "passed" | "failed";
   readonly results: readonly CheckResult[];
   readonly failedRequired: readonly string[];
@@ -90,6 +99,7 @@ const defaultDesignPolicyRules: readonly DesignPolicyRule[] = [
 ];
 
 export async function runCheckSet(input: RunCheckSetInput): Promise<CheckSetResult> {
+  const runId = `run_${randomUUID()}`;
   const definitions = orderChecks(input.checks);
   const builtIns = new Map((input.builtIns ?? []).map((check) => [check.name, check]));
   const results: CheckResult[] = [];
@@ -97,6 +107,23 @@ export async function runCheckSet(input: RunCheckSetInput): Promise<CheckSetResu
 
   for (const definition of definitions) {
     const dependencies = definition.dependsOn ?? [];
+    const affected = definition.affected ?? [];
+    const skippedReason = affectedSkipReason(affected, input.changedFiles);
+    if (skippedReason !== undefined) {
+      const result: CheckResult = {
+        name: definition.name,
+        required: definition.required,
+        dependencies,
+        affected,
+        skippedReason,
+        status: "skipped",
+        summary: skippedReason
+      };
+      results.push(result);
+      byName.set(result.name, result);
+      continue;
+    }
+
     const blockedBy = dependencies.filter((name) => {
       const dependency = byName.get(name);
       return dependency === undefined || (dependency.required && dependency.status !== "passed");
@@ -106,6 +133,7 @@ export async function runCheckSet(input: RunCheckSetInput): Promise<CheckSetResu
         name: definition.name,
         required: definition.required,
         dependencies,
+        affected,
         status: "blocked",
         summary: `Blocked by failed or missing dependency: ${blockedBy.join(", ")}`
       };
@@ -116,12 +144,13 @@ export async function runCheckSet(input: RunCheckSetInput): Promise<CheckSetResu
 
     const execution =
       definition.command === undefined
-        ? await runBuiltInCheck(definition, builtIns)
+        ? await runNonCommandCheck(definition, builtIns, input)
         : await runCommandCheck(definition, input);
     const result: CheckResult = {
       name: definition.name,
       required: definition.required,
       dependencies,
+      affected,
       ...execution
     };
     results.push(result);
@@ -132,6 +161,7 @@ export async function runCheckSet(input: RunCheckSetInput): Promise<CheckSetResu
     .filter((result) => result.required && result.status !== "passed" && result.status !== "skipped")
     .map((result) => result.name);
   return {
+    runId,
     status: failedRequired.length === 0 ? "passed" : "failed",
     results,
     failedRequired
@@ -175,10 +205,23 @@ export function scanDesignPolicies(input: DesignPolicyScanInput): DesignPolicySc
   };
 }
 
-async function runBuiltInCheck(
+async function runNonCommandCheck(
   definition: CheckDefinition,
-  builtIns: ReadonlyMap<string, BuiltInCheck>
+  builtIns: ReadonlyMap<string, BuiltInCheck>,
+  input: RunCheckSetInput
 ): Promise<CheckExecutionResult> {
+  if (definition.kind === "design-scan") {
+    const rootDir = join(input.cwd ?? process.cwd(), definition.root ?? ".");
+    const scan = scanDesignPolicies({ rootDir, maxFiles: definition.maxFiles });
+    return {
+      status: scan.status,
+      summary:
+        scan.status === "passed"
+          ? `Design scan passed across ${scan.scannedFiles} file(s)`
+          : `Design scan found ${scan.violations.length} violation(s) across ${scan.scannedFiles} file(s)`
+    };
+  }
+
   const builtIn = builtIns.get(definition.name);
   if (builtIn === undefined) {
     return { status: "blocked", summary: `Built-in check is not registered: ${definition.name}` };
@@ -194,6 +237,7 @@ async function runCommandCheck(
     command: definition.command ?? "",
     args: definition.args,
     cwd: input.cwd,
+    allowedCwdRoot: input.cwd,
     env: input.env,
     timeoutMs: definition.timeoutMs,
     maxOutputBytes: input.maxOutputBytes
@@ -246,6 +290,29 @@ function orderChecks(checks: readonly CheckDefinition[]): readonly CheckDefiniti
 
   for (const check of checks) visit(check.name);
   return ordered;
+}
+
+function affectedSkipReason(affected: readonly string[], changedFiles: readonly string[] | undefined): string | undefined {
+  if (affected.length === 0 || changedFiles === undefined) return undefined;
+  const matched = changedFiles.some((file) => affected.some((pattern) => matchesAffectedPattern(file, pattern)));
+  return matched ? undefined : `Skipped because changed files do not match affected patterns: ${affected.join(", ")}`;
+}
+
+function matchesAffectedPattern(file: string, pattern: string): boolean {
+  const normalizedFile = file.replaceAll("\\", "/");
+  const normalizedPattern = pattern.replaceAll("\\", "/");
+  if (normalizedPattern.includes("*")) {
+    const expression = `^${normalizedPattern
+      .split("*")
+      .map(escapeRegex)
+      .join(".*")}$`;
+    return new RegExp(expression).test(normalizedFile);
+  }
+  return normalizedFile === normalizedPattern || normalizedFile.startsWith(`${normalizedPattern.replace(/\/$/, "")}/`);
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function listScannableFiles(rootDir: string, maxFiles: number): string[] {

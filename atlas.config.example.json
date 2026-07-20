@@ -11,11 +11,21 @@
   "checks": [
     {
       "name": "typecheck",
+      "kind": "command",
       "required": true,
       "command": "pnpm",
       "args": ["check"],
       "dependsOn": ["basic-session-integrity"],
+      "affected": ["packages/**", "app/**"],
       "timeoutMs": 120000
+    },
+    {
+      "name": "design-scan",
+      "kind": "design-scan",
+      "required": false,
+      "dependsOn": ["basic-session-integrity"],
+      "root": ".",
+      "maxFiles": 500
     }
   ],
   "ai": {

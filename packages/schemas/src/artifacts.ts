@@ -17,6 +17,7 @@ export const artifactTypeSchema = z.enum([
   "agent_implementation_package",
   "agent_run_log",
   "execution_report",
+  "check_run_log",
   "check_result",
   "review_package",
   "review_report",
@@ -292,6 +293,37 @@ export const executionReportSchema = artifactEnvelopeSchema.extend({
   limitations: z.array(z.string()).default([])
 });
 
+export const checkRunLogSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("check_run_log"),
+  run_id: idSchema,
+  status: z.enum(["passed", "failed"]),
+  failed_required: z.array(z.string()).default([]),
+  results: z.array(
+    z.object({
+      name: z.string().min(1),
+      required: z.boolean(),
+      status: z.enum(["passed", "failed", "skipped", "blocked", "cancelled", "timeout"]),
+      summary: z.string().min(1),
+      dependencies: z.array(z.string()).default([]),
+      affected: z.array(z.string()).default([]),
+      skipped_reason: z.string().min(1).optional(),
+      process: z
+        .object({
+          run_id: idSchema,
+          command: z.string().min(1),
+          args: z.array(z.string()),
+          status: z.enum(["succeeded", "failed", "timeout", "cancelled"]),
+          exit_code: z.number().int().optional(),
+          timed_out: z.boolean(),
+          stdout_truncated: z.boolean(),
+          stderr_truncated: z.boolean(),
+          redacted: z.boolean()
+        })
+        .optional()
+    })
+  )
+});
+
 export const checkResultSchema = artifactEnvelopeSchema.extend({
   type: z.literal("check_result"),
   check_name: z.string().min(1),
@@ -397,6 +429,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   agentImplementationPackageSchema,
   agentRunLogSchema,
   executionReportSchema,
+  checkRunLogSchema,
   checkResultSchema,
   reviewPackageSchema,
   reviewReportSchema,
@@ -413,4 +446,5 @@ export type ContextQualityReport = z.infer<typeof contextQualityReportSchema>;
 export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;
 export type ImplementationContract = z.infer<typeof implementationContractSchema>;
 export type AgentRunLog = z.infer<typeof agentRunLogSchema>;
+export type CheckRunLog = z.infer<typeof checkRunLogSchema>;
 export type WalkingSkeletonArtifact = z.infer<typeof walkingSkeletonArtifactSchema>;

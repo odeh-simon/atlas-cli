@@ -34,6 +34,9 @@ describe("runBasicCheck", () => {
     const checkArtifacts = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "check_result"
     );
+    const runLogArtifacts = listArtifactsForSession(runtime.db, result.sessionId).filter(
+      (artifact) => artifact.type === "check_run_log"
+    );
     closeAtlasRuntime(runtime, false);
 
     expect(result.status).toBe("passed");
@@ -42,6 +45,7 @@ describe("runBasicCheck", () => {
     expect(status.session?.primaryState).toBe("checks_completed");
     expect(status.nextCommands[0]).toBe("atlas review prepare");
     expect(checkArtifacts).toHaveLength(1);
+    expect(runLogArtifacts).toHaveLength(1);
   });
 
   it("fails before an execution report is imported", async () => {
@@ -93,6 +97,30 @@ describe("runBasicCheck", () => {
 
     expect(typeof check.git_fingerprint).toBe("string");
     expect(check.metadata?.git?.dirty).toBe(false);
+  });
+
+  it("runs configured design scans and writes a rejected check log when required violations exist", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    writeFileSync(join(cwd, "view.tsx"), '<div className="bg-[#123456]" />\n');
+    writeFileSync(
+      join(cwd, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        checks: [{ name: "design", kind: "design-scan", required: true, dependsOn: ["basic-session-integrity"] }]
+      })
+    );
+
+    await expect(runBasicCheck({ cwd, env })).rejects.toThrow("Required check failed");
+    const status = await getStatus({ cwd, env });
+    const runtime = await openAtlasRuntime({ cwd, env });
+    const runLogs = listArtifactsForSession(runtime.db, status.session?.sessionId ?? "").filter(
+      (artifact) => artifact.type === "check_run_log"
+    );
+    closeAtlasRuntime(runtime, false);
+
+    expect(runLogs.at(-1)?.status).toBe("rejected");
   });
 });
 

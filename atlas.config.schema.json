@@ -28,13 +28,17 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "command"],
+        "required": ["name"],
         "properties": {
           "name": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
+          "kind": { "type": "string", "enum": ["command", "design-scan"] },
           "required": { "type": "boolean" },
           "command": { "type": "string", "minLength": 1 },
           "args": { "type": "array", "items": { "type": "string" } },
           "dependsOn": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" } },
+          "affected": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "root": { "type": "string", "minLength": 1 },
+          "maxFiles": { "type": "integer", "minimum": 1 },
           "timeoutMs": { "type": "integer", "minimum": 1 }
         },
         "additionalProperties": false

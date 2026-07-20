@@ -49,6 +49,50 @@ describe("runCheckSet", () => {
     expect(result.results[1]?.status).toBe("blocked");
   });
 
+  it("does not fail the set for optional command failures", async () => {
+    const result = await runCheckSet({
+      checks: [{ name: "optional", required: false, command: process.execPath, args: ["-e", "process.exit(2)"] }]
+    });
+
+    expect(result.status).toBe("passed");
+    expect(result.failedRequired).toEqual([]);
+    expect(result.results[0]?.status).toBe("failed");
+  });
+
+  it("skips affected checks when changed files do not match", async () => {
+    const result = await runCheckSet({
+      changedFiles: ["src/app.ts"],
+      checks: [
+        {
+          name: "docs-only",
+          required: true,
+          command: process.execPath,
+          args: ["-e", "process.exit(1)"],
+          affected: ["docs/**"]
+        }
+      ]
+    });
+
+    expect(result.status).toBe("passed");
+    expect(result.results[0]?.status).toBe("skipped");
+    expect(result.results[0]?.skippedReason).toContain("affected patterns");
+  });
+
+  it("runs design scan as a configured check", async () => {
+    const root = tempRoot();
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src", "view.tsx"), '<div className="bg-[#123456]" />\n');
+
+    const result = await runCheckSet({
+      cwd: root,
+      checks: [{ name: "design", kind: "design-scan", required: true }]
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.failedRequired).toEqual(["design"]);
+    expect(result.results[0]?.summary).toContain("Design scan found");
+  });
+
   it("rejects dependency cycles", async () => {
     await expect(
       runCheckSet({
