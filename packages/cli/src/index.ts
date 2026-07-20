@@ -819,15 +819,19 @@ async function contextBuildCommand(args: string[]): Promise<number> {
       console.error(alias === undefined ? "No AI provider configured" : `AI provider not configured: ${alias}`);
       return 2;
     }
-    const scout = await runAiContextScout({
-      provider,
-      apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai"),
-      ...(maxFiles === undefined ? {} : { maxFiles }),
-      ...(maxBytes === undefined ? {} : { maxBytes })
-    });
-    aiRecommendationArtifactId = scout.recommendationArtifactId;
-    console.log(`AI recommendation: ${scout.recommendationArtifactId}`);
-    console.log(`AI recommendations: ${scout.recommendationCount}`);
+    try {
+      const scout = await runAiContextScout({
+        provider,
+        apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai"),
+        ...(maxFiles === undefined ? {} : { maxFiles }),
+        ...(maxBytes === undefined ? {} : { maxBytes })
+      });
+      aiRecommendationArtifactId = scout.recommendationArtifactId;
+      console.log(`AI recommendation: ${scout.recommendationArtifactId}`);
+      console.log(`AI recommendations: ${scout.recommendationCount}`);
+    } catch (error) {
+      console.error(`AI scout unavailable; falling back to deterministic context: ${errorMessage(error)}`);
+    }
   }
   const result = await buildContextManifest({
     ...(maxFiles === undefined ? {} : { maxFiles }),
@@ -1176,6 +1180,10 @@ function readNumberOption(args: string[], name: string): number | undefined {
 
 function compact(values: Array<string | undefined>): string[] {
   return values.filter((value): value is string => value !== undefined);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function readConfiguredBaseBranch(): string | undefined {
