@@ -1,5 +1,6 @@
 export * from "./agent-package.js";
 export * from "./agent-invoke.js";
+export * from "./artifact-show.js";
 export * from "./contract-approval.js";
 export * from "./contract-import.js";
 export * from "./checks.js";

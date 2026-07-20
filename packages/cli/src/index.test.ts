@@ -103,7 +103,45 @@ describe("cli", () => {
     expect(logs.join("\n")).toContain("atlas checks design-scan");
     expect(logs.join("\n")).toContain("atlas fix prepare");
     expect(logs.join("\n")).toContain("atlas doctor");
+    expect(logs.join("\n")).toContain("atlas artifacts show");
     expect(logs.join("\n")).toContain("atlas ai providers health");
+  });
+
+  it("shows artifact content by id", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+
+      const startCode = await main([
+        "start",
+        "--manual",
+        "--title",
+        "Artifact Demo",
+        "--objective",
+        "Show stored artifact content"
+      ]);
+
+      expect(startCode).toBe(0);
+      const artifactId = logs.find((line) => line.startsWith("Task brief: "))?.replace("Task brief: ", "");
+      expect(artifactId).toMatch(/^art_/);
+
+      logs.length = 0;
+      const showCode = await main(["artifacts", "show", artifactId ?? ""]);
+
+      expect(showCode).toBe(0);
+      expect(logs.join("\n")).toContain("Artifact Demo");
+      expect(logs.join("\n")).toContain("Show stored artifact content");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+    }
   });
 
   it("accepts pnpm-style leading argument separator", async () => {

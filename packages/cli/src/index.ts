@@ -32,7 +32,8 @@ import {
   resumePausedSession,
   unarchiveSession,
   startLinearIssueTask,
-  startManualTask
+  startManualTask,
+  showArtifactContent
 } from "@atlas/app-services";
 import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
 import { getCodexAdapterHealth } from "@atlas/adapters-codex";
@@ -120,6 +121,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "adapters" && subcommand === "health") {
       return adaptersHealthCommand();
+    }
+
+    if (command === "artifacts" && subcommand === "show") {
+      return await artifactsShowCommand(rest);
     }
 
     if (command === "ai") {
@@ -322,6 +327,7 @@ Usage:
   atlas auth list
   atlas auth remove --alias <alias>
   atlas adapters health
+  atlas artifacts show <artifact-id>
   atlas ai providers health
   atlas ai models [--provider <alias>]
   atlas orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
@@ -434,6 +440,23 @@ async function doctorCommand(): Promise<number> {
     console.log(`Recovery: ${issue.recovery}`);
   }
   return result.status === "passed" ? 0 : 1;
+}
+
+async function artifactsShowCommand(args: string[]): Promise<number> {
+  const artifactId = args[0];
+  if (artifactId === undefined) {
+    console.error("atlas artifacts show requires an artifact id");
+    return 2;
+  }
+
+  const artifact = await showArtifactContent({ artifactId });
+  if (artifact === undefined) {
+    console.error(`Artifact not found: ${artifactId}`);
+    return 1;
+  }
+
+  console.log(formatArtifactForDisplay(artifact.content, artifact.type, artifact.mediaType));
+  return 0;
 }
 
 function authAddCommand(args: string[]): number {
@@ -1188,6 +1211,29 @@ function readNumberOption(args: string[], name: string): number | undefined {
 
 function compact(values: Array<string | undefined>): string[] {
   return values.filter((value): value is string => value !== undefined);
+}
+
+function formatArtifactForDisplay(content: string, type: string, mediaType: string): string {
+  if (type === "ai_planning_draft") {
+    try {
+      const parsed = JSON.parse(content) as { readonly draft_markdown?: unknown };
+      if (typeof parsed.draft_markdown === "string") {
+        return parsed.draft_markdown;
+      }
+    } catch {
+      return content;
+    }
+  }
+
+  if (mediaType === "application/json") {
+    try {
+      return JSON.stringify(JSON.parse(content) as unknown, null, 2);
+    } catch {
+      return content;
+    }
+  }
+
+  return content;
 }
 
 function errorMessage(error: unknown): string {
