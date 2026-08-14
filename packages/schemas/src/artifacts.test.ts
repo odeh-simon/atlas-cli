@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { implementationContractSchema, walkingSkeletonArtifactSchema } from "./index.js";
+import { contextManifestSchema, implementationContractSchema, walkingSkeletonArtifactSchema } from "./index.js";
 
 const envelope = {
   artifact_id: "art_contract_1",
@@ -60,5 +60,31 @@ describe("walking skeleton artifact schemas", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it("accepts compact version-two context manifests", () => {
+    const result = contextManifestSchema.parse({
+      ...envelope,
+      artifact_id: "art_context_1",
+      type: "context_manifest",
+      schema_version: 2,
+      discovery_summary: {
+        scanned_file_count: 100,
+        candidate_file_count: 10,
+        included_source_count: 5,
+        excluded_candidate_count: 5,
+        omitted_scan_count: 90
+      },
+      included_sources: [
+        { uri: "src/index.ts", kind: "file", reason: "Task source", byte_length: 10, included: true, rank: 1 }
+      ],
+      excluded_candidates: [],
+      budgets: { max_files: 5, max_bytes: 1000, used_files: 1, used_bytes: 10 },
+      gaps: [],
+      freshness: "partial"
+    });
+
+    expect(result.sources).toBeUndefined();
+    expect(result.included_sources).toHaveLength(1);
   });
 });

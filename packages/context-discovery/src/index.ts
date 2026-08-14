@@ -32,10 +32,17 @@ export interface DiscoveredContextSource {
   readonly byte_length: number;
   readonly included: boolean;
   readonly exclusion_reason?: string | undefined;
+  readonly rank: number;
+  readonly deterministic_score: number;
+  readonly ai_confidence?: number | undefined;
 }
 
 export interface ContextDiscoveryResult {
   readonly sources: readonly DiscoveredContextSource[];
+  readonly includedSources: readonly DiscoveredContextSource[];
+  readonly excludedCandidates: readonly DiscoveredContextSource[];
+  readonly scannedFileCount: number;
+  readonly omittedScanCount: number;
   readonly budgets: {
     readonly max_files: number;
     readonly max_bytes: number;
@@ -91,12 +98,21 @@ export function discoverContextSources(options: ContextDiscoveryOptions): Contex
     .filter((source): source is DiscoveredContextSource => source !== undefined)
     .map((source) => applyRecommendation(source, recommendations.get(source.uri)))
     .sort((a, b) => compareSources(a, b, recommendations, taskTerms));
+  const candidateLimit = Math.min(candidates.length, budget.maxFiles + Math.min(20, budget.maxFiles));
+  const rankedCandidates = candidates.slice(0, candidateLimit).map((source, index) => ({
+    ...source,
+    rank: index + 1,
+    deterministic_score: deterministicScore(source.uri, taskTerms),
+    ...(recommendations.get(source.uri) === undefined
+      ? {}
+      : { ai_confidence: recommendations.get(source.uri)?.confidence })
+  }));
 
   const sources: DiscoveredContextSource[] = [];
   let usedFiles = 0;
   let usedBytes = 0;
 
-  for (const source of candidates) {
+  for (const source of rankedCandidates) {
     if (usedFiles >= budget.maxFiles) {
       sources.push({ ...source, included: false, exclusion_reason: "file budget exceeded" });
       continue;
@@ -111,15 +127,21 @@ export function discoverContextSources(options: ContextDiscoveryOptions): Contex
     usedBytes += source.byte_length;
   }
 
+  const includedSources = sources.filter((source) => source.included);
+  const excludedCandidates = sources.filter((source) => !source.included);
   return {
     sources,
+    includedSources,
+    excludedCandidates,
+    scannedFileCount: candidates.length,
+    omittedScanCount: candidates.length - rankedCandidates.length,
     budgets: {
       max_files: budget.maxFiles,
       max_bytes: budget.maxBytes,
       used_files: usedFiles,
       used_bytes: usedBytes
     },
-    freshness: sources.some((source) => !source.included) ? "partial" : "fresh"
+    freshness: excludedCandidates.length > 0 || candidates.length > rankedCandidates.length ? "partial" : "fresh"
   };
 }
 
@@ -155,7 +177,9 @@ function toSource(rootPath: string, absolutePath: string): DiscoveredContextSour
     reason: reasonForPath(uri),
     sha256: createHash("sha256").update(bytes).digest("hex"),
     byte_length: statSync(absolutePath).size,
-    included: true
+    included: true,
+    rank: 0,
+    deterministic_score: 0
   };
 }
 
@@ -290,6 +314,10 @@ function taskRelevanceForPath(path: string, taskTerms: ReadonlySet<string>): num
     score += 1;
   }
   return score;
+}
+
+function deterministicScore(path: string, taskTerms: ReadonlySet<string>): number {
+  return Math.max(0, 100 - priorityForPath(path) * 10) + taskRelevanceForPath(path, taskTerms);
 }
 
 function safeReadDir(path: string): Dirent[] {

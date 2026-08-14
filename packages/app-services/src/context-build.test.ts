@@ -97,13 +97,17 @@ describe("buildContextManifest", () => {
       expect(contextArtifact).toBeDefined();
       const manifest = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, contextArtifact?.storageUri ?? ""), "utf8")) as {
         metadata: Record<string, unknown>;
-        sources: Array<{ uri: string; included: boolean; reason: string }>;
+        discovery_summary: { scanned_file_count: number; candidate_file_count: number };
+        included_sources: Array<{ uri: string; included: boolean; reason: string }>;
+        excluded_candidates: Array<{ uri: string; included: boolean; reason: string }>;
       };
 
       expect(manifest.metadata.discovery).toBe("hybrid");
       expect(manifest.metadata.ai_recommendation_artifact_id).toBe(scout.recommendationArtifactId);
-      expect(manifest.sources.filter((source) => source.included).map((source) => source.uri)).toEqual(["src/target.ts"]);
-      expect(manifest.sources[0]?.reason).toContain("AI recommended");
+      expect(manifest.discovery_summary).toMatchObject({ scanned_file_count: 3, candidate_file_count: 2 });
+      expect(manifest.included_sources.map((source) => source.uri)).toEqual(["src/target.ts"]);
+      expect(manifest.included_sources[0]?.reason).toContain("AI recommended");
+      expect(manifest.excluded_candidates).toHaveLength(1);
       expect(result.contextReadiness).toBe("weak");
     } finally {
       closeAtlasRuntime(runtime, false);

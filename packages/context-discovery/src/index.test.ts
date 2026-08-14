@@ -33,6 +33,8 @@ describe("discoverContextSources", () => {
 
     expect(result.freshness).toBe("fresh");
     expect(result.budgets.used_files).toBe(4);
+    expect(result.scannedFileCount).toBe(4);
+    expect(result.includedSources).toHaveLength(4);
     expect(result.sources.map((source) => source.uri)).toEqual([
       "package.json",
       "README.md",
@@ -63,6 +65,23 @@ describe("discoverContextSources", () => {
       included: false,
       exclusion_reason: "file budget exceeded"
     });
+    expect(result.excludedCandidates).toHaveLength(1);
+  });
+
+  it("keeps only a bounded ranked shortlist while reporting the full scan", () => {
+    const root = tempRoot();
+    for (let index = 0; index < 50; index += 1) {
+      writeFixture(root, `src/file-${index}.ts`, `export const value${index} = ${index};\n`);
+    }
+
+    const result = discoverContextSources({ rootPath: root, budget: { maxFiles: 5, maxBytes: 10_000 } });
+
+    expect(result.scannedFileCount).toBe(50);
+    expect(result.sources).toHaveLength(10);
+    expect(result.includedSources).toHaveLength(5);
+    expect(result.excludedCandidates).toHaveLength(5);
+    expect(result.omittedScanCount).toBe(40);
+    expect(result.sources.map((source) => source.rank)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   });
 
   it("prioritizes recommended sources before applying budgets", () => {

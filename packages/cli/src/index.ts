@@ -20,6 +20,7 @@ import {
   runAiContextScout,
   runDoctor,
   importContextManifest,
+  inspectContextManifest,
   importContract,
   importExecutionResult,
   importReviewReport,
@@ -201,6 +202,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return await contextBuildCommand(rest);
     }
 
+    if (command === "context" && (subcommand === "inspect" || subcommand === "summarize")) {
+      return await contextInspectCommand(rest, subcommand === "summarize");
+    }
+
     if (command === "plan") {
       return await planCommand(compact([subcommand, ...rest]));
     }
@@ -297,6 +302,8 @@ Usage:
   atlas start <LINEAR-ISSUE-KEY>
   atlas context import <file>
   atlas context build [--ai] [--ai-provider <alias>] [--max-files <n>] [--max-bytes <n>]
+  atlas context inspect [artifact-id] [--included|--excluded|--all|--json]
+  atlas context summarize [artifact-id]
   atlas decisions record --kind <decision|deviation> --title <title> --rationale <text> --category <category> --yes
   atlas plan [--ai] [--ai-provider <alias>]
   atlas contract import <file>
@@ -863,6 +870,63 @@ async function contextImportCommand(args: string[]): Promise<number> {
   return 0;
 }
 
+async function contextInspectCommand(args: string[], summaryOnly: boolean): Promise<number> {
+  const artifactId = args.find((argument) => !argument.startsWith("--"));
+  const inspection = await inspectContextManifest({ ...(artifactId === undefined ? {} : { artifactId }) });
+  if (inspection === undefined) {
+    console.error(artifactId === undefined ? "No context manifest found for the active session" : `Context manifest not found: ${artifactId}`);
+    return 1;
+  }
+
+  if (args.includes("--json")) {
+    console.log(JSON.stringify(inspection, null, 2));
+    return 0;
+  }
+
+  console.log(`Context: ${inspection.artifactId}`);
+  console.log(`Discovery: ${inspection.discovery}`);
+  console.log(`Freshness: ${inspection.freshness}`);
+  console.log(`Scanned files: ${inspection.scannedFileCount}`);
+  console.log(`Candidates: ${inspection.candidateFileCount}`);
+  console.log(`Included sources: ${inspection.includedSources.length}`);
+  console.log(`Excluded candidates: ${inspection.excludedCandidates.length}`);
+  console.log(`Omitted after scan: ${inspection.omittedScanCount}`);
+  console.log(
+    `Budget: ${inspection.budgets.used_files}/${inspection.budgets.max_files} files, ${inspection.budgets.used_bytes}/${inspection.budgets.max_bytes} bytes`
+  );
+  if (summaryOnly) return 0;
+
+  const showIncluded = !args.includes("--excluded") || args.includes("--included") || args.includes("--all");
+  const showExcluded = args.includes("--excluded") || args.includes("--all");
+  if (showIncluded) printContextSources("Included", inspection.includedSources);
+  if (showExcluded) printContextSources("Excluded", inspection.excludedCandidates);
+  return 0;
+}
+
+function printContextSources(
+  label: string,
+  sources: readonly {
+    readonly uri: string;
+    readonly kind: string;
+    readonly reason: string;
+    readonly rank?: number | undefined;
+    readonly ai_confidence?: number | undefined;
+    readonly exclusion_reason?: string | undefined;
+  }[]
+): void {
+  console.log(`${label}:`);
+  if (sources.length === 0) {
+    console.log("(none)");
+    return;
+  }
+  for (const source of sources) {
+    const rank = source.rank === undefined ? "---" : String(source.rank).padStart(3, "0");
+    const confidence = source.ai_confidence === undefined ? "" : ` ai=${source.ai_confidence.toFixed(2)}`;
+    const exclusion = source.exclusion_reason === undefined ? "" : ` [${source.exclusion_reason}]`;
+    console.log(`${rank} ${source.kind}${confidence} ${source.uri}${exclusion} - ${source.reason}`);
+  }
+}
+
 async function contextBuildCommand(args: string[]): Promise<number> {
   const maxFiles = readNumberOption(args, "--max-files");
   const maxBytes = readNumberOption(args, "--max-bytes");
@@ -911,7 +975,10 @@ async function contextBuildCommand(args: string[]): Promise<number> {
   console.log(`Context quality: ${result.contextReadiness}`);
   console.log(`Context quality report: ${result.contextQualityReportArtifactId}`);
   console.log(`Session: ${result.sessionId}`);
-  console.log(`Sources: ${result.includedSourceCount}/${result.sourceCount}`);
+  console.log(`Scanned files: ${result.scannedFileCount}`);
+  console.log(`Candidates: ${result.candidateSourceCount}`);
+  console.log(`Included sources: ${result.includedSourceCount}`);
+  console.log(`Excluded candidates: ${result.excludedCandidateCount}`);
   console.log(`State: ${result.state}`);
   console.log(`Next: ${result.nextCommand}`);
   return 0;

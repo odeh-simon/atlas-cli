@@ -33,6 +33,9 @@ export interface BuildContextResult {
   readonly state: string;
   readonly sourceCount: number;
   readonly includedSourceCount: number;
+  readonly scannedFileCount: number;
+  readonly candidateSourceCount: number;
+  readonly excludedCandidateCount: number;
   readonly nextCommand: string;
 }
 
@@ -66,7 +69,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       artifact_id: artifactId,
       session_id: session.sessionId,
       type: "context_manifest",
-      schema_version: 1,
+      schema_version: 2,
       content_version: nextContextVersion(runtime.db, session.sessionId),
       created_at: now,
       producer: { type: "atlas" },
@@ -89,7 +92,15 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
               ai_recommendation_count: aiRecommendation.recommendations.length
             })
       },
-      sources: discovery.sources,
+      discovery_summary: {
+        scanned_file_count: discovery.scannedFileCount,
+        candidate_file_count: discovery.sources.length,
+        included_source_count: discovery.includedSources.length,
+        excluded_candidate_count: discovery.excludedCandidates.length,
+        omitted_scan_count: discovery.omittedScanCount
+      },
+      included_sources: discovery.includedSources,
+      excluded_candidates: discovery.excludedCandidates,
       budgets: discovery.budgets,
       gaps: [],
       freshness: discovery.freshness
@@ -114,7 +125,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       artifactId,
       sessionId: session.sessionId,
       type: "context_manifest",
-      schemaVersion: 1,
+      schemaVersion: 2,
       contentVersion,
       storageUri: written.storageUri,
       sha256: written.sha256,
@@ -209,8 +220,10 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
         contextQualityReportArtifactId: qualityArtifactId,
         contextReadiness: qualityReport.readiness,
         gitFingerprint: git?.base_fingerprint,
-        sourceCount: discovery.sources.length,
-        includedSourceCount: discovery.sources.filter((source) => source.included).length
+        scannedFileCount: discovery.scannedFileCount,
+        candidateSourceCount: discovery.sources.length,
+        includedSourceCount: discovery.includedSources.length,
+        excludedCandidateCount: discovery.excludedCandidates.length
       }
     });
 
@@ -221,7 +234,10 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       contextReadiness: qualityReport.readiness,
       state: next,
       sourceCount: discovery.sources.length,
-      includedSourceCount: discovery.sources.filter((source) => source.included).length,
+      includedSourceCount: discovery.includedSources.length,
+      scannedFileCount: discovery.scannedFileCount,
+      candidateSourceCount: discovery.sources.length,
+      excludedCandidateCount: discovery.excludedCandidates.length,
       nextCommand: "atlas plan"
     };
   } finally {
@@ -237,7 +253,7 @@ function evaluateContextQuality(input: {
   readonly issues: readonly { readonly code: string; readonly severity: "blocking" | "warning" | "info"; readonly summary: string }[];
   readonly recommended_next_actions: readonly string[];
 } {
-  const includedSources = input.discovery.sources.filter((source) => source.included);
+  const includedSources = input.discovery.includedSources;
   const issues: Array<{ code: string; severity: "blocking" | "warning" | "info"; summary: string }> = [];
   if (includedSources.length === 0) {
     issues.push({ code: "no-context-sources", severity: "blocking", summary: "No context sources were included." });

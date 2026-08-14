@@ -119,11 +119,17 @@ function normalizeManifest(raw: unknown, sessionId: string, artifactId: string, 
 
   const value = raw as {
     sources?: unknown[];
+    included_sources?: unknown[];
+    excluded_candidates?: unknown[];
+    discovery_summary?: unknown;
     gaps?: unknown[];
     budgets?: { max_files?: number; max_bytes?: number; used_files?: number; used_bytes?: number };
     freshness?: string;
   };
   const sources = Array.isArray(value.sources) ? value.sources : [];
+  const includedSources = Array.isArray(value.included_sources) ? value.included_sources : undefined;
+  const excludedCandidates = Array.isArray(value.excluded_candidates) ? value.excluded_candidates : undefined;
+  const usedSources = includedSources ?? sources.filter((source) => isIncludedSource(source));
   return {
     artifact_id: artifactId,
     session_id: sessionId,
@@ -136,14 +142,21 @@ function normalizeManifest(raw: unknown, sessionId: string, artifactId: string, 
     parents: [],
     content_sha256: "0".repeat(64),
     metadata: {},
-    sources,
+    ...(includedSources === undefined && excludedCandidates === undefined ? { sources } : {}),
+    ...(value.discovery_summary === undefined ? {} : { discovery_summary: value.discovery_summary }),
+    ...(includedSources === undefined ? {} : { included_sources: includedSources }),
+    ...(excludedCandidates === undefined ? {} : { excluded_candidates: excludedCandidates }),
     budgets: {
-      max_files: value.budgets?.max_files ?? Math.max(1, sources.length),
+      max_files: value.budgets?.max_files ?? Math.max(1, usedSources.length),
       max_bytes: value.budgets?.max_bytes ?? 400000,
-      used_files: value.budgets?.used_files ?? sources.length,
+      used_files: value.budgets?.used_files ?? usedSources.length,
       used_bytes: value.budgets?.used_bytes ?? 0
     },
     gaps: Array.isArray(value.gaps) ? value.gaps : [],
     freshness: value.freshness ?? "fresh"
   };
+}
+
+function isIncludedSource(source: unknown): boolean {
+  return typeof source === "object" && source !== null && "included" in source && source.included === true;
 }

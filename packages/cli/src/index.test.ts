@@ -97,6 +97,8 @@ describe("cli", () => {
 
     expect(code).toBe(0);
     expect(logs.join("\n")).toContain("atlas context build");
+    expect(logs.join("\n")).toContain("atlas context inspect");
+    expect(logs.join("\n")).toContain("atlas context summarize");
     expect(logs.join("\n")).toContain("atlas figma inspect");
     expect(logs.join("\n")).toContain("atlas github inspect");
     expect(logs.join("\n")).toContain("atlas git diff-safeguards");
@@ -138,6 +140,39 @@ describe("cli", () => {
       expect(showCode).toBe(0);
       expect(logs.join("\n")).toContain("Artifact Demo");
       expect(logs.join("\n")).toContain("Show stored artifact content");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+    }
+  });
+
+  it("summarizes and inspects the latest compact context manifest", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(join(repo, "src", "target.ts"), "export const target = true;\n");
+    writeFileSync(join(repo, "src", "target.test.ts"), "expect(true).toBe(true);\n");
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      await main(["start", "--manual", "--title", "Target", "--objective", "Update target source"]);
+      await main(["context", "build", "--max-files", "1", "--max-bytes", "1000"]);
+      logs.length = 0;
+
+      expect(await main(["context", "summarize"])).toBe(0);
+      expect(logs).toContain("Scanned files: 2");
+      expect(logs).toContain("Candidates: 2");
+      expect(logs).toContain("Included sources: 1");
+      expect(logs).toContain("Excluded candidates: 1");
+
+      logs.length = 0;
+      expect(await main(["context", "inspect", "--excluded"])).toBe(0);
+      expect(logs).toContain("Excluded:");
+      expect(logs.some((line) => line.includes("file budget exceeded"))).toBe(true);
     } finally {
       process.chdir(previousCwd);
       restoreEnv("ATLAS_HOME", previousAtlasHome);
@@ -491,7 +526,10 @@ describe("cli", () => {
       expect(logs.some((line) => line.startsWith("AI recommendation: art_"))).toBe(true);
       expect(logs.some((line) => line.startsWith("Context quality: "))).toBe(true);
       expect(logs.some((line) => line.startsWith("Context quality report: art_"))).toBe(true);
-      expect(logs).toContain("Sources: 1/4");
+      expect(logs).toContain("Scanned files: 4");
+      expect(logs).toContain("Candidates: 2");
+      expect(logs).toContain("Included sources: 1");
+      expect(logs).toContain("Excluded candidates: 1");
       expect(logs).toContain("State: context_ready");
     } finally {
       process.chdir(previousCwd);

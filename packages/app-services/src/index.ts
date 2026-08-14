@@ -8,6 +8,7 @@ export * from "./completion.js";
 export * from "./context-build.js";
 export * from "./context-scout.js";
 export * from "./context-import.js";
+export * from "./context-inspect.js";
 export * from "./decision-record.js";
 export * from "./doctor.js";
 export * from "./execution-import.js";

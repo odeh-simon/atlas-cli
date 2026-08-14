@@ -87,12 +87,26 @@ export const contextSourceRecordSchema = z.object({
   fetched_at: isoDateTimeSchema.optional(),
   byte_length: z.number().int().nonnegative(),
   included: z.boolean(),
-  exclusion_reason: z.string().min(1).optional()
+  exclusion_reason: z.string().min(1).optional(),
+  rank: z.number().int().positive().optional(),
+  deterministic_score: z.number().nonnegative().optional(),
+  ai_confidence: z.number().min(0).max(1).optional()
 });
 
 export const contextManifestSchema = artifactEnvelopeSchema.extend({
   type: z.literal("context_manifest"),
-  sources: z.array(contextSourceRecordSchema),
+  sources: z.array(contextSourceRecordSchema).optional(),
+  discovery_summary: z
+    .object({
+      scanned_file_count: z.number().int().nonnegative(),
+      candidate_file_count: z.number().int().nonnegative(),
+      included_source_count: z.number().int().nonnegative(),
+      excluded_candidate_count: z.number().int().nonnegative(),
+      omitted_scan_count: z.number().int().nonnegative()
+    })
+    .optional(),
+  included_sources: z.array(contextSourceRecordSchema).optional(),
+  excluded_candidates: z.array(contextSourceRecordSchema).optional(),
   budgets: z.object({
     max_files: z.number().int().positive(),
     max_bytes: z.number().int().positive(),
@@ -476,6 +490,8 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
 ]);
 
 export type ArtifactEnvelope = z.infer<typeof artifactEnvelopeSchema>;
+export type ContextSourceRecord = z.infer<typeof contextSourceRecordSchema>;
+export type ContextManifest = z.infer<typeof contextManifestSchema>;
 export type AiContextRecommendation = z.infer<typeof aiContextRecommendationSchema>;
 export type ContextQualityReport = z.infer<typeof contextQualityReportSchema>;
 export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;

@@ -82,7 +82,7 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       rootPath: runtime.paths.cwd,
       maxInputTokens: input.provider.maxInputTokens,
       taskBriefText,
-      sources: discovery.sources.filter((source) => source.included)
+      sources: discovery.includedSources
     });
     const prompt = buildScoutPrompt({
       taskBriefText,
@@ -123,8 +123,10 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       content_sha256: "0".repeat(64),
       metadata: {
         discovery: "ai-context-scout",
+        scanned_file_count: discovery.scannedFileCount,
         candidate_count: discovery.sources.length,
-        included_candidate_count: discovery.sources.filter((source) => source.included).length,
+        included_candidate_count: discovery.includedSources.length,
+        omitted_scan_count: discovery.omittedScanCount,
         data_egress: {
           destination: isCloudAiProvider(input.provider) ? "cloud" : "local",
           consent: input.cloudDataConsent === true,
