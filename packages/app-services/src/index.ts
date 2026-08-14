@@ -26,3 +26,4 @@ export * from "./runtime.js";
 export * from "./status.js";
 export * from "./writebacks.js";
 export * from "./visual-qa.js";
+export * from "./visual-review.js";

@@ -39,6 +39,7 @@
         "pixelThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
         "allowedDiffRatio": { "type": "number", "minimum": 0, "maximum": 1 },
         "maxPixels": { "type": "integer", "minimum": 1 },
+        "maxReferenceBytes": { "type": "integer", "minimum": 1 },
         "viewports": {
           "type": "object",
           "properties": {

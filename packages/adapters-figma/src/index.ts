@@ -6,7 +6,7 @@ export interface FigmaAdapterHealth {
   readonly provider: "figma";
   readonly configured: boolean;
   readonly writable: false;
-  readonly capabilities: readonly ["health", "parseReference", "readFixture"];
+  readonly capabilities: readonly ["health", "parseReference", "readFixture", "fetchNodeImage"];
   readonly mode: "fixture" | "api-token-present";
 }
 
@@ -41,12 +41,25 @@ export interface FetchFigmaFileInput {
   readonly fetchImpl?: typeof fetch | undefined;
 }
 
+export interface FetchFigmaNodeImageInput extends FetchFigmaFileInput {
+  readonly scale?: number | undefined;
+  readonly maxBytes?: number | undefined;
+}
+
+export interface FigmaNodeImage {
+  readonly bytes: Uint8Array;
+  readonly mediaType: "image/png";
+  readonly fileKey: string;
+  readonly nodeId: string;
+  readonly scale: number;
+}
+
 export function getFigmaAdapterHealth(input: { readonly apiKey?: string | undefined } = {}): FigmaAdapterHealth {
   return {
     provider: "figma",
     configured: typeof input.apiKey === "string" && input.apiKey.length > 0,
     writable: false,
-    capabilities: ["health", "parseReference", "readFixture"],
+    capabilities: ["health", "parseReference", "readFixture", "fetchNodeImage"],
     mode: typeof input.apiKey === "string" && input.apiKey.length > 0 ? "api-token-present" : "fixture"
   };
 }
@@ -99,6 +112,46 @@ export async function fetchFigmaFileSnapshot(input: FetchFigmaFileInput): Promis
   });
 }
 
+export async function fetchFigmaNodeImage(input: FetchFigmaNodeImageInput): Promise<FigmaNodeImage> {
+  const nodeId = input.reference.nodeId;
+  if (nodeId === undefined) throw new TypeError("Figma visual evidence requires a URL with node-id");
+  const scale = input.scale ?? 1;
+  if (!Number.isFinite(scale) || scale < 0.01 || scale > 4) {
+    throw new TypeError("Figma image scale must be between 0.01 and 4");
+  }
+  const maxBytes = input.maxBytes ?? 10_000_000;
+  if (!Number.isInteger(maxBytes) || maxBytes <= 0) throw new TypeError("Figma image byte limit must be positive");
+
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const apiNodeId = nodeId.includes(":") ? nodeId : nodeId.replace("-", ":");
+  const exportUrl = new URL(`https://api.figma.com/v1/images/${encodeURIComponent(input.reference.fileKey)}`);
+  exportUrl.searchParams.set("ids", apiNodeId);
+  exportUrl.searchParams.set("format", "png");
+  exportUrl.searchParams.set("scale", String(scale));
+  const exportResponse = await fetchImpl(exportUrl, { headers: { "x-figma-token": input.apiKey } });
+  if (!exportResponse.ok) throw new Error(`Figma image export request failed: ${exportResponse.status}`);
+
+  const payload = asRecord(await exportResponse.json(), "Figma image export response must be an object");
+  const images = asRecord(payload.images, "Figma image export response must include images");
+  const imageUrl = stringValue(images[apiNodeId]) ?? stringValue(images[nodeId]);
+  if (imageUrl === undefined) throw new Error(`Figma did not render node ${nodeId}`);
+  const parsedImageUrl = new URL(imageUrl);
+  if (parsedImageUrl.protocol !== "https:") throw new Error("Figma rendered image URL must use HTTPS");
+
+  const imageResponse = await fetchImpl(parsedImageUrl);
+  if (!imageResponse.ok) throw new Error(`Figma rendered image download failed: ${imageResponse.status}`);
+  const contentLength = Number(imageResponse.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new Error(`Figma rendered image exceeds the ${maxBytes} byte limit`);
+  }
+  const bytes = new Uint8Array(await imageResponse.arrayBuffer());
+  if (bytes.length === 0) throw new Error("Figma rendered image was empty");
+  if (bytes.length > maxBytes) throw new Error(`Figma rendered image exceeds the ${maxBytes} byte limit`);
+  if (!isPng(bytes)) throw new Error("Figma rendered image was not a PNG");
+
+  return { bytes, mediaType: "image/png", fileKey: input.reference.fileKey, nodeId, scale };
+}
+
 export function readFigmaFixture(filePath: string): FigmaFileSnapshot {
   return normalizeFigmaSnapshot(JSON.parse(readFileSync(filePath, "utf8")) as unknown);
 }
@@ -149,4 +202,9 @@ function asRecord(value: unknown, message: string): Record<string, unknown> {
     throw new TypeError(message);
   }
   return value as Record<string, unknown>;
+}
+
+function isPng(bytes: Uint8Array): boolean {
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  return signature.every((value, index) => bytes[index] === value);
 }

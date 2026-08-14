@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { contextManifestSchema, implementationContractSchema, walkingSkeletonArtifactSchema } from "./index.js";
+import {
+  aiVisualReviewSchema,
+  contextManifestSchema,
+  figmaVisualEvidenceSchema,
+  implementationContractSchema,
+  walkingSkeletonArtifactSchema
+} from "./index.js";
 
 const envelope = {
   artifact_id: "art_contract_1",
@@ -86,5 +92,54 @@ describe("walking skeleton artifact schemas", () => {
 
     expect(result.sources).toBeUndefined();
     expect(result.included_sources).toHaveLength(1);
+  });
+
+  it("validates Figma evidence and structured AI visual reviews", () => {
+    const figma = figmaVisualEvidenceSchema.parse({
+      ...envelope,
+      artifact_id: "art_figma_1",
+      type: "figma_visual_evidence",
+      producer: { type: "adapter", id: "figma" },
+      figma_url: "https://www.figma.com/design/ABC123/Product?node-id=1-2",
+      file_key: "ABC123",
+      node_id: "1-2",
+      scale: 1,
+      source: "api",
+      reference_artifact_id: "art_reference_1",
+      reference_sha256: "b".repeat(64),
+      retrieved_at: envelope.created_at
+    });
+    const review = aiVisualReviewSchema.parse({
+      ...envelope,
+      artifact_id: "art_visual_review_1",
+      type: "ai_visual_review",
+      provider_alias: "hetzner.default",
+      model: "vision-model",
+      prompt_version: "visual-review-v1",
+      comparison_artifact_id: "art_comparison_1",
+      evidence: {
+        reference_artifact_id: "art_reference_1",
+        actual_artifact_id: "art_actual_1",
+        diff_artifact_id: "art_diff_1"
+      },
+      status: "findings",
+      summary: "One spacing issue was found.",
+      findings: [
+        {
+          finding_id: "visual_1",
+          severity: "important",
+          category: "spacing",
+          title: "Padding differs",
+          detail: "The actual header has less padding.",
+          evidence: ["reference", "actual"],
+          confidence: 0.9
+        }
+      ],
+      data_egress: { destination: "cloud", consent: true },
+      reviewed_at: envelope.created_at
+    });
+
+    expect(figma.reference_artifact_id).toBe("art_reference_1");
+    expect(walkingSkeletonArtifactSchema.parse(review).type).toBe("ai_visual_review");
   });
 });

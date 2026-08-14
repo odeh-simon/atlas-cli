@@ -110,6 +110,8 @@ describe("cli", () => {
     expect(logs.join("\n")).toContain("atlas ai providers health");
     expect(logs.join("\n")).toContain("atlas visual capture");
     expect(logs.join("\n")).toContain("atlas visual compare");
+    expect(logs.join("\n")).toContain("atlas visual review");
+    expect(logs.join("\n")).toContain("atlas figma evidence");
   });
 
   it("requires a URL for visual capture", async () => {
@@ -164,6 +166,91 @@ describe("cli", () => {
     } finally {
       process.chdir(previousCwd);
       restoreEnv("ATLAS_HOME", previousAtlasHome);
+    }
+  });
+
+  it("imports Figma evidence and runs a structured AI visual review", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    const referencePath = join(root, "figma.png");
+    const actualPath = join(root, "actual.png");
+    mkdirSync(repo, { recursive: true });
+    const image = new PNG({ width: 2, height: 2 });
+    image.data.fill(255);
+    const png = PNG.sync.write(image);
+    writeFileSync(referencePath, png);
+    writeFileSync(actualPath, png);
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          defaultProviderAlias: "ollama.vision",
+          providers: [
+            {
+              alias: "ollama.vision",
+              provider: "ollama",
+              baseUrl: "http://127.0.0.1:11434",
+              model: "vision-model",
+              capabilities: ["text", "vision"]
+            }
+          ]
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousFetch = globalThis.fetch;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      await main(["start", "--manual", "--title", "Figma QA", "--objective", "Review implementation fidelity"]);
+      logs.length = 0;
+      expect(
+        await main([
+          "figma",
+          "evidence",
+          "https://www.figma.com/design/ABC123/Product?node-id=1-2",
+          "--image",
+          referencePath
+        ])
+      ).toBe(0);
+      const referenceId = logs.find((line) => line.startsWith("Visual reference: "))?.replace("Visual reference: ", "");
+      expect(referenceId).toMatch(/^art_/);
+
+      logs.length = 0;
+      expect(
+        await main(["visual", "compare", "--reference-artifact", referenceId ?? "", "--actual", actualPath])
+      ).toBe(0);
+      const comparisonId = logs
+        .find((line) => line.startsWith("Visual comparison: "))
+        ?.replace("Visual comparison: ", "");
+      expect(comparisonId).toMatch(/^art_/);
+
+      globalThis.fetch = (async (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as { messages: Array<{ images?: string[] }> };
+        expect(body.messages.at(-1)?.images).toHaveLength(3);
+        return new Response(
+          JSON.stringify({
+            message: {
+              content: JSON.stringify({ status: "passed", summary: "No visible regressions found.", findings: [] })
+            }
+          }),
+          { status: 200 }
+        );
+      }) as typeof fetch;
+      logs.length = 0;
+      expect(await main(["visual", "review", "--comparison", comparisonId ?? ""])).toBe(0);
+      expect(logs).toContain("Status: passed");
+      expect(logs).toContain("Findings: 0 (0 blocking)");
+      expect(logs.some((line) => line.startsWith("Visual review: art_"))).toBe(true);
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      globalThis.fetch = previousFetch;
     }
   });
 

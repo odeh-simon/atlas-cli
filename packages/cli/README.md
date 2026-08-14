@@ -48,3 +48,24 @@ atlas visual compare --reference baseline.png --actual-artifact art_snapshot_id
 ```
 
 The command returns exit code `0` when the changed-pixel ratio is within the configured allowance and `1` when it fails or dimensions differ. Use `atlas artifacts show <snapshot-or-diff-id>` to print the stored PNG path.
+
+Import a specific Figma node as the immutable reference. The URL must contain `node-id`; Atlas uses Figma's rendered-image endpoint when a token is configured. A manually exported PNG can be attached without an API call.
+
+```sh
+export FIGMA_API_KEY="your-token"
+atlas auth add --provider figma --alias figma.default --value-env FIGMA_API_KEY
+atlas figma evidence "https://www.figma.com/design/FILE_KEY/Product?node-id=1-2"
+
+# Offline/manual export alternative
+atlas figma evidence "https://www.figma.com/design/FILE_KEY/Product?node-id=1-2" --image figma-export.png
+```
+
+The command prints a `visual_reference` artifact ID. Compare that reference with a captured snapshot, then ask a vision-capable provider for a structured semantic review:
+
+```sh
+atlas visual compare --reference-artifact art_reference_id --actual-artifact art_snapshot_id
+atlas visual review --comparison art_comparison_id --provider hetzner.default
+atlas artifacts show art_visual_review_id
+```
+
+AI visual reviews classify observable findings as blocking, important, or suggestion and record provider/model identity, evidence IDs, confidence, and cloud-image consent. They are advisory in this release; deterministic comparison still controls the command exit code.

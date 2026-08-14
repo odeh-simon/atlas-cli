@@ -17,6 +17,8 @@ export const artifactTypeSchema = z.enum([
   "visual_diff",
   "visual_capture",
   "visual_comparison",
+  "figma_visual_evidence",
+  "ai_visual_review",
   "planning_package_metadata",
   "implementation_contract",
   "contract_approval",
@@ -222,6 +224,49 @@ export const visualComparisonSchema = artifactEnvelopeSchema.extend({
   diff_ratio: z.number().min(0).max(1),
   pixel_threshold: z.number().min(0).max(1),
   allowed_diff_ratio: z.number().min(0).max(1)
+});
+
+export const figmaVisualEvidenceSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("figma_visual_evidence"),
+  figma_url: z.string().url(),
+  file_key: z.string().min(1),
+  node_id: z.string().min(1),
+  scale: z.number().min(0.01).max(4),
+  source: z.enum(["api", "file"]),
+  reference_artifact_id: idSchema,
+  reference_sha256: sha256Schema,
+  retrieved_at: isoDateTimeSchema
+});
+
+export const aiVisualReviewSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("ai_visual_review"),
+  provider_alias: idSchema,
+  model: z.string().min(1),
+  prompt_version: z.string().min(1),
+  comparison_artifact_id: idSchema,
+  evidence: z.object({
+    reference_artifact_id: idSchema,
+    actual_artifact_id: idSchema,
+    diff_artifact_id: idSchema.optional()
+  }),
+  status: z.enum(["passed", "findings", "inconclusive"]),
+  summary: z.string().min(1),
+  findings: z.array(
+    z.object({
+      finding_id: idSchema,
+      severity: z.enum(["blocking", "important", "suggestion"]),
+      category: z.enum(["layout", "spacing", "typography", "color", "content", "responsive", "accessibility", "other"]),
+      title: z.string().min(1),
+      detail: z.string().min(1),
+      evidence: z.array(z.enum(["reference", "actual", "diff"])).min(1),
+      confidence: z.number().min(0).max(1)
+    })
+  ),
+  data_egress: z.object({
+    destination: z.enum(["local", "cloud"]),
+    consent: z.boolean()
+  }),
+  reviewed_at: isoDateTimeSchema
 });
 
 export const planningPackageMetadataSchema = artifactEnvelopeSchema.extend({
@@ -532,6 +577,8 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   aiVisionResultSchema,
   visualCaptureSchema,
   visualComparisonSchema,
+  figmaVisualEvidenceSchema,
+  aiVisualReviewSchema,
   planningPackageMetadataSchema,
   implementationContractSchema,
   contractApprovalSchema,
@@ -560,6 +607,8 @@ export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;
 export type AiVisionResult = z.infer<typeof aiVisionResultSchema>;
 export type VisualCapture = z.infer<typeof visualCaptureSchema>;
 export type VisualComparison = z.infer<typeof visualComparisonSchema>;
+export type FigmaVisualEvidence = z.infer<typeof figmaVisualEvidenceSchema>;
+export type AiVisualReview = z.infer<typeof aiVisualReviewSchema>;
 export type ImplementationContract = z.infer<typeof implementationContractSchema>;
 export type AgentRunLog = z.infer<typeof agentRunLogSchema>;
 export type CheckRunLog = z.infer<typeof checkRunLogSchema>;

@@ -6,7 +6,13 @@ import { PNG } from "pngjs";
 
 import { listArtifactsForSession } from "@atlas/persistence";
 
-import { captureVisualPage, compareVisualEvidence, openAtlasRuntime, startManualTask } from "./index.js";
+import {
+  captureVisualPage,
+  compareVisualEvidence,
+  importFigmaVisualEvidence,
+  openAtlasRuntime,
+  startManualTask
+} from "./index.js";
 import { closeAtlasRuntime } from "./runtime.js";
 
 const tempRoots: string[] = [];
@@ -67,6 +73,38 @@ describe("visual QA evidence", () => {
     await expect(compareVisualEvidence({ referencePath: "reference.png" })).rejects.toThrow(
       "exactly one of actualPath or actualArtifactId"
     );
+  });
+
+  it("imports Figma PNG evidence and compares its reference artifact", async () => {
+    const root = mkdtempSync(join(tmpdir(), "atlas-figma-visual-"));
+    tempRoots.push(root);
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    const png = pngFixture();
+    mkdirSync(cwd, { recursive: true });
+    await startManualTask({ cwd, env, title: "Figma evidence", objective: "Compare implementation with design" });
+    const imported = await importFigmaVisualEvidence({
+      cwd,
+      env,
+      bytes: png,
+      figmaUrl: "https://www.figma.com/design/ABC123/Product?node-id=1-2",
+      fileKey: "ABC123",
+      nodeId: "1-2",
+      source: "file"
+    });
+    const actualPath = join(root, "actual.png");
+    writeFileSync(actualPath, png);
+    const compared = await compareVisualEvidence({
+      cwd,
+      env,
+      referenceArtifactId: imported.referenceArtifactId,
+      actualPath,
+      allowedDiffRatio: 0
+    });
+
+    expect(imported.evidenceArtifactId).toMatch(/^art_/);
+    expect(imported.referencePath).toMatch(/visual_reference/);
+    expect(compared).toMatchObject({ referenceArtifactId: imported.referenceArtifactId, status: "passed" });
   });
 });
 

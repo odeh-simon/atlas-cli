@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   fetchFigmaFileSnapshot,
+  fetchFigmaNodeImage,
   getFigmaAdapterHealth,
   normalizeFigmaSnapshot,
   parseFigmaReference,
@@ -88,5 +89,38 @@ describe("Figma adapter", () => {
 
     expect(snapshot).toMatchObject({ fileKey: "ABC123", name: "Product", nodeId: "1-2" });
     expect(snapshot.evidence.map((evidence) => evidence.title)).toContain("Figma node id");
+  });
+
+  it("exports a Figma node as bounded PNG evidence", async () => {
+    const reference = parseFigmaReference("https://www.figma.com/design/ABC123/Product?node-id=1-2");
+    const calls: string[] = [];
+    const image = await fetchFigmaNodeImage({
+      apiKey: "figd_api_key",
+      reference,
+      scale: 2,
+      fetchImpl: (async (url, init) => {
+        calls.push(String(url));
+        if (calls.length === 1) {
+          expect(String(url)).toContain("ids=1%3A2");
+          expect(String(url)).toContain("format=png");
+          expect(init?.headers).toMatchObject({ "x-figma-token": "figd_api_key" });
+          return new Response(JSON.stringify({ images: { "1:2": "https://figma.example/render.png" } }), {
+            status: 200
+          });
+        }
+        return new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), {
+          status: 200,
+          headers: { "content-type": "image/png" }
+        });
+      }) as typeof fetch
+    });
+
+    expect(image).toMatchObject({ fileKey: "ABC123", nodeId: "1-2", scale: 2, mediaType: "image/png" });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("requires a node id before requesting a Figma image", async () => {
+    const reference = parseFigmaReference("https://www.figma.com/design/ABC123/Product");
+    await expect(fetchFigmaNodeImage({ apiKey: "figd_api_key", reference })).rejects.toThrow("node-id");
   });
 });

@@ -11,7 +11,7 @@ import {
   listArtifactsForSession,
   listSessionsForRepository
 } from "@atlas/persistence";
-import { visualCaptureSchema, visualComparisonSchema } from "@atlas/schemas";
+import { figmaVisualEvidenceSchema, visualCaptureSchema, visualComparisonSchema } from "@atlas/schemas";
 import {
   comparePngImages,
   playwrightVisualCaptureAdapter,
@@ -35,12 +35,31 @@ export interface CaptureVisualPageResult {
 }
 
 export interface CompareVisualEvidenceInput extends RuntimeOptions {
-  readonly referencePath: string;
+  readonly referencePath?: string | undefined;
+  readonly referenceArtifactId?: string | undefined;
   readonly actualPath?: string | undefined;
   readonly actualArtifactId?: string | undefined;
   readonly pixelThreshold?: number | undefined;
   readonly allowedDiffRatio?: number | undefined;
   readonly maxPixels?: number | undefined;
+}
+
+export interface ImportFigmaVisualEvidenceInput extends RuntimeOptions {
+  readonly bytes: Uint8Array;
+  readonly figmaUrl: string;
+  readonly fileKey: string;
+  readonly nodeId: string;
+  readonly scale?: number | undefined;
+  readonly source: "api" | "file";
+  readonly maxBytes?: number | undefined;
+}
+
+export interface ImportFigmaVisualEvidenceResult {
+  readonly sessionId: string;
+  readonly evidenceArtifactId: string;
+  readonly referenceArtifactId: string;
+  readonly referencePath: string;
+  readonly referenceSha256: string;
 }
 
 export interface CompareVisualEvidenceResult {
@@ -123,7 +142,88 @@ export async function captureVisualPage(input: CaptureVisualPageInput): Promise<
   }
 }
 
+export async function importFigmaVisualEvidence(
+  input: ImportFigmaVisualEvidenceInput
+): Promise<ImportFigmaVisualEvidenceResult> {
+  assertPng(input.bytes, "Figma reference");
+  const maxBytes = input.maxBytes ?? 10_000_000;
+  if (!Number.isInteger(maxBytes) || maxBytes <= 0) throw new ValidationError("Figma evidence byte limit must be positive");
+  if (input.bytes.length > maxBytes) {
+    throw new ValidationError(`Figma reference exceeds the ${maxBytes} byte limit`);
+  }
+  const scale = input.scale ?? 1;
+  if (!Number.isFinite(scale) || scale < 0.01 || scale > 4) {
+    throw new ValidationError("Figma evidence scale must be between 0.01 and 4");
+  }
+  const runtime = await openAtlasRuntime(input);
+  try {
+    const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
+    if (session === undefined) throw new StateTransitionError("Figma visual evidence requires an active Atlas session");
+    const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
+    const now = new Date().toISOString();
+    const reference = storeBinaryArtifact(runtime, {
+      sessionId: session.sessionId,
+      type: "visual_reference",
+      contentVersion: nextVersion(artifacts, "visual_reference"),
+      content: input.bytes,
+      mediaType: "image/png",
+      extension: ".png",
+      now
+    });
+    const evidenceArtifactId = newId("art");
+    const evidence = figmaVisualEvidenceSchema.parse({
+      artifact_id: evidenceArtifactId,
+      session_id: session.sessionId,
+      type: "figma_visual_evidence",
+      schema_version: 1,
+      content_version: nextVersion(artifacts, "figma_visual_evidence"),
+      created_at: now,
+      producer: { type: "adapter", id: "figma" },
+      sensitivity: "confidential",
+      parents: [reference.artifactId],
+      content_sha256: "0".repeat(64),
+      metadata: { source: input.source, reference_path: reference.storageUri },
+      figma_url: input.figmaUrl,
+      file_key: input.fileKey,
+      node_id: input.nodeId,
+      scale,
+      source: input.source,
+      reference_artifact_id: reference.artifactId,
+      reference_sha256: reference.sha256,
+      retrieved_at: now
+    });
+    storeJsonArtifact(runtime, evidence, now);
+    addArtifactDependency(runtime.db, {
+      artifactId: evidenceArtifactId,
+      dependsOnArtifactId: reference.artifactId,
+      dependencyKind: "evidence"
+    });
+    appendEvent(runtime.db, {
+      eventId: newId("evt"),
+      sessionId: session.sessionId,
+      eventType: "figma.visual_evidence_imported",
+      actorType: "adapter",
+      actorId: "figma",
+      occurredAt: now,
+      summary: "Figma visual reference imported",
+      metadata: { evidenceArtifactId, referenceArtifactId: reference.artifactId, nodeId: input.nodeId }
+    });
+    return {
+      sessionId: session.sessionId,
+      evidenceArtifactId,
+      referenceArtifactId: reference.artifactId,
+      referencePath: reference.absolutePath,
+      referenceSha256: reference.sha256
+    };
+  } finally {
+    closeAtlasRuntime(runtime);
+  }
+}
+
 export async function compareVisualEvidence(input: CompareVisualEvidenceInput): Promise<CompareVisualEvidenceResult> {
+  if ((input.referencePath === undefined) === (input.referenceArtifactId === undefined)) {
+    throw new ValidationError("Visual comparison requires exactly one of referencePath or referenceArtifactId");
+  }
   if ((input.actualPath === undefined) === (input.actualArtifactId === undefined)) {
     throw new ValidationError("Visual comparison requires exactly one of actualPath or actualArtifactId");
   }
@@ -133,16 +233,19 @@ export async function compareVisualEvidence(input: CompareVisualEvidenceInput): 
     if (session === undefined) throw new StateTransitionError("Visual comparison requires an active Atlas session");
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     const now = new Date().toISOString();
-    const referenceBytes = readPng(input.referencePath, "reference");
-    const reference = storeBinaryArtifact(runtime, {
-      sessionId: session.sessionId,
-      type: "visual_reference",
-      contentVersion: nextVersion(artifacts, "visual_reference"),
-      content: referenceBytes,
-      mediaType: "image/png",
-      extension: ".png",
-      now
-    });
+    const reference =
+      input.referenceArtifactId === undefined
+        ? storeBinaryArtifact(runtime, {
+            sessionId: session.sessionId,
+            type: "visual_reference",
+            contentVersion: nextVersion(artifacts, "visual_reference"),
+            content: readPng(input.referencePath ?? "", "reference"),
+            mediaType: "image/png",
+            extension: ".png",
+            now
+          })
+        : resolveVisualArtifact(runtime, session.sessionId, input.referenceArtifactId, "visual_reference");
+    const referenceBytes = readFileSync(reference.absolutePath);
     const actual =
       input.actualArtifactId === undefined
         ? storeBinaryArtifact(runtime, {
@@ -154,7 +257,7 @@ export async function compareVisualEvidence(input: CompareVisualEvidenceInput): 
             extension: ".png",
             now
           })
-        : resolveSnapshotArtifact(runtime, session.sessionId, input.actualArtifactId);
+        : resolveVisualArtifact(runtime, session.sessionId, input.actualArtifactId, "visual_snapshot");
     const actualBytes = readFileSync(actual.absolutePath);
     const comparison = comparePngImages({
       reference: referenceBytes,
@@ -188,7 +291,7 @@ export async function compareVisualEvidence(input: CompareVisualEvidenceInput): 
       parents: [reference.artifactId, actual.artifactId, ...(diff === undefined ? [] : [diff.artifactId])],
       content_sha256: "0".repeat(64),
       metadata: {
-        reference_name: basename(input.referencePath),
+        reference_name: input.referenceArtifactId ?? basename(input.referencePath ?? ""),
         actual_source: input.actualArtifactId ?? basename(input.actualPath ?? "")
       },
       status: comparison.status,
@@ -316,14 +419,21 @@ function storeJsonArtifact(
   });
 }
 
-function resolveSnapshotArtifact(
+function resolveVisualArtifact(
   runtime: Awaited<ReturnType<typeof openAtlasRuntime>>,
   sessionId: string,
-  artifactId: string
+  artifactId: string,
+  type: "visual_reference" | "visual_snapshot"
 ): { readonly artifactId: string; readonly absolutePath: string; readonly storageUri: string; readonly sha256: string } {
   const record = getArtifactRecord(runtime.db, artifactId);
-  if (record === undefined || record.sessionId !== sessionId || record.type !== "visual_snapshot" || record.mediaType !== "image/png") {
-    throw new ValidationError(`Visual snapshot artifact is not available in the active session: ${artifactId}`);
+  if (
+    record === undefined ||
+    record.sessionId !== sessionId ||
+    record.type !== type ||
+    record.mediaType !== "image/png" ||
+    record.status !== "valid"
+  ) {
+    throw new ValidationError(`Visual ${type} artifact is not available in the active session: ${artifactId}`);
   }
   return {
     artifactId: record.artifactId,
@@ -335,10 +445,15 @@ function resolveSnapshotArtifact(
 
 function readPng(path: string, label: string): Buffer {
   const bytes = readFileSync(path);
-  if (!bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
-    throw new ValidationError(`Visual ${label} must be a PNG image`);
-  }
+  assertPng(bytes, `Visual ${label}`);
   return bytes;
+}
+
+function assertPng(bytes: Uint8Array, label: string): void {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (bytes.length < signature.length || !Buffer.from(bytes.subarray(0, 8)).equals(signature)) {
+    throw new ValidationError(`${label} must be a PNG image`);
+  }
 }
 
 function nextVersion(artifacts: readonly { readonly type: string }[], type: string): number {

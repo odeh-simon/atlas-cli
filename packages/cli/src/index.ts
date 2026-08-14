@@ -37,11 +37,19 @@ import {
   startManualTask,
   showArtifactContent,
   captureVisualPage,
-  compareVisualEvidence
+  compareVisualEvidence,
+  importFigmaVisualEvidence,
+  runAiVisualReview
 } from "@atlas/app-services";
 import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
 import { getCodexAdapterHealth } from "@atlas/adapters-codex";
-import { fetchFigmaFileSnapshot, getFigmaAdapterHealth, parseFigmaReference, readFigmaFixture } from "@atlas/adapters-figma";
+import {
+  fetchFigmaFileSnapshot,
+  fetchFigmaNodeImage,
+  getFigmaAdapterHealth,
+  parseFigmaReference,
+  readFigmaFixture
+} from "@atlas/adapters-figma";
 import {
   commentGitHubPullRequest,
   fetchGitHubRepositorySnapshot,
@@ -157,6 +165,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       return await visualCompareCommand(rest);
     }
 
+    if (command === "visual" && subcommand === "review") {
+      return await visualReviewCommand(rest);
+    }
+
     if (command === "git" && subcommand === "status") {
       return gitStatusCommand();
     }
@@ -175,6 +187,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "figma" && subcommand === "inspect") {
       return await figmaInspectCommand(rest);
+    }
+
+    if (command === "figma" && subcommand === "evidence") {
+      return await figmaEvidenceCommand(rest);
     }
 
     if (command === "decisions" && subcommand === "record") {
@@ -339,6 +355,7 @@ Usage:
   atlas git preflight [--base <branch>] [--target <branch>] [--allow-dirty]
   atlas git diff-safeguards [--base <ref>]
   atlas figma inspect <figma-url|fixture.json>
+  atlas figma evidence <figma-url> [--image <png>] [--scale <0.01-4>]
   atlas github inspect <github-url|fixture.json>
   atlas linear inspect <fixture.json>
   atlas status
@@ -353,7 +370,8 @@ Usage:
   atlas ai models [--provider <alias>]
   atlas ai vision test <image> [--provider <alias>] [--prompt <text>]
   atlas visual capture --url <url> [--viewport <desktop|mobile|WIDTHxHEIGHT>] [--full-page]
-  atlas visual compare --reference <png> (--actual <png>|--actual-artifact <id>)
+  atlas visual compare (--reference <png>|--reference-artifact <id>) (--actual <png>|--actual-artifact <id>)
+  atlas visual review --comparison <id> [--provider <alias>]
   atlas orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
   atlas writebacks run --provider <linear|github|figma> --target <id|url> --summary <text> [--dry-run|--yes]
   atlas telemetry status
@@ -663,11 +681,17 @@ async function visualCaptureCommand(args: string[]): Promise<number> {
 }
 
 async function visualCompareCommand(args: string[]): Promise<number> {
-  const referencePath = readOption(args, "--reference");
+  const referencePath = readOption(args, "--reference", false);
+  const referenceArtifactId = readOption(args, "--reference-artifact", false);
   const actualPath = readOption(args, "--actual", false);
   const actualArtifactId = readOption(args, "--actual-artifact", false);
-  if (referencePath === undefined || (actualPath === undefined) === (actualArtifactId === undefined)) {
-    console.error("atlas visual compare requires --reference and exactly one of --actual or --actual-artifact");
+  if (
+    (referencePath === undefined) === (referenceArtifactId === undefined) ||
+    (actualPath === undefined) === (actualArtifactId === undefined)
+  ) {
+    console.error(
+      "atlas visual compare requires exactly one reference (--reference or --reference-artifact) and one actual (--actual or --actual-artifact)"
+    );
     return 2;
   }
   const config = readAtlasConfig().visualQa;
@@ -675,7 +699,8 @@ async function visualCompareCommand(args: string[]): Promise<number> {
   const allowedDiffRatio = readRatioOption(args, "--allowed-ratio") ?? config?.allowedDiffRatio;
   const maxPixels = readNumberOption(args, "--max-pixels") ?? config?.maxPixels;
   const result = await compareVisualEvidence({
-    referencePath,
+    ...(referencePath === undefined ? {} : { referencePath }),
+    ...(referenceArtifactId === undefined ? {} : { referenceArtifactId }),
     ...(actualPath === undefined ? {} : { actualPath }),
     ...(actualArtifactId === undefined ? {} : { actualArtifactId }),
     ...(pixelThreshold === undefined ? {} : { pixelThreshold }),
@@ -683,12 +708,49 @@ async function visualCompareCommand(args: string[]): Promise<number> {
     ...(maxPixels === undefined ? {} : { maxPixels })
   });
   console.log(`Visual comparison: ${result.comparisonArtifactId}`);
+  console.log(`Reference: ${result.referenceArtifactId}`);
+  console.log(`Actual: ${result.actualArtifactId}`);
   console.log(`Status: ${result.status}`);
   console.log(`Changed pixels: ${result.mismatchedPixels}/${result.totalPixels}`);
   console.log(`Diff ratio: ${result.diffRatio.toFixed(6)}`);
   if (result.diffArtifactId !== undefined) console.log(`Diff: ${result.diffArtifactId}`);
   if (result.diffPath !== undefined) console.log(`Diff path: ${result.diffPath}`);
   return result.status === "passed" ? 0 : 1;
+}
+
+async function visualReviewCommand(args: string[]): Promise<number> {
+  const comparisonArtifactId = readOption(args, "--comparison");
+  if (comparisonArtifactId === undefined) {
+    console.error("atlas visual review requires --comparison <artifact-id>");
+    return 2;
+  }
+  const providerAlias = readOption(args, "--provider", false);
+  const provider = readConfiguredAiProvider(providerAlias);
+  if (provider === undefined) {
+    console.error(providerAlias === undefined ? "No AI provider configured" : `AI provider not configured: ${providerAlias}`);
+    return 2;
+  }
+  const config = readAtlasConfig();
+  assertAiDataConsent(provider, "image", config.ai?.allowCloudImages);
+  const apiKey = tokenForConfiguredAlias(provider.tokenAlias, "ai");
+  if (provider.tokenAlias !== undefined && apiKey === undefined) {
+    console.error(`AI credential missing: ${provider.tokenAlias}`);
+    return 2;
+  }
+  const result = await runAiVisualReview({
+    comparisonArtifactId,
+    provider,
+    apiKey,
+    cloudImageConsent: config.ai?.allowCloudImages,
+    maxImageBytes: config.ai?.maxImageBytes
+  });
+  console.log(`Visual review: ${result.reviewArtifactId}`);
+  console.log(`Provider: ${result.providerAlias} ${result.model}`);
+  console.log(`Status: ${result.status}`);
+  console.log(`Findings: ${result.findingCount} (${result.blockingCount} blocking)`);
+  console.log(result.summary);
+  console.log(`Inspect: atlas artifacts show ${result.reviewArtifactId}`);
+  return 0;
 }
 
 async function aiProvidersHealthCommand(): Promise<number> {
@@ -848,6 +910,59 @@ async function figmaInspectCommand(args: string[]): Promise<number> {
   console.log(`File: ${reference.fileKey}`);
   console.log(`Node: ${reference.nodeId ?? "(none)"}`);
   console.log(`URL: ${reference.url}`);
+  return 0;
+}
+
+async function figmaEvidenceCommand(args: string[]): Promise<number> {
+  const input = args[0];
+  if (input === undefined || input.startsWith("--")) {
+    console.error("atlas figma evidence requires a Figma URL");
+    return 2;
+  }
+  const reference = parseFigmaReference(input);
+  if (reference.nodeId === undefined) {
+    console.error("atlas figma evidence requires a Figma URL with node-id");
+    return 2;
+  }
+  const rawScale = readOption(args, "--scale", false);
+  const scale = rawScale === undefined ? 1 : Number(rawScale);
+  if (!Number.isFinite(scale) || scale < 0.01 || scale > 4) {
+    console.error("atlas figma evidence --scale must be between 0.01 and 4");
+    return 2;
+  }
+  const config = readAtlasConfig();
+  const maxBytes = config.visualQa?.maxReferenceBytes ?? 10_000_000;
+  const imagePath = readOption(args, "--image", false);
+  let bytes: Uint8Array;
+  let source: "api" | "file";
+  if (imagePath !== undefined) {
+    bytes = readFileSync(imagePath);
+    source = "file";
+  } else {
+    const tokenAlias = config.adapters?.figma?.tokenAlias ?? "figma.default";
+    const token = getCredentialToken({ alias: tokenAlias, provider: "figma" });
+    if (token === undefined) {
+      console.error(`Figma credential missing: ${tokenAlias}`);
+      return 2;
+    }
+    const image = await fetchFigmaNodeImage({ apiKey: token, reference, scale, maxBytes });
+    bytes = image.bytes;
+    source = "api";
+  }
+  const result = await importFigmaVisualEvidence({
+    bytes,
+    figmaUrl: reference.url,
+    fileKey: reference.fileKey,
+    nodeId: reference.nodeId,
+    scale,
+    source,
+    maxBytes
+  });
+  console.log(`Figma evidence: ${result.evidenceArtifactId}`);
+  console.log(`Visual reference: ${result.referenceArtifactId}`);
+  console.log(`Path: ${result.referencePath}`);
+  console.log(`SHA-256: ${result.referenceSha256}`);
+  console.log(`Next: atlas visual compare --reference-artifact ${result.referenceArtifactId} --actual-artifact <snapshot-id>`);
   return 0;
 }
 
@@ -1495,6 +1610,7 @@ interface AtlasCliConfig {
     readonly pixelThreshold?: number | undefined;
     readonly allowedDiffRatio?: number | undefined;
     readonly maxPixels?: number | undefined;
+    readonly maxReferenceBytes?: number | undefined;
     readonly viewports?: {
       readonly desktop?: { readonly width: number; readonly height: number } | undefined;
       readonly mobile?: { readonly width: number; readonly height: number } | undefined;
