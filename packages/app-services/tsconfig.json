@@ -9,6 +9,7 @@
   "references": [
     { "path": "../adapters-claude-code" },
     { "path": "../adapters-codex" },
+    { "path": "../adapters-figma" },
     { "path": "../adapters-linear" },
     { "path": "../artifacts" },
     { "path": "../checks" },

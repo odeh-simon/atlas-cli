@@ -20,6 +20,7 @@ import { transition } from "@atlas/workflow-engine";
 
 import { hasStaleGitFingerprint, readWorkflowGitSnapshot, type WorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { visualCheckConfigFingerprint } from "./visual-gates.js";
 
 export interface EvaluateCompletionResult {
   readonly sessionId: string;
@@ -53,7 +54,8 @@ export async function evaluateCompletion(options: RuntimeOptions = {}): Promise<
       listArtifactsForSession(runtime.db, session.sessionId),
       listFindingsForSession(runtime.db, session.sessionId),
       runtime.paths.artifactRoot,
-      readWorkflowGitSnapshot(runtime.paths.cwd)
+      readWorkflowGitSnapshot(runtime.paths.cwd),
+      runtime.paths.cwd
     );
 
     const now = new Date().toISOString();
@@ -97,7 +99,8 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
       artifacts,
       listFindingsForSession(runtime.db, session.sessionId),
       runtime.paths.artifactRoot,
-      readWorkflowGitSnapshot(runtime.paths.cwd)
+      readWorkflowGitSnapshot(runtime.paths.cwd),
+      runtime.paths.cwd
     );
 
     const now = new Date().toISOString();
@@ -195,7 +198,8 @@ function assertCompletionGates(
   artifacts: readonly ArtifactRecord[],
   findings: readonly FindingRecord[],
   artifactRoot: string,
-  currentGit: WorkflowGitSnapshot | undefined
+  currentGit: WorkflowGitSnapshot | undefined,
+  cwd: string
 ): {
   readonly contractArtifact: ArtifactRecord;
   readonly checkResultArtifacts: readonly ArtifactRecord[];
@@ -210,13 +214,14 @@ function assertCompletionGates(
     failures.push("approved contract missing");
   }
 
-  const checkResultArtifacts = artifacts.filter(
-    (artifact) => artifact.type === "check_result" && artifact.status === "valid"
-  );
+  const latestCheckResult = artifacts.filter((artifact) => artifact.type === "check_result").at(-1);
+  const checkResultArtifacts = latestCheckResult?.status === "valid" ? [latestCheckResult] : [];
   if (checkResultArtifacts.length === 0) {
-    failures.push("passing required check result missing");
+    failures.push(
+      latestCheckResult === undefined ? "passing required check result missing" : "latest required check result is not passing"
+    );
   }
-  failures.push(...gitFreshnessFailures({ session, artifacts, checkResultArtifacts, artifactRoot, currentGit }));
+  failures.push(...gitFreshnessFailures({ session, artifacts, checkResultArtifacts, artifactRoot, currentGit, cwd }));
 
   const unresolvedBlockingFindings = findings.filter(
     (finding) => finding.severity === "blocking" && (finding.status === "open" || finding.status === "reopened")
@@ -243,23 +248,50 @@ function gitFreshnessFailures(input: {
   readonly checkResultArtifacts: readonly ArtifactRecord[];
   readonly artifactRoot: string;
   readonly currentGit: WorkflowGitSnapshot | undefined;
+  readonly cwd: string;
 }): string[] {
-  if (input.currentGit === undefined) return [];
-
   const failures: string[] = [];
-  const context = input.artifacts.find((artifact) => artifact.artifactId === input.session.currentContextArtifactId);
-  const contextFingerprint = context === undefined ? undefined : readArtifactGitFingerprint(input.artifactRoot, context);
-  if (hasStaleGitFingerprint({ recorded: contextFingerprint, current: input.currentGit.base_fingerprint })) {
-    failures.push("context manifest is stale against current Git HEAD; rerun atlas context build");
+  const latestCheck = input.checkResultArtifacts.at(-1);
+  if (input.currentGit !== undefined) {
+    const context = input.artifacts.find((artifact) => artifact.artifactId === input.session.currentContextArtifactId);
+    const contextFingerprint = context === undefined ? undefined : readArtifactGitFingerprint(input.artifactRoot, context);
+    if (hasStaleGitFingerprint({ recorded: contextFingerprint, current: input.currentGit.base_fingerprint })) {
+      failures.push("context manifest is stale against current Git HEAD; rerun atlas context build");
+    }
+
+    const checkFingerprint = latestCheck === undefined ? undefined : readArtifactGitFingerprint(input.artifactRoot, latestCheck);
+    if (hasStaleGitFingerprint({ recorded: checkFingerprint, current: input.currentGit.fingerprint })) {
+      failures.push("check result is stale against current Git state; rerun atlas checks run");
+    }
   }
 
-  const latestCheck = input.checkResultArtifacts.at(-1);
-  const checkFingerprint = latestCheck === undefined ? undefined : readArtifactGitFingerprint(input.artifactRoot, latestCheck);
-  if (hasStaleGitFingerprint({ recorded: checkFingerprint, current: input.currentGit.fingerprint })) {
-    failures.push("check result is stale against current Git state; rerun atlas checks run");
+  const recordedVisualFingerprint =
+    latestCheck === undefined ? undefined : readArtifactVisualFingerprint(input.artifactRoot, latestCheck);
+  try {
+    const currentVisualFingerprint = visualCheckConfigFingerprint(input.cwd);
+    if (recordedVisualFingerprint !== currentVisualFingerprint) {
+      failures.push("visual check configuration or local baseline is stale; rerun atlas checks run");
+    }
+  } catch (error) {
+    failures.push(`visual check configuration is invalid: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return failures;
+}
+
+function readArtifactVisualFingerprint(artifactRoot: string, artifact: ArtifactRecord): string | undefined {
+  try {
+    const raw = JSON.parse(readFileSync(join(artifactRoot, artifact.storageUri), "utf8")) as {
+      visual_config_fingerprint?: unknown;
+      metadata?: { visual_config_fingerprint?: unknown };
+    };
+    if (typeof raw.visual_config_fingerprint === "string") return raw.visual_config_fingerprint;
+    return typeof raw.metadata?.visual_config_fingerprint === "string"
+      ? raw.metadata.visual_config_fingerprint
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function readArtifactGitFingerprint(artifactRoot: string, artifact: ArtifactRecord): string | undefined {

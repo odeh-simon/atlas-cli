@@ -12,6 +12,7 @@
   "dependencies": {
     "@atlas/adapters-claude-code": "workspace:*",
     "@atlas/adapters-codex": "workspace:*",
+    "@atlas/adapters-figma": "workspace:*",
     "@atlas/adapters-linear": "workspace:*",
     "@atlas/artifacts": "workspace:*",
     "@atlas/checks": "workspace:*",

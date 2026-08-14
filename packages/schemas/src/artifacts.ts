@@ -426,6 +426,7 @@ export const checkRunLogSchema = artifactEnvelopeSchema.extend({
       summary: z.string().min(1),
       dependencies: z.array(z.string()).default([]),
       affected: z.array(z.string()).default([]),
+      evidence_artifact_ids: z.array(idSchema).default([]),
       skipped_reason: z.string().min(1).optional(),
       process: z
         .object({
@@ -450,7 +451,8 @@ export const checkResultSchema = artifactEnvelopeSchema.extend({
   status: z.enum(["passed", "failed", "skipped", "blocked", "cancelled", "timeout"]),
   required: z.boolean(),
   summary: z.string().min(1),
-  git_fingerprint: z.string().min(1).optional()
+  git_fingerprint: z.string().min(1).optional(),
+  visual_config_fingerprint: sha256Schema.optional()
 });
 
 export const reviewPackageSchema = artifactEnvelopeSchema.extend({
@@ -458,6 +460,7 @@ export const reviewPackageSchema = artifactEnvelopeSchema.extend({
   contract_artifact_id: idSchema,
   execution_report_artifact_id: idSchema,
   check_result_artifact_ids: z.array(idSchema),
+  visual_evidence_artifact_ids: z.array(idSchema).default([]),
   review_ready_label: z.enum(["ready", "draft", "blocked"]),
   rubric_markdown: z.string().min(1)
 });

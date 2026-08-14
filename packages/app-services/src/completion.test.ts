@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { PNG } from "pngjs";
 
 import {
   approveCompletion,
@@ -21,7 +22,7 @@ import {
 } from "./index.js";
 import { closeAtlasRuntime } from "./runtime.js";
 import { listApprovalsForSession, listArtifactsForSession } from "@atlas/persistence";
-import { prepareReviewImported } from "./test-support.js";
+import { prepareExecution, prepareReviewImported } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
@@ -131,7 +132,101 @@ describe("completion approval", () => {
 
     await expect(evaluateCompletion({ cwd, env })).rejects.toThrow("Completion gates failed");
   });
+
+  it("blocks completion when a visual baseline changes after checks", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    const baselinePath = join(cwd, "baseline.png");
+    const original = pngFixture([255, 255, 255, 255]);
+    writeFileSync(baselinePath, original);
+    writeFileSync(
+      join(cwd, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        checks: [
+          {
+            name: "visual",
+            kind: "visual",
+            required: true,
+            url: "http://127.0.0.1:3000",
+            referencePath: "baseline.png"
+          }
+        ]
+      })
+    );
+    await runBasicCheck({
+      cwd,
+      env,
+      visualRuntime: {
+        captureAdapter: {
+          capture: async (input) => ({
+            png: original,
+            url: input.url,
+            title: "App",
+            viewport: input.viewport,
+            fullPage: false,
+            browserChannel: "msedge"
+          })
+        }
+      }
+    });
+
+    writeFileSync(baselinePath, pngFixture([0, 0, 0, 255]));
+
+    await expect(evaluateCompletion({ cwd, env })).rejects.toThrow("Completion gates failed");
+  });
+
+  it("does not let an older passing check mask a newer visual failure", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    const baseline = pngFixture([255, 255, 255, 255]);
+    writeFileSync(join(cwd, "baseline.png"), baseline);
+    writeFileSync(
+      join(cwd, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        checks: [
+          {
+            name: "visual",
+            kind: "visual",
+            required: true,
+            url: "http://127.0.0.1:3000",
+            referencePath: "baseline.png",
+            allowedDiffRatio: 0
+          }
+        ]
+      })
+    );
+    const capture = (png: Buffer) => ({
+      capture: async (input: { readonly url: string; readonly viewport: { readonly width: number; readonly height: number } }) => ({
+        png,
+        url: input.url,
+        title: "App",
+        viewport: input.viewport,
+        fullPage: false,
+        browserChannel: "msedge" as const
+      })
+    });
+    await runBasicCheck({ cwd, env, visualRuntime: { captureAdapter: capture(baseline) } });
+    await expect(
+      runBasicCheck({
+        cwd,
+        env,
+        visualRuntime: { captureAdapter: capture(pngFixture([0, 0, 0, 255])) }
+      })
+    ).rejects.toThrow("Required check failed");
+
+    await expect(evaluateCompletion({ cwd, env })).rejects.toThrow("Completion gates failed");
+  });
 });
+
+function pngFixture(color: readonly [number, number, number, number]): Buffer {
+  const image = new PNG({ width: 2, height: 2 });
+  for (let offset = 0; offset < image.data.length; offset += 4) image.data.set(color, offset);
+  return PNG.sync.write(image);
+}
 
 function initGitRepository(cwd: string): void {
   git(cwd, "init");

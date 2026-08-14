@@ -48,6 +48,9 @@ importers:
       '@atlas/adapters-codex':
         specifier: workspace:*
         version: link:../adapters-codex
+      '@atlas/adapters-figma':
+        specifier: workspace:*
+        version: link:../adapters-figma
       '@atlas/adapters-linear':
         specifier: workspace:*
         version: link:../adapters-linear

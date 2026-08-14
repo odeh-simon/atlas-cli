@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { PNG } from "pngjs";
 
 import { getStatus, openAtlasRuntime, runBasicCheck } from "./index.js";
 import { closeAtlasRuntime } from "./runtime.js";
@@ -122,7 +123,174 @@ describe("runBasicCheck", () => {
 
     expect(runLogs.at(-1)?.status).toBe("rejected");
   });
+
+  it("runs required visual checks and records their evidence artifacts", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    const png = pngFixture([255, 255, 255, 255]);
+    writeFileSync(join(cwd, "dashboard-baseline.png"), png);
+    writeVisualConfig(cwd);
+
+    const result = await runBasicCheck({
+      cwd,
+      env,
+      visualRuntime: {
+        captureAdapter: {
+          capture: async (input) => ({
+            png,
+            url: input.url,
+            title: "Dashboard",
+            viewport: input.viewport,
+            fullPage: false,
+            browserChannel: "msedge"
+          })
+        }
+      }
+    });
+    const check = readLatestJsonArtifact(root, result.sessionId, "check_result") as {
+      visual_config_fingerprint?: unknown;
+      metadata?: { visual_evidence_artifact_ids?: unknown[] };
+    };
+
+    expect(result).toMatchObject({ status: "passed", checkCount: 2 });
+    expect(check.visual_config_fingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(check.metadata?.visual_evidence_artifact_ids?.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("blocks a required visual check when AI findings meet its severity policy", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    const png = pngFixture([255, 255, 255, 255]);
+    writeFileSync(join(cwd, "dashboard-baseline.png"), png);
+    writeVisualConfig(cwd, {
+      ai: {
+        defaultProviderAlias: "ollama.vision",
+        providers: [
+          {
+            alias: "ollama.vision",
+            provider: "ollama",
+            baseUrl: "http://127.0.0.1:11434",
+            model: "vision-model",
+            capabilities: ["text", "vision"]
+          }
+        ]
+      },
+      aiReview: { required: true, failOn: ["important"] }
+    });
+
+    await expect(
+      runBasicCheck({
+        cwd,
+        env,
+        visualRuntime: {
+          captureAdapter: {
+            capture: async (input) => ({
+              png,
+              url: input.url,
+              title: "Dashboard",
+              viewport: input.viewport,
+              fullPage: false,
+              browserChannel: "msedge"
+            })
+          },
+          completionImpl: async () => ({
+            providerAlias: "ollama.vision",
+            model: "vision-model",
+            content: JSON.stringify({
+              status: "findings",
+              summary: "A spacing regression is visible.",
+              findings: [
+                {
+                  severity: "important",
+                  category: "spacing",
+                  title: "Header spacing differs",
+                  detail: "The actual header spacing does not match the reference.",
+                  evidence: ["reference", "actual"],
+                  confidence: 0.9
+                }
+              ]
+            })
+          })
+        }
+      })
+    ).rejects.toThrow("Required check failed");
+  });
+
+  it("records an optional visual failure without blocking the check set", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    writeFileSync(join(cwd, "dashboard-baseline.png"), pngFixture([255, 255, 255, 255]));
+    writeVisualConfig(cwd, { required: false });
+
+    const result = await runBasicCheck({
+      cwd,
+      env,
+      visualRuntime: {
+        captureAdapter: {
+          capture: async (input) => ({
+            png: pngFixture([0, 0, 0, 255]),
+            url: input.url,
+            title: "Dashboard",
+            viewport: input.viewport,
+            fullPage: false,
+            browserChannel: "msedge"
+          })
+        }
+      }
+    });
+
+    expect(result).toMatchObject({ status: "passed", checkCount: 2 });
+    expect(result.evidenceCount).toBeGreaterThanOrEqual(5);
+  });
+
+  it("rejects invalid visual thresholds instead of silently using defaults", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    writeFileSync(join(cwd, "dashboard-baseline.png"), pngFixture([255, 255, 255, 255]));
+    writeVisualConfig(cwd);
+    const configPath = join(cwd, "atlas.config.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as { checks: Array<Record<string, unknown>> };
+    config.checks[0]!.allowedDiffRatio = 2;
+    writeFileSync(configPath, JSON.stringify(config));
+
+    await expect(runBasicCheck({ cwd, env })).rejects.toThrow(
+      "dashboard-visual.allowedDiffRatio must be between 0 and 1"
+    );
+  });
 });
+
+function writeVisualConfig(
+  cwd: string,
+  options: { readonly ai?: unknown; readonly aiReview?: unknown; readonly required?: boolean } = {}
+): void {
+  writeFileSync(
+    join(cwd, "atlas.config.json"),
+    JSON.stringify({
+      schemaVersion: 1,
+      project: { name: "fixture", baseBranch: "main" },
+      ...(options.ai === undefined ? {} : { ai: options.ai }),
+      checks: [
+        {
+          name: "dashboard-visual",
+          kind: "visual",
+          required: options.required ?? true,
+          dependsOn: ["basic-session-integrity"],
+          url: "http://127.0.0.1:3000/dashboard",
+          referencePath: "dashboard-baseline.png",
+          viewport: { width: 800, height: 600 },
+          allowedDiffRatio: 0,
+          ...(options.aiReview === undefined ? {} : { aiReview: options.aiReview })
+        }
+      ]
+    })
+  );
+}
+
+function pngFixture(color: readonly [number, number, number, number]): Buffer {
+  const image = new PNG({ width: 2, height: 2 });
+  for (let offset = 0; offset < image.data.length; offset += 4) image.data.set(color, offset);
+  return PNG.sync.write(image);
+}
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, {

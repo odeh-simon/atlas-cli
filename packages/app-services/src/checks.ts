@@ -5,6 +5,7 @@ import { sha256Bytes, writeImmutableArtifactContent } from "@atlas/artifacts";
 import { runCheckSet, type CheckDefinition, type CheckExecutionResult } from "@atlas/checks";
 import { GateFailedError, StateTransitionError } from "@atlas/domain";
 import {
+  addArtifactDependency,
   appendEvent,
   createArtifactRecord,
   listArtifactsForSession,
@@ -16,40 +17,89 @@ import { transition } from "@atlas/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import {
+  readVisualCheckDefinitions,
+  runConfiguredVisualCheck,
+  visualCheckConfigFingerprint,
+  type VisualGateRuntimeOptions
+} from "./visual-gates.js";
 
 export interface RunBasicCheckResult {
   readonly sessionId: string;
   readonly checkResultArtifactId: string;
   readonly status: "passed" | "failed";
   readonly checkCount: number;
+  readonly evidenceCount: number;
   readonly state: string;
   readonly nextCommand: string;
 }
 
-export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBasicCheckResult> {
-  const runtime = await openAtlasRuntime(options);
+export interface RunBasicCheckOptions extends RuntimeOptions {
+  readonly visualRuntime?: Omit<VisualGateRuntimeOptions, "cwd" | "env"> | undefined;
+}
+
+export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise<RunBasicCheckResult> {
+  const initialRuntime = await openAtlasRuntime(options);
+  let sessionId: string;
+  let initialArtifacts: ReturnType<typeof listArtifactsForSession>;
+  let git: ReturnType<typeof readWorkflowGitSnapshot>;
   try {
-    const repoId = repoIdForPath(runtime.paths.cwd);
-    const session = listSessionsForRepository(runtime.db, repoId)[0];
+    const repoId = repoIdForPath(initialRuntime.paths.cwd);
+    const session = listSessionsForRepository(initialRuntime.db, repoId)[0];
     if (session === undefined) {
       throw new StateTransitionError("No active session found for checks");
     }
+    sessionId = session.sessionId;
+    initialArtifacts = listArtifactsForSession(initialRuntime.db, session.sessionId);
+    git = readWorkflowGitSnapshot(initialRuntime.paths.cwd);
+  } finally {
+    closeAtlasRuntime(initialRuntime, false);
+  }
 
+  const cwd = initialRuntime.paths.cwd;
+  const configuredChecks = readConfiguredChecks(cwd);
+  const visualChecks = readVisualCheckDefinitions(cwd);
+  const visualByName = new Map(visualChecks.map((check) => [check.name, check]));
+  const checkSet = await runCheckSet({
+    cwd,
+    env: options.env,
+    changedFiles: git?.changed_files.map((file) => file.path),
+    checks: [{ name: "basic-session-integrity", required: true }, ...configuredChecks],
+    builtIns: [
+      {
+        name: "basic-session-integrity",
+        run: () => runBasicSessionIntegrityCheck(initialRuntime.paths.artifactRoot, initialArtifacts)
+      },
+      ...configuredChecks.flatMap((check) => {
+        const visual = visualByName.get(check.name);
+        return visual === undefined
+          ? []
+          : [
+              {
+                name: check.name,
+                run: () =>
+                  runConfiguredVisualCheck(visual, {
+                    cwd,
+                    env: options.env,
+                    ...options.visualRuntime
+                  })
+              }
+            ];
+      })
+    ]
+  });
+
+  const runtime = await openAtlasRuntime(options);
+  try {
+    const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
+    if (session === undefined || session.sessionId !== sessionId) {
+      throw new StateTransitionError("Active session changed while checks were running");
+    }
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
-    const git = readWorkflowGitSnapshot(runtime.paths.cwd);
-    const configuredChecks = readConfiguredChecks(runtime.paths.cwd);
-    const checkSet = await runCheckSet({
-      cwd: runtime.paths.cwd,
-      env: options.env,
-      changedFiles: git?.changed_files.map((file) => file.path),
-      checks: [{ name: "basic-session-integrity", required: true }, ...configuredChecks],
-      builtIns: [
-        {
-          name: "basic-session-integrity",
-          run: () => runBasicSessionIntegrityCheck(runtime.paths.artifactRoot, artifacts)
-        }
-      ]
-    });
+    const visualConfigFingerprint = visualCheckConfigFingerprint(runtime.paths.cwd);
+    const evidenceArtifactIds = unique(
+      checkSet.results.flatMap((result) => result.evidenceArtifactIds ?? [])
+    );
 
     const status = checkSet.status;
     const failures = checkSet.results
@@ -66,15 +116,17 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       created_at: now,
       producer: { type: "atlas" },
       sensitivity: "internal",
-      parents: [],
+      parents: evidenceArtifactIds,
       content_sha256: "0".repeat(64),
       metadata: {
+        visual_evidence_artifact_ids: evidenceArtifactIds,
         ...(git === undefined
           ? {}
           : {
               git,
               git_fingerprint: git.fingerprint
-            })
+            }),
+        ...(visualConfigFingerprint === undefined ? {} : { visual_config_fingerprint: visualConfigFingerprint })
       },
       run_id: checkSet.runId,
       status: checkSet.status,
@@ -86,6 +138,7 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
         summary: result.summary,
         dependencies: result.dependencies,
         affected: result.affected,
+        evidence_artifact_ids: [...(result.evidenceArtifactIds ?? [])],
         ...(result.skippedReason === undefined ? {} : { skipped_reason: result.skippedReason }),
         process: result.process
           ? {
@@ -126,30 +179,40 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       producerType: "atlas",
       createdAt: now
     });
+    for (const evidenceId of evidenceArtifactIds) {
+      addArtifactDependency(runtime.db, {
+        artifactId: runLogArtifactId,
+        dependsOnArtifactId: evidenceId,
+        dependencyKind: "evidence"
+      });
+    }
 
     const artifactId = newId("art");
+    const checkResultContentVersion = artifacts.filter((artifact) => artifact.type === "check_result").length + 1;
     const checkResult = checkResultSchema.parse({
       artifact_id: artifactId,
       session_id: session.sessionId,
       type: "check_result",
       schema_version: 1,
-      content_version: 1,
+      content_version: checkResultContentVersion,
       created_at: now,
       producer: { type: "atlas" },
       sensitivity: "internal",
-      parents: [runLogArtifactId],
+      parents: [runLogArtifactId, ...evidenceArtifactIds],
       content_sha256: "0".repeat(64),
       metadata: {
         run_id: checkSet.runId,
         check_run_log_artifact_id: runLogArtifactId,
         check_count: checkSet.results.length,
         failed_required: checkSet.failedRequired,
+        visual_evidence_artifact_ids: evidenceArtifactIds,
         ...(git === undefined
           ? {}
           : {
               git,
               git_fingerprint: git.fingerprint
             }),
+        ...(visualConfigFingerprint === undefined ? {} : { visual_config_fingerprint: visualConfigFingerprint }),
         results: checkSet.results.map((result) => ({
           name: result.name,
           required: result.required,
@@ -157,6 +220,7 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
           summary: result.summary,
           dependencies: result.dependencies,
           affected: result.affected,
+          evidenceArtifactIds: result.evidenceArtifactIds ?? [],
           skippedReason: result.skippedReason,
           process: result.process
             ? {
@@ -177,14 +241,15 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       status,
       required: true,
       summary: status === "passed" ? "All required checks passed" : failures.join("; "),
-      ...(git === undefined ? {} : { git_fingerprint: git.fingerprint })
+      ...(git === undefined ? {} : { git_fingerprint: git.fingerprint }),
+      ...(visualConfigFingerprint === undefined ? {} : { visual_config_fingerprint: visualConfigFingerprint })
     });
     const written = writeImmutableArtifactContent({
       rootDir: runtime.paths.artifactRoot,
       sessionId: session.sessionId,
       artifactId,
       type: "check_result",
-      contentVersion: artifacts.filter((artifact) => artifact.type === "check_result").length + 1,
+      contentVersion: checkResultContentVersion,
       mediaType: "application/json",
       content: `${JSON.stringify(checkResult, null, 2)}\n`
     });
@@ -193,7 +258,7 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       sessionId: session.sessionId,
       type: "check_result",
       schemaVersion: 1,
-      contentVersion: artifacts.filter((artifact) => artifact.type === "check_result").length + 1,
+      contentVersion: checkResultContentVersion,
       storageUri: written.storageUri,
       sha256: written.sha256,
       byteLength: written.byteLength,
@@ -203,6 +268,18 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       producerType: "atlas",
       createdAt: now
     });
+    addArtifactDependency(runtime.db, {
+      artifactId,
+      dependsOnArtifactId: runLogArtifactId,
+      dependencyKind: "parent"
+    });
+    for (const evidenceId of evidenceArtifactIds) {
+      addArtifactDependency(runtime.db, {
+        artifactId,
+        dependsOnArtifactId: evidenceId,
+        dependencyKind: "evidence"
+      });
+    }
 
     if (status === "failed") {
       appendEvent(runtime.db, {
@@ -249,6 +326,7 @@ export async function runBasicCheck(options: RuntimeOptions = {}): Promise<RunBa
       checkResultArtifactId: artifactId,
       status,
       checkCount: checkSet.results.length,
+      evidenceCount: evidenceArtifactIds.length,
       state: next,
       nextCommand: "atlas review prepare"
     };
@@ -293,13 +371,19 @@ function readConfiguredChecks(cwd: string): CheckDefinition[] {
       if (typeof record.name !== "string" || record.name.length === 0) {
         throw new TypeError("Check config entry requires name");
       }
-      if (record.kind !== "design-scan" && (typeof record.command !== "string" || record.command.length === 0)) {
+      if (
+        record.kind !== "design-scan" &&
+        record.kind !== "visual" &&
+        (typeof record.command !== "string" || record.command.length === 0)
+      ) {
         throw new TypeError(`Check config entry requires command: ${record.name}`);
       }
       const definition: CheckDefinition = {
         name: record.name,
         required: record.required !== false,
-        ...(record.kind === "command" || record.kind === "design-scan" ? { kind: record.kind } : {}),
+        ...(record.kind === "command" || record.kind === "design-scan" || record.kind === "visual"
+          ? { kind: record.kind }
+          : {}),
         ...(typeof record.command === "string" ? { command: record.command } : {}),
         args: Array.isArray(record.args) ? record.args.map(String) : [],
         dependsOn: Array.isArray(record.dependsOn) ? record.dependsOn.map(String) : [],
@@ -320,4 +404,8 @@ function readConfiguredChecks(cwd: string): CheckDefinition[] {
 
 function isMissingFileError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+function unique(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }

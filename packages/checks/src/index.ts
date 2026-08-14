@@ -10,7 +10,7 @@ export type CheckStatus = "passed" | "failed" | "skipped" | "blocked" | "cancell
 export interface CheckDefinition {
   readonly name: string;
   readonly required: boolean;
-  readonly kind?: "command" | "design-scan" | undefined;
+  readonly kind?: "command" | "design-scan" | "visual" | undefined;
   readonly command?: string | undefined;
   readonly args?: readonly string[] | undefined;
   readonly dependsOn?: readonly string[] | undefined;
@@ -29,6 +29,7 @@ export interface CheckExecutionResult {
   readonly status: CheckStatus;
   readonly summary: string;
   readonly process?: ProcessRunResult | undefined;
+  readonly evidenceArtifactIds?: readonly string[] | undefined;
 }
 
 export interface CheckResult extends CheckExecutionResult {

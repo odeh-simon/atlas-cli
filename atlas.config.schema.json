@@ -58,7 +58,7 @@
         "required": ["name"],
         "properties": {
           "name": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
-          "kind": { "type": "string", "enum": ["command", "design-scan"] },
+          "kind": { "type": "string", "enum": ["command", "design-scan", "visual"] },
           "required": { "type": "boolean" },
           "command": { "type": "string", "minLength": 1 },
           "args": { "type": "array", "items": { "type": "string" } },
@@ -66,9 +66,50 @@
           "affected": { "type": "array", "items": { "type": "string", "minLength": 1 } },
           "root": { "type": "string", "minLength": 1 },
           "maxFiles": { "type": "integer", "minimum": 1 },
-          "timeoutMs": { "type": "integer", "minimum": 1 }
+          "timeoutMs": { "type": "integer", "minimum": 1 },
+          "url": { "type": "string", "format": "uri", "pattern": "^https?://" },
+          "referencePath": { "type": "string", "minLength": 1 },
+          "figmaUrl": { "type": "string", "format": "uri", "pattern": "^https://([^/]+\\.)?figma\\.com/" },
+          "figmaScale": { "type": "number", "minimum": 0.01, "maximum": 4 },
+          "viewport": {
+            "oneOf": [
+              { "type": "string", "enum": ["desktop", "mobile"] },
+              { "$ref": "#/$defs/viewport" }
+            ]
+          },
+          "fullPage": { "type": "boolean" },
+          "browserChannel": { "type": "string", "enum": ["auto", "msedge", "chrome", "chromium"] },
+          "pixelThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+          "allowedDiffRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+          "maxPixels": { "type": "integer", "minimum": 1 },
+          "maxReferenceBytes": { "type": "integer", "minimum": 1 },
+          "aiReview": {
+            "type": "object",
+            "properties": {
+              "providerAlias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
+              "required": { "type": "boolean" },
+              "failOn": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["blocking", "important", "suggestion"] },
+                "uniqueItems": true
+              }
+            },
+            "additionalProperties": false
+          }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": { "properties": { "kind": { "const": "visual" } }, "required": ["kind"] },
+            "then": {
+              "required": ["url"],
+              "oneOf": [
+                { "required": ["referencePath"] },
+                { "required": ["figmaUrl"] }
+              ]
+            }
+          }
+        ]
       }
     },
     "ai": {

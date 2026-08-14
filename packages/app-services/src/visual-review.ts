@@ -66,6 +66,7 @@ export interface RunAiVisualReviewResult {
   readonly summary: string;
   readonly findingCount: number;
   readonly blockingCount: number;
+  readonly severityCounts: Readonly<Record<"blocking" | "important" | "suggestion", number>>;
 }
 
 export async function runAiVisualReview(input: RunAiVisualReviewInput): Promise<RunAiVisualReviewResult> {
@@ -237,7 +238,12 @@ export async function runAiVisualReview(input: RunAiVisualReviewInput): Promise<
       status: normalizedStatus,
       summary: review.summary,
       findingCount: review.findings.length,
-      blockingCount: review.findings.filter((finding) => finding.severity === "blocking").length
+      blockingCount: review.findings.filter((finding) => finding.severity === "blocking").length,
+      severityCounts: {
+        blocking: review.findings.filter((finding) => finding.severity === "blocking").length,
+        important: review.findings.filter((finding) => finding.severity === "important").length,
+        suggestion: review.findings.filter((finding) => finding.severity === "suggestion").length
+      }
     };
   } finally {
     closeAtlasRuntime(runtime);

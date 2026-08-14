@@ -1,6 +1,16 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { GateFailedError, StateTransitionError } from "@atlas/domain";
-import { appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
+import {
+  addArtifactDependency,
+  appendEvent,
+  createArtifactRecord,
+  listArtifactsForSession,
+  listSessionsForRepository,
+  updateSessionState
+} from "@atlas/persistence";
 import { reviewPackageSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
@@ -24,10 +34,14 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     const contract = artifacts.find((artifact) => artifact.type === "implementation_contract" && artifact.status === "approved");
     const execution = artifacts.find((artifact) => artifact.type === "execution_report");
-    const checks = artifacts.filter((artifact) => artifact.type === "check_result" && artifact.status === "valid");
+    const latestCheck = artifacts.filter((artifact) => artifact.type === "check_result").at(-1);
+    const checks = latestCheck?.status === "valid" ? [latestCheck] : [];
     if (contract === undefined || execution === undefined || checks.length === 0) {
       throw new GateFailedError("Review package requires approved contract, execution report, and passing check result");
     }
+    const visualEvidenceArtifactIds = readVisualEvidenceIds(runtime.paths.artifactRoot, checks.at(-1)).filter((id) =>
+      artifacts.some((artifact) => artifact.artifactId === id && artifact.status === "valid")
+    );
     const git = readWorkflowGitSnapshot(runtime.paths.cwd);
 
     const now = new Date().toISOString();
@@ -42,7 +56,12 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       created_at: now,
       producer: { type: "atlas" },
       sensitivity: "confidential",
-      parents: [contract.artifactId, execution.artifactId, ...checks.map((check) => check.artifactId)],
+      parents: [
+        contract.artifactId,
+        execution.artifactId,
+        ...checks.map((check) => check.artifactId),
+        ...visualEvidenceArtifactIds
+      ],
       content_sha256: "0".repeat(64),
       metadata: {
         ...(git === undefined
@@ -55,9 +74,10 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       contract_artifact_id: contract.artifactId,
       execution_report_artifact_id: execution.artifactId,
       check_result_artifact_ids: checks.map((check) => check.artifactId),
+      visual_evidence_artifact_ids: visualEvidenceArtifactIds,
       review_ready_label: "ready",
       rubric_markdown:
-        "Review the implementation against the approved contract. Classify findings as blocking, important, suggestion, question, or accepted_deviation."
+        "Review the implementation against the approved contract and attached visual evidence. Classify findings as blocking, important, suggestion, question, or accepted_deviation."
     });
     const next = transition({
       state: session.primaryState,
@@ -88,6 +108,13 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       producerType: "atlas",
       createdAt: now
     });
+    for (const parentId of reviewPackage.parents) {
+      addArtifactDependency(runtime.db, {
+        artifactId,
+        dependsOnArtifactId: parentId,
+        dependencyKind: visualEvidenceArtifactIds.includes(parentId) ? "evidence" : "parent"
+      });
+    }
     updateSessionState(runtime.db, { sessionId: session.sessionId, primaryState: next, now });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
@@ -107,5 +134,22 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
     };
   } finally {
     closeAtlasRuntime(runtime);
+  }
+}
+
+function readVisualEvidenceIds(
+  artifactRoot: string,
+  check: { readonly storageUri: string } | undefined
+): string[] {
+  if (check === undefined) return [];
+  try {
+    const raw = JSON.parse(readFileSync(join(artifactRoot, check.storageUri), "utf8")) as {
+      metadata?: { visual_evidence_artifact_ids?: unknown };
+    };
+    return Array.isArray(raw.metadata?.visual_evidence_artifact_ids)
+      ? raw.metadata.visual_evidence_artifact_ids.filter((id): id is string => typeof id === "string")
+      : [];
+  } catch {
+    return [];
   }
 }

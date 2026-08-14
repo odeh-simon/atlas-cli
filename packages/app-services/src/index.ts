@@ -27,3 +27,4 @@ export * from "./status.js";
 export * from "./writebacks.js";
 export * from "./visual-qa.js";
 export * from "./visual-review.js";
+export * from "./visual-gates.js";

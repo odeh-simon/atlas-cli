@@ -68,4 +68,43 @@ atlas visual review --comparison art_comparison_id --provider hetzner.default
 atlas artifacts show art_visual_review_id
 ```
 
-AI visual reviews classify observable findings as blocking, important, or suggestion and record provider/model identity, evidence IDs, confidence, and cloud-image consent. They are advisory in this release; deterministic comparison still controls the command exit code.
+AI visual reviews classify observable findings as blocking, important, or suggestion and record provider/model identity, evidence IDs, confidence, and cloud-image consent.
+
+### Visual Workflow Gates
+
+Add a `visual` check to `atlas.config.json` to run capture, comparison, and optional semantic review through `atlas checks run`:
+
+```json
+{
+  "checks": [
+    {
+      "name": "dashboard-visual",
+      "kind": "visual",
+      "required": true,
+      "dependsOn": ["basic-session-integrity"],
+      "affected": ["app/dashboard/**", "components/**"],
+      "url": "http://127.0.0.1:3000/dashboard",
+      "referencePath": "test/visual/dashboard.png",
+      "viewport": "desktop",
+      "fullPage": false,
+      "pixelThreshold": 0.1,
+      "allowedDiffRatio": 0.01,
+      "aiReview": {
+        "providerAlias": "hetzner.default",
+        "required": false,
+        "failOn": ["blocking", "important"]
+      }
+    }
+  ]
+}
+```
+
+Use `figmaUrl` instead of `referencePath` to fetch a node-specific Figma PNG during each run. The target application must be running before checks begin.
+
+```sh
+atlas checks run
+atlas artifacts show art_check_result_id
+atlas review prepare
+```
+
+Required visual failures reject the normal check gate; optional failures are recorded without blocking the check set. `aiReview.required` controls whether an unavailable or inconclusive AI review fails the visual check, while `failOn` controls which returned severities fail it. Review packages include all visual artifacts from the latest passing check. Atlas fingerprints the visual configuration and local baseline bytes, so changing the route, viewport, tolerance, AI policy, or baseline requires rerunning checks before completion.
