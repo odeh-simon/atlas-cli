@@ -33,6 +33,8 @@
   ],
   "ai": {
     "defaultProviderAlias": "ollama.local",
+    "allowCloudCodeContext": false,
+    "allowCloudImages": false,
     "providers": [
       {
         "alias": "ollama.local",

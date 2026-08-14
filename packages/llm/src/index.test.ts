@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertAiDataConsent,
   createAiCompletion,
+  defaultHetznerProvider,
   defaultOllamaProvider,
   getAiProviderHealth,
   listAiModels,
@@ -143,6 +145,28 @@ describe("LLM provider foundation", () => {
 
   it("redacts long secret-like text", () => {
     expect(redactSecretText("Bearer abcdefghijklmnopqrstuvwxyz1234567890")).toBe("[REDACTED]");
+  });
+
+  it("provides the official Hetzner inference preset", () => {
+    expect(defaultHetznerProvider()).toEqual({
+      alias: "hetzner.default",
+      provider: "openai-compatible",
+      preset: "hetzner-inference",
+      baseUrl: "https://inference.hetzner.com/api/v1",
+      model: "Qwen/Qwen3.6-35B-A3B-FP8",
+      tokenAlias: "hetzner.default",
+      timeoutMs: 120_000,
+      maxInputTokens: 120_000
+    });
+  });
+
+  it("requires explicit consent before sending code or images to cloud AI", () => {
+    expect(() => assertAiDataConsent(defaultHetznerProvider(), "code-context", false)).toThrow(
+      "ai.allowCloudCodeContext=true"
+    );
+    expect(() => assertAiDataConsent(defaultHetznerProvider(), "image", undefined)).toThrow("ai.allowCloudImages=true");
+    expect(() => assertAiDataConsent(defaultOllamaProvider(), "code-context", false)).not.toThrow();
+    expect(() => assertAiDataConsent(defaultHetznerProvider(), "code-context", true)).not.toThrow();
   });
 
   it("rejects invalid provider config", async () => {

@@ -57,6 +57,8 @@ import { createTelemetryPreview, telemetryEnabled } from "@atlas/diagnostics";
 import { AtlasError } from "@atlas/domain";
 import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
 import {
+  assertAiDataConsent,
+  defaultHetznerProvider,
   defaultOllamaProvider,
   getAiProviderHealth,
   listAiModels,
@@ -329,6 +331,7 @@ Usage:
   atlas adapters health
   atlas artifacts show <artifact-id>
   atlas ai providers health
+  atlas ai providers add hetzner --token-alias <alias> [--alias <alias>] [--allow-cloud-code]
   atlas ai models [--provider <alias>]
   atlas orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
   atlas writebacks run --provider <linear|github|figma> --target <id|url> --summary <text> [--dry-run|--yes]
@@ -528,12 +531,44 @@ async function aiCommand(args: string[]): Promise<number> {
   if (scope === "providers" && action === "health") {
     return await aiProvidersHealthCommand();
   }
+  if (scope === "providers" && action === "add" && rest[0] === "hetzner") {
+    return aiProvidersAddHetznerCommand(rest.slice(1));
+  }
   if (scope === "models") {
     return await aiModelsCommand([action, ...rest].filter((value): value is string => value !== undefined));
   }
 
-  console.error("atlas ai requires providers health or models");
+  console.error("atlas ai requires providers health, providers add hetzner, or models");
   return 2;
+}
+
+function aiProvidersAddHetznerCommand(args: string[]): number {
+  const tokenAlias = readOption(args, "--token-alias");
+  const alias = readOption(args, "--alias", false) ?? "hetzner.default";
+  if (tokenAlias === undefined) {
+    console.error("atlas ai providers add hetzner requires --token-alias <alias>");
+    return 2;
+  }
+
+  const config = readAtlasConfig();
+  const provider = defaultHetznerProvider({ alias, tokenAlias });
+  const providers = (config.ai?.providers ?? []).filter((candidate) => candidate.alias !== alias);
+  writeAtlasConfig({
+    ...config,
+    ai: {
+      ...config.ai,
+      defaultProviderAlias: alias,
+      allowCloudCodeContext: args.includes("--allow-cloud-code") || config.ai?.allowCloudCodeContext === true,
+      allowCloudImages: config.ai?.allowCloudImages ?? false,
+      providers: [...providers, provider]
+    }
+  });
+  console.log(`AI provider: ${alias}`);
+  console.log(`Preset: ${provider.preset}`);
+  console.log(`Model: ${provider.model}`);
+  console.log(`Cloud code context: ${args.includes("--allow-cloud-code") ? "allowed" : "blocked"}`);
+  console.log(`Next: atlas auth add --provider ai --alias ${tokenAlias} --value-env HETZNER_INFERENCE_API_KEY`);
+  return 0;
 }
 
 async function aiProvidersHealthCommand(): Promise<number> {
@@ -842,18 +877,21 @@ async function contextBuildCommand(args: string[]): Promise<number> {
 
   let aiRecommendationArtifactId: string | undefined;
   if (useAi) {
+    const config = readAtlasConfig();
     const providers = readConfiguredAiProviders();
-    const alias = aiProviderAlias ?? readAtlasConfig().ai?.defaultProviderAlias;
+    const alias = aiProviderAlias ?? config.ai?.defaultProviderAlias;
     const provider = alias === undefined ? providers[0] : providers.find((candidate) => candidate.alias === alias);
     if (provider === undefined) {
       console.error(alias === undefined ? "No AI provider configured" : `AI provider not configured: ${alias}`);
       return 2;
     }
+    assertAiDataConsent(provider, "code-context", config.ai?.allowCloudCodeContext);
     try {
       console.log(`AI scout: ${provider.alias} ${provider.model}`);
       const scout = await runAiContextScout({
         provider,
         apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai"),
+        cloudDataConsent: config.ai?.allowCloudCodeContext,
         ...(maxFiles === undefined ? {} : { maxFiles }),
         ...(maxBytes === undefined ? {} : { maxBytes })
       });
@@ -887,13 +925,16 @@ async function planCommand(args: string[]): Promise<number> {
     console.error(aiProviderAlias === undefined ? "No AI provider configured" : `AI provider not configured: ${aiProviderAlias}`);
     return 2;
   }
+  const cloudDataConsent = readAtlasConfig().ai?.allowCloudCodeContext;
+  if (provider !== undefined) assertAiDataConsent(provider, "code-context", cloudDataConsent);
   const result = await exportPlanningPackage({
     ...(provider === undefined
       ? {}
       : {
           ai: {
             provider,
-            apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai")
+            apiKey: tokenForConfiguredAlias(provider.tokenAlias, "ai"),
+            cloudDataConsent
           }
         })
   });
@@ -1263,6 +1304,8 @@ interface AtlasCliConfig {
   readonly writebacks?: { readonly enabled?: boolean | undefined } | undefined;
   readonly ai?: {
     readonly defaultProviderAlias?: string | undefined;
+    readonly allowCloudCodeContext?: boolean | undefined;
+    readonly allowCloudImages?: boolean | undefined;
     readonly providers?: readonly Partial<AiProviderConfig>[] | undefined;
   } | undefined;
   readonly adapters?: {
@@ -1311,7 +1354,8 @@ function readConfiguredAiProviders(): AiProviderConfig[] {
       model: provider.model,
       ...(typeof provider.tokenAlias === "string" ? { tokenAlias: provider.tokenAlias } : {}),
       ...(typeof provider.timeoutMs === "number" ? { timeoutMs: provider.timeoutMs } : {}),
-      ...(typeof provider.maxInputTokens === "number" ? { maxInputTokens: provider.maxInputTokens } : {})
+      ...(typeof provider.maxInputTokens === "number" ? { maxInputTokens: provider.maxInputTokens } : {}),
+      ...(provider.preset === "hetzner-inference" ? { preset: provider.preset } : {})
     };
     return [config];
   });

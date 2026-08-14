@@ -1,6 +1,8 @@
 export const llmPackage = "@atlas/llm";
 
 export type AiProviderKind = "ollama" | "openai-compatible";
+export type AiProviderPreset = "hetzner-inference";
+export type AiDataKind = "code-context" | "image";
 
 export interface AiProviderConfig {
   readonly alias: string;
@@ -10,6 +12,7 @@ export interface AiProviderConfig {
   readonly tokenAlias?: string | undefined;
   readonly timeoutMs?: number | undefined;
   readonly maxInputTokens?: number | undefined;
+  readonly preset?: AiProviderPreset | undefined;
 }
 
 export interface AiProviderHealth {
@@ -217,6 +220,37 @@ export function defaultOllamaProvider(): AiProviderConfig {
   };
 }
 
+export function defaultHetznerProvider(input: {
+  readonly alias?: string | undefined;
+  readonly tokenAlias?: string | undefined;
+} = {}): AiProviderConfig {
+  return {
+    alias: input.alias ?? "hetzner.default",
+    provider: "openai-compatible",
+    preset: "hetzner-inference",
+    baseUrl: "https://inference.hetzner.com/api/v1",
+    model: "Qwen/Qwen3.6-35B-A3B-FP8",
+    tokenAlias: input.tokenAlias ?? "hetzner.default",
+    timeoutMs: 120_000,
+    maxInputTokens: 120_000
+  };
+}
+
+export function isCloudAiProvider(provider: AiProviderConfig): boolean {
+  const hostname = new URL(provider.baseUrl).hostname.toLowerCase();
+  return hostname !== "localhost" && hostname !== "127.0.0.1" && hostname !== "::1";
+}
+
+export function assertAiDataConsent(
+  provider: AiProviderConfig,
+  dataKind: AiDataKind,
+  consent: boolean | undefined
+): void {
+  if (!isCloudAiProvider(provider) || consent === true) return;
+  const setting = dataKind === "image" ? "ai.allowCloudImages" : "ai.allowCloudCodeContext";
+  throw new Error(`Cloud AI provider ${provider.alias} requires explicit ${setting}=true consent`);
+}
+
 function validateProviderConfig(provider: AiProviderConfig): string | undefined {
   if (!/^[A-Za-z0-9_.:-]+$/.test(provider.alias)) return "Invalid provider alias";
   if (provider.provider !== "ollama" && provider.provider !== "openai-compatible") return "Invalid provider kind";
@@ -229,6 +263,7 @@ function validateProviderConfig(provider: AiProviderConfig): string | undefined 
   }
   if (provider.timeoutMs !== undefined && provider.timeoutMs < 1) return "timeoutMs must be positive";
   if (provider.maxInputTokens !== undefined && provider.maxInputTokens < 1) return "maxInputTokens must be positive";
+  if (provider.preset !== undefined && provider.preset !== "hetzner-inference") return "Invalid provider preset";
   return undefined;
 }
 

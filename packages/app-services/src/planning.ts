@@ -3,7 +3,13 @@ import { join } from "node:path";
 
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { StateTransitionError } from "@atlas/domain";
-import { createAiCompletion, type AiCompletionResponse, type AiProviderConfig } from "@atlas/llm";
+import {
+  assertAiDataConsent,
+  createAiCompletion,
+  isCloudAiProvider,
+  type AiCompletionResponse,
+  type AiProviderConfig
+} from "@atlas/llm";
 import {
   addArtifactDependency,
   appendEvent,
@@ -30,6 +36,7 @@ export interface AiPlanningOptions {
   readonly apiKey?: string | undefined;
   readonly fetchImpl?: typeof fetch | undefined;
   readonly completionImpl?: ((prompt: string) => Promise<AiCompletionResponse>) | undefined;
+  readonly cloudDataConsent?: boolean | undefined;
 }
 
 export interface ExportPlanningPackageInput extends RuntimeOptions {
@@ -96,6 +103,7 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
 
     let aiPlanningDraftArtifactId: string | undefined;
     if (options.ai !== undefined) {
+      assertAiDataConsent(options.ai.provider, "code-context", options.ai.cloudDataConsent);
       const draftArtifactId = newId("art");
       const prompt = renderAiPlanningPrompt({
         taskBrief: readFileSync(join(runtime.paths.artifactRoot, taskBrief.storageUri), "utf8"),
@@ -136,7 +144,12 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
         content_sha256: "0".repeat(64),
         metadata: {
           planning_package_artifact_id: artifactId,
-          next_gate: "atlas contract import <file>"
+          next_gate: "atlas contract import <file>",
+          data_egress: {
+            destination: isCloudAiProvider(options.ai.provider) ? "cloud" : "local",
+            consent: options.ai.cloudDataConsent === true,
+            payload: "task-and-context-manifest"
+          }
         },
         provider_alias: options.ai.provider.alias,
         model: options.ai.provider.model,

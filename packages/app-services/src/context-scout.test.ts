@@ -43,6 +43,7 @@ describe("runAiContextScout", () => {
     const result = await runAiContextScout({
       cwd,
       env,
+      cloudDataConsent: true,
       provider: {
         alias: "ollama.local",
         provider: "ollama",
@@ -136,6 +137,7 @@ describe("runAiContextScout", () => {
     const result = await runAiContextScout({
       cwd,
       env,
+      cloudDataConsent: true,
       provider: {
         alias: "openrouter.free",
         provider: "openai-compatible",
@@ -168,6 +170,7 @@ describe("runAiContextScout", () => {
     await runAiContextScout({
       cwd,
       env,
+      cloudDataConsent: true,
       maxFiles: 8,
       provider: {
         alias: "openrouter.free",
@@ -187,5 +190,25 @@ describe("runAiContextScout", () => {
     });
 
     expect(prompts[0]?.length).toBeLessThan(8_000);
+  });
+
+  it("blocks cloud context egress without explicit consent", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(cwd, { recursive: true });
+
+    await expect(
+      runAiContextScout({
+        cwd,
+        env,
+        provider: {
+          alias: "hetzner.default",
+          provider: "openai-compatible",
+          baseUrl: "https://inference.hetzner.com/api/v1",
+          model: "Qwen/Qwen3.6-35B-A3B-FP8"
+        }
+      })
+    ).rejects.toThrow("ai.allowCloudCodeContext=true");
   });
 });

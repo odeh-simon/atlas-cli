@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -300,6 +300,87 @@ describe("cli", () => {
     } finally {
       process.chdir(previousCwd);
       globalThis.fetch = previousFetch;
+    }
+  });
+
+  it("adds the Hetzner provider preset with explicit cloud-code consent", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({ schemaVersion: 1, project: { name: "fixture", baseBranch: "main" } })
+    );
+    const previousCwd = process.cwd();
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      const code = await main([
+        "ai",
+        "providers",
+        "add",
+        "hetzner",
+        "--token-alias",
+        "hetzner.default",
+        "--allow-cloud-code"
+      ]);
+      const config = JSON.parse(readFileSync(join(repo, "atlas.config.json"), "utf8")) as {
+        ai: { allowCloudCodeContext: boolean; providers: Array<Record<string, unknown>> };
+      };
+
+      expect(code).toBe(0);
+      expect(config.ai.allowCloudCodeContext).toBe(true);
+      expect(config.ai.providers[0]).toMatchObject({
+        preset: "hetzner-inference",
+        baseUrl: "https://inference.hetzner.com/api/v1",
+        model: "Qwen/Qwen3.6-35B-A3B-FP8"
+      });
+      expect(logs).toContain("Cloud code context: allowed");
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+
+  it("blocks cloud context build when project consent is absent", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(join(repo, "package.json"), "{\"name\":\"fixture\"}\n");
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          providers: [
+            {
+              alias: "hetzner.default",
+              provider: "openai-compatible",
+              baseUrl: "https://inference.hetzner.com/api/v1",
+              model: "Qwen/Qwen3.6-35B-A3B-FP8"
+            }
+          ]
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      await main(["start", "--manual", "--title", "Target", "--objective", "Update target source"]);
+      const code = await main(["context", "build", "--ai"]);
+
+      expect(code).toBe(1);
+      expect(logs).toContain(
+        "Cloud AI provider hetzner.default requires explicit ai.allowCloudCodeContext=true consent"
+      );
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
     }
   });
 

@@ -5,7 +5,13 @@ import { z } from "zod";
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { discoverContextSources } from "@atlas/context-discovery";
 import { StateTransitionError, ValidationError } from "@atlas/domain";
-import { createAiCompletion, type AiProviderConfig, type AiCompletionResponse } from "@atlas/llm";
+import {
+  assertAiDataConsent,
+  createAiCompletion,
+  isCloudAiProvider,
+  type AiProviderConfig,
+  type AiCompletionResponse
+} from "@atlas/llm";
 import {
   addArtifactDependency,
   appendEvent,
@@ -25,6 +31,7 @@ export interface RunAiContextScoutInput extends RuntimeOptions {
   readonly maxBytes?: number | undefined;
   readonly fetchImpl?: typeof fetch | undefined;
   readonly completionImpl?: ((prompt: string) => Promise<AiCompletionResponse>) | undefined;
+  readonly cloudDataConsent?: boolean | undefined;
 }
 
 export interface RunAiContextScoutResult {
@@ -47,6 +54,7 @@ const scoutResponseSchema = z.object({
 });
 
 export async function runAiContextScout(input: RunAiContextScoutInput): Promise<RunAiContextScoutResult> {
+  assertAiDataConsent(input.provider, "code-context", input.cloudDataConsent);
   const runtime = await openAtlasRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
@@ -116,7 +124,12 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       metadata: {
         discovery: "ai-context-scout",
         candidate_count: discovery.sources.length,
-        included_candidate_count: discovery.sources.filter((source) => source.included).length
+        included_candidate_count: discovery.sources.filter((source) => source.included).length,
+        data_egress: {
+          destination: isCloudAiProvider(input.provider) ? "cloud" : "local",
+          consent: input.cloudDataConsent === true,
+          payload: "task-and-source-context"
+        }
       },
       provider_alias: input.provider.alias,
       model: input.provider.model,
