@@ -10,6 +10,7 @@ export interface ShowArtifactContentResult {
   readonly type: string;
   readonly mediaType: string;
   readonly content: string;
+  readonly storagePath: string;
 }
 
 export async function showArtifactContent(input: {
@@ -22,13 +23,21 @@ export async function showArtifactContent(input: {
       return undefined;
     }
 
+    const storagePath = join(runtime.paths.artifactRoot, artifact.storageUri);
     return {
       artifactId: artifact.artifactId,
       type: artifact.type,
       mediaType: artifact.mediaType,
-      content: readFileSync(join(runtime.paths.artifactRoot, artifact.storageUri), "utf8")
+      content: isTextMediaType(artifact.mediaType)
+        ? readFileSync(storagePath, "utf8")
+        : `Binary artifact: ${artifact.type}\nMedia type: ${artifact.mediaType}\nBytes: ${artifact.byteLength}\nPath: ${storagePath}\n`,
+      storagePath
     };
   } finally {
     closeAtlasRuntime(runtime, false);
   }
+}
+
+function isTextMediaType(mediaType: string): boolean {
+  return mediaType === "application/json" || mediaType === "text/markdown" || mediaType.startsWith("text/");
 }

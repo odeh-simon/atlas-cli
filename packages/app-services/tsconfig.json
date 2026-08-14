@@ -18,6 +18,7 @@
     { "path": "../persistence" },
     { "path": "../security" },
     { "path": "../schemas" },
+    { "path": "../visual-qa" },
     { "path": "../workflow-engine" }
   ]
 }

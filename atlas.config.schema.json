@@ -31,6 +31,25 @@
       },
       "additionalProperties": false
     },
+    "visualQa": {
+      "type": "object",
+      "properties": {
+        "browserChannel": { "type": "string", "enum": ["auto", "msedge", "chrome", "chromium"] },
+        "timeoutMs": { "type": "integer", "minimum": 1 },
+        "pixelThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "allowedDiffRatio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "maxPixels": { "type": "integer", "minimum": 1 },
+        "viewports": {
+          "type": "object",
+          "properties": {
+            "desktop": { "$ref": "#/$defs/viewport" },
+            "mobile": { "$ref": "#/$defs/viewport" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "checks": {
       "type": "array",
       "items": {
@@ -126,5 +145,16 @@
       "additionalProperties": false
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "viewport": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 240, "maximum": 7680 },
+        "height": { "type": "integer", "minimum": 240, "maximum": 7680 }
+      },
+      "additionalProperties": false
+    }
+  }
 }

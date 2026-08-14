@@ -34,5 +34,9 @@
     "@atlas/git": "workspace:*",
     "@atlas/llm": "workspace:*",
     "@atlas/security": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0"
   }
 }

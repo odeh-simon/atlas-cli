@@ -23,6 +23,7 @@
     { "path": "./packages/schemas" },
     { "path": "./packages/security" },
     { "path": "./packages/test-utils" },
+    { "path": "./packages/visual-qa" },
     { "path": "./packages/workflow-engine" }
   ]
 }

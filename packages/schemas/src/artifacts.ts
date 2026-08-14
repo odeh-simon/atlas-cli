@@ -12,6 +12,11 @@ export const artifactTypeSchema = z.enum([
   "context_quality_report",
   "ai_planning_draft",
   "ai_vision_result",
+  "visual_snapshot",
+  "visual_reference",
+  "visual_diff",
+  "visual_capture",
+  "visual_comparison",
   "planning_package_metadata",
   "implementation_contract",
   "contract_approval",
@@ -182,6 +187,41 @@ export const aiVisionResultSchema = artifactEnvelopeSchema.extend({
     destination: z.enum(["local", "cloud"]),
     consent: z.boolean()
   })
+});
+
+export const visualCaptureSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("visual_capture"),
+  url: z.string().url(),
+  title: z.string(),
+  viewport: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }),
+  full_page: z.boolean(),
+  browser_channel: z.enum(["msedge", "chrome", "chromium"]),
+  snapshot_artifact_id: idSchema,
+  snapshot_sha256: sha256Schema,
+  captured_at: isoDateTimeSchema
+});
+
+export const visualComparisonSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("visual_comparison"),
+  status: z.enum(["passed", "failed", "dimension-mismatch"]),
+  reference: z.object({
+    artifact_id: idSchema,
+    sha256: sha256Schema,
+    width: z.number().int().positive(),
+    height: z.number().int().positive()
+  }),
+  actual: z.object({
+    artifact_id: idSchema,
+    sha256: sha256Schema,
+    width: z.number().int().positive(),
+    height: z.number().int().positive()
+  }),
+  diff_artifact_id: idSchema.optional(),
+  mismatched_pixels: z.number().int().nonnegative(),
+  total_pixels: z.number().int().positive(),
+  diff_ratio: z.number().min(0).max(1),
+  pixel_threshold: z.number().min(0).max(1),
+  allowed_diff_ratio: z.number().min(0).max(1)
 });
 
 export const planningPackageMetadataSchema = artifactEnvelopeSchema.extend({
@@ -490,6 +530,8 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   contextQualityReportSchema,
   aiPlanningDraftSchema,
   aiVisionResultSchema,
+  visualCaptureSchema,
+  visualComparisonSchema,
   planningPackageMetadataSchema,
   implementationContractSchema,
   contractApprovalSchema,
@@ -516,6 +558,8 @@ export type AiContextRecommendation = z.infer<typeof aiContextRecommendationSche
 export type ContextQualityReport = z.infer<typeof contextQualityReportSchema>;
 export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;
 export type AiVisionResult = z.infer<typeof aiVisionResultSchema>;
+export type VisualCapture = z.infer<typeof visualCaptureSchema>;
+export type VisualComparison = z.infer<typeof visualComparisonSchema>;
 export type ImplementationContract = z.infer<typeof implementationContractSchema>;
 export type AgentRunLog = z.infer<typeof agentRunLogSchema>;
 export type CheckRunLog = z.infer<typeof checkRunLogSchema>;

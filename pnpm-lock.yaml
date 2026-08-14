@@ -81,12 +81,22 @@ importers:
       '@atlas/security':
         specifier: workspace:*
         version: link:../security
+      '@atlas/visual-qa':
+        specifier: workspace:*
+        version: link:../visual-qa
       '@atlas/workflow-engine':
         specifier: workspace:*
         version: link:../workflow-engine
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+    devDependencies:
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
 
   packages/artifacts:
     dependencies:
@@ -138,6 +148,13 @@ importers:
       '@atlas/security':
         specifier: workspace:*
         version: link:../security
+    devDependencies:
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
 
   packages/config: {}
 
@@ -179,6 +196,22 @@ importers:
   packages/security: {}
 
   packages/test-utils: {}
+
+  packages/visual-qa:
+    dependencies:
+      pixelmatch:
+        specifier: ^7.1.0
+        version: 7.2.0
+      playwright-core:
+        specifier: ^1.54.2
+        version: 1.62.1
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
+    devDependencies:
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
 
   packages/workflow-engine:
     dependencies:
@@ -466,6 +499,9 @@ packages:
   '@types/node@22.20.1':
     resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
 
+  '@types/pngjs@6.0.5':
+    resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
+
   '@types/sql.js@1.4.11':
     resolution: {integrity: sha512-QXIx38p2ZThJaK9vP5ZdqdlRe1FG9I8SmCZOS7FHfB/2qPAjZwkL7/vlfPg6N/oWHuuOaGg/P/IRwfP2W0kWVQ==}
 
@@ -570,6 +606,19 @@ packages:
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
+
+  pixelmatch@7.2.0:
+    resolution: {integrity: sha512-xhcb4yHu9sM/G7foGzoLtXYcC0zHEaOXXjRKhGup0fw78Nf2Tkiapv4EQyMzrbcmQPsllAI7DbFY2UT7PlI9Pg==}
+    hasBin: true
+
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  pngjs@7.0.0:
+    resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
+    engines: {node: '>=14.19.0'}
 
   postcss@8.5.17:
     resolution: {integrity: sha512-J7EF+8X+CzRPaJPOv9Ck2wNWJvGnnl3PcNPAdGg6GTLjyVpyQ0yATMSXRFRV01BviT/9Gwuc3rjEyJbDJG9a4w==}
@@ -847,6 +896,10 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/pngjs@6.0.5':
+    dependencies:
+      '@types/node': 22.20.1
+
   '@types/sql.js@1.4.11':
     dependencies:
       '@types/emscripten': 1.41.5
@@ -964,6 +1017,14 @@ snapshots:
   pathval@2.0.1: {}
 
   picocolors@1.1.1: {}
+
+  pixelmatch@7.2.0:
+    dependencies:
+      pngjs: 7.0.0
+
+  playwright-core@1.62.1: {}
+
+  pngjs@7.0.0: {}
 
   postcss@8.5.17:
     dependencies:

@@ -35,7 +35,9 @@ import {
   unarchiveSession,
   startLinearIssueTask,
   startManualTask,
-  showArtifactContent
+  showArtifactContent,
+  captureVisualPage,
+  compareVisualEvidence
 } from "@atlas/app-services";
 import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
 import { getCodexAdapterHealth } from "@atlas/adapters-codex";
@@ -145,6 +147,14 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
     if (command === "writebacks" && subcommand === "run") {
       return await writebacksRunCommand(rest);
+    }
+
+    if (command === "visual" && subcommand === "capture") {
+      return await visualCaptureCommand(rest);
+    }
+
+    if (command === "visual" && subcommand === "compare") {
+      return await visualCompareCommand(rest);
     }
 
     if (command === "git" && subcommand === "status") {
@@ -342,6 +352,8 @@ Usage:
   atlas ai providers add hetzner --token-alias <alias> [--alias <alias>] [--allow-cloud-code] [--allow-cloud-images]
   atlas ai models [--provider <alias>]
   atlas ai vision test <image> [--provider <alias>] [--prompt <text>]
+  atlas visual capture --url <url> [--viewport <desktop|mobile|WIDTHxHEIGHT>] [--full-page]
+  atlas visual compare --reference <png> (--actual <png>|--actual-artifact <id>)
   atlas orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
   atlas writebacks run --provider <linear|github|figma> --target <id|url> --summary <text> [--dry-run|--yes]
   atlas telemetry status
@@ -619,6 +631,64 @@ async function aiVisionTestCommand(args: string[]): Promise<number> {
   if (result.artifactId !== undefined) console.log(`Vision result: ${result.artifactId}`);
   console.log(result.analysis);
   return 0;
+}
+
+async function visualCaptureCommand(args: string[]): Promise<number> {
+  const url = readOption(args, "--url");
+  if (url === undefined) {
+    console.error("atlas visual capture requires --url <url>");
+    return 2;
+  }
+  const config = readAtlasConfig().visualQa;
+  const viewport = readVisualViewport(readOption(args, "--viewport", false), config?.viewports);
+  const browserChannel = readVisualBrowserChannel(readOption(args, "--browser", false) ?? config?.browserChannel);
+  if (browserChannel === undefined) {
+    console.error("atlas visual capture --browser must be auto, msedge, chrome, or chromium");
+    return 2;
+  }
+  const timeoutMs = readNumberOption(args, "--timeout-ms") ?? config?.timeoutMs;
+  const result = await captureVisualPage({
+    url,
+    viewport,
+    browserChannel,
+    fullPage: args.includes("--full-page"),
+    ...(timeoutMs === undefined ? {} : { timeoutMs })
+  });
+  console.log(`Visual capture: ${result.captureArtifactId}`);
+  console.log(`Snapshot: ${result.snapshotArtifactId}`);
+  console.log(`Path: ${result.snapshotPath}`);
+  console.log(`Browser: ${result.browserChannel}`);
+  console.log(`SHA-256: ${result.snapshotSha256}`);
+  return 0;
+}
+
+async function visualCompareCommand(args: string[]): Promise<number> {
+  const referencePath = readOption(args, "--reference");
+  const actualPath = readOption(args, "--actual", false);
+  const actualArtifactId = readOption(args, "--actual-artifact", false);
+  if (referencePath === undefined || (actualPath === undefined) === (actualArtifactId === undefined)) {
+    console.error("atlas visual compare requires --reference and exactly one of --actual or --actual-artifact");
+    return 2;
+  }
+  const config = readAtlasConfig().visualQa;
+  const pixelThreshold = readRatioOption(args, "--pixel-threshold") ?? config?.pixelThreshold;
+  const allowedDiffRatio = readRatioOption(args, "--allowed-ratio") ?? config?.allowedDiffRatio;
+  const maxPixels = readNumberOption(args, "--max-pixels") ?? config?.maxPixels;
+  const result = await compareVisualEvidence({
+    referencePath,
+    ...(actualPath === undefined ? {} : { actualPath }),
+    ...(actualArtifactId === undefined ? {} : { actualArtifactId }),
+    ...(pixelThreshold === undefined ? {} : { pixelThreshold }),
+    ...(allowedDiffRatio === undefined ? {} : { allowedDiffRatio }),
+    ...(maxPixels === undefined ? {} : { maxPixels })
+  });
+  console.log(`Visual comparison: ${result.comparisonArtifactId}`);
+  console.log(`Status: ${result.status}`);
+  console.log(`Changed pixels: ${result.mismatchedPixels}/${result.totalPixels}`);
+  console.log(`Diff ratio: ${result.diffRatio.toFixed(6)}`);
+  if (result.diffArtifactId !== undefined) console.log(`Diff: ${result.diffArtifactId}`);
+  if (result.diffPath !== undefined) console.log(`Diff path: ${result.diffPath}`);
+  return result.status === "passed" ? 0 : 1;
 }
 
 async function aiProvidersHealthCommand(): Promise<number> {
@@ -1360,6 +1430,13 @@ function readNumberOption(args: string[], name: string): number | undefined {
   return Number.isFinite(number) && Number.isInteger(number) && number > 0 ? number : undefined;
 }
 
+function readRatioOption(args: string[], name: string): number | undefined {
+  const value = readOption(args, name, false);
+  if (value === undefined) return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 && number <= 1 ? number : undefined;
+}
+
 function compact(values: Array<string | undefined>): string[] {
   return values.filter((value): value is string => value !== undefined);
 }
@@ -1412,6 +1489,17 @@ interface AtlasCliConfig {
   readonly project?: { readonly name?: string | undefined; readonly baseBranch?: string | undefined } | undefined;
   readonly telemetry?: { readonly enabled?: boolean | undefined } | undefined;
   readonly writebacks?: { readonly enabled?: boolean | undefined } | undefined;
+  readonly visualQa?: {
+    readonly browserChannel?: "auto" | "msedge" | "chrome" | "chromium" | undefined;
+    readonly timeoutMs?: number | undefined;
+    readonly pixelThreshold?: number | undefined;
+    readonly allowedDiffRatio?: number | undefined;
+    readonly maxPixels?: number | undefined;
+    readonly viewports?: {
+      readonly desktop?: { readonly width: number; readonly height: number } | undefined;
+      readonly mobile?: { readonly width: number; readonly height: number } | undefined;
+    } | undefined;
+  } | undefined;
   readonly ai?: {
     readonly defaultProviderAlias?: string | undefined;
     readonly allowCloudCodeContext?: boolean | undefined;
@@ -1426,6 +1514,33 @@ interface AtlasCliConfig {
     readonly codex?: { readonly command?: string | undefined } | undefined;
     readonly claudeCode?: { readonly command?: string | undefined } | undefined;
   } | undefined;
+}
+
+function readVisualViewport(
+  value: string | undefined,
+  configured:
+    | {
+        readonly desktop?: { readonly width: number; readonly height: number } | undefined;
+        readonly mobile?: { readonly width: number; readonly height: number } | undefined;
+      }
+    | undefined
+): { readonly width: number; readonly height: number } {
+  const preset = value ?? "desktop";
+  if (preset === "desktop") return configured?.desktop ?? { width: 1440, height: 900 };
+  if (preset === "mobile") return configured?.mobile ?? { width: 390, height: 844 };
+  const match = /^(\d+)x(\d+)$/i.exec(preset);
+  if (match?.[1] === undefined || match[2] === undefined) {
+    throw new TypeError("Visual viewport must be desktop, mobile, or WIDTHxHEIGHT");
+  }
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
+function readVisualBrowserChannel(
+  value: string | undefined
+): "auto" | "msedge" | "chrome" | "chromium" | undefined {
+  return value === undefined || value === "auto" || value === "msedge" || value === "chrome" || value === "chromium"
+    ? value ?? "auto"
+    : undefined;
 }
 
 function readAtlasConfig(): AtlasCliConfig {

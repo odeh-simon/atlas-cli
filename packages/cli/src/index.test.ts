@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PNG } from "pngjs";
 
 import { main } from "./index.js";
 
@@ -107,6 +108,63 @@ describe("cli", () => {
     expect(logs.join("\n")).toContain("atlas doctor");
     expect(logs.join("\n")).toContain("atlas artifacts show");
     expect(logs.join("\n")).toContain("atlas ai providers health");
+    expect(logs.join("\n")).toContain("atlas visual capture");
+    expect(logs.join("\n")).toContain("atlas visual compare");
+  });
+
+  it("requires a URL for visual capture", async () => {
+    const logs = captureLogs();
+
+    const code = await main(["visual", "capture"]);
+
+    expect(code).toBe(2);
+    expect(logs).toContain("atlas visual capture requires --url <url>");
+  });
+
+  it("compares visual evidence and exposes the binary diff path", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    const referencePath = join(root, "reference.png");
+    const actualPath = join(root, "actual.png");
+    mkdirSync(repo, { recursive: true });
+    const image = new PNG({ width: 2, height: 2 });
+    image.data.fill(255);
+    const png = PNG.sync.write(image);
+    writeFileSync(referencePath, png);
+    writeFileSync(actualPath, png);
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      await main(["start", "--manual", "--title", "Visual QA", "--objective", "Compare screenshots"]);
+      logs.length = 0;
+
+      const code = await main([
+        "visual",
+        "compare",
+        "--reference",
+        referencePath,
+        "--actual",
+        actualPath,
+        "--allowed-ratio",
+        "0"
+      ]);
+      const diffId = logs.find((line) => line.startsWith("Diff: "))?.replace("Diff: ", "");
+
+      expect(code).toBe(0);
+      expect(logs).toContain("Status: passed");
+      expect(diffId).toMatch(/^art_/);
+      logs.length = 0;
+      expect(await main(["artifacts", "show", diffId ?? ""])).toBe(0);
+      expect(logs.join("\n")).toContain("Binary artifact: visual_diff\nMedia type: image/png");
+      expect(logs.join("\n")).toContain("Path:");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+    }
   });
 
   it("shows artifact content by id", async () => {

@@ -23,7 +23,12 @@
     "@atlas/process-runner": "workspace:*",
     "@atlas/security": "workspace:*",
     "@atlas/schemas": "workspace:*",
+    "@atlas/visual-qa": "workspace:*",
     "@atlas/workflow-engine": "workspace:*",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0"
   }
 }
