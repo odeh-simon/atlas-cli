@@ -57,6 +57,7 @@
         "defaultProviderAlias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
         "allowCloudCodeContext": { "type": "boolean" },
         "allowCloudImages": { "type": "boolean" },
+        "maxImageBytes": { "type": "integer", "minimum": 1 },
         "providers": {
           "type": "array",
           "items": {
@@ -70,7 +71,12 @@
               "tokenAlias": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]+$" },
               "timeoutMs": { "type": "integer", "minimum": 1 },
               "maxInputTokens": { "type": "integer", "minimum": 1 },
-              "preset": { "type": "string", "enum": ["hetzner-inference"] }
+              "preset": { "type": "string", "enum": ["hetzner-inference"] },
+              "capabilities": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["text", "vision"] },
+                "uniqueItems": true
+              }
             },
             "additionalProperties": false
           }

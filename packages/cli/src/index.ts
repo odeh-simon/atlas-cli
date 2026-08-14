@@ -30,6 +30,7 @@ import {
   prepareFixBatch,
   recordDecision,
   recordAdapterWriteback,
+  runAiVisionTest,
   resumePausedSession,
   unarchiveSession,
   startLinearIssueTask,
@@ -338,8 +339,9 @@ Usage:
   atlas adapters health
   atlas artifacts show <artifact-id>
   atlas ai providers health
-  atlas ai providers add hetzner --token-alias <alias> [--alias <alias>] [--allow-cloud-code]
+  atlas ai providers add hetzner --token-alias <alias> [--alias <alias>] [--allow-cloud-code] [--allow-cloud-images]
   atlas ai models [--provider <alias>]
+  atlas ai vision test <image> [--provider <alias>] [--prompt <text>]
   atlas orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
   atlas writebacks run --provider <linear|github|figma> --target <id|url> --summary <text> [--dry-run|--yes]
   atlas telemetry status
@@ -544,6 +546,9 @@ async function aiCommand(args: string[]): Promise<number> {
   if (scope === "models") {
     return await aiModelsCommand([action, ...rest].filter((value): value is string => value !== undefined));
   }
+  if (scope === "vision" && action === "test") {
+    return await aiVisionTestCommand(rest);
+  }
 
   console.error("atlas ai requires providers health, providers add hetzner, or models");
   return 2;
@@ -566,7 +571,7 @@ function aiProvidersAddHetznerCommand(args: string[]): number {
       ...config.ai,
       defaultProviderAlias: alias,
       allowCloudCodeContext: args.includes("--allow-cloud-code") || config.ai?.allowCloudCodeContext === true,
-      allowCloudImages: config.ai?.allowCloudImages ?? false,
+      allowCloudImages: args.includes("--allow-cloud-images") || config.ai?.allowCloudImages === true,
       providers: [...providers, provider]
     }
   });
@@ -574,7 +579,45 @@ function aiProvidersAddHetznerCommand(args: string[]): number {
   console.log(`Preset: ${provider.preset}`);
   console.log(`Model: ${provider.model}`);
   console.log(`Cloud code context: ${args.includes("--allow-cloud-code") ? "allowed" : "blocked"}`);
+  console.log(`Cloud images: ${args.includes("--allow-cloud-images") ? "allowed" : "blocked"}`);
   console.log(`Next: atlas auth add --provider ai --alias ${tokenAlias} --value-env HETZNER_INFERENCE_API_KEY`);
+  return 0;
+}
+
+async function aiVisionTestCommand(args: string[]): Promise<number> {
+  const imagePath = args.find((argument) => !argument.startsWith("--"));
+  const providerAlias = readOption(args, "--provider", false);
+  const prompt = readOption(args, "--prompt", false) ?? "Describe this interface and identify visible UI problems.";
+  if (imagePath === undefined) {
+    console.error("atlas ai vision test requires an image path");
+    return 2;
+  }
+  const provider = readConfiguredAiProvider(providerAlias);
+  if (provider === undefined) {
+    console.error(providerAlias === undefined ? "No AI provider configured" : `AI provider not configured: ${providerAlias}`);
+    return 2;
+  }
+  const config = readAtlasConfig();
+  assertAiDataConsent(provider, "image", config.ai?.allowCloudImages);
+  const apiKey = tokenForConfiguredAlias(provider.tokenAlias, "ai");
+  if (provider.tokenAlias !== undefined && apiKey === undefined) {
+    console.error(`AI credential missing: ${provider.tokenAlias}`);
+    return 2;
+  }
+
+  const result = await runAiVisionTest({
+    provider,
+    imagePath,
+    prompt,
+    apiKey,
+    cloudImageConsent: config.ai?.allowCloudImages,
+    maxImageBytes: config.ai?.maxImageBytes
+  });
+  console.log(`Provider: ${result.providerAlias}`);
+  console.log(`Model: ${result.model}`);
+  console.log(`Image: ${result.mediaType} ${result.byteLength} bytes ${result.sha256.slice(0, 12)}...`);
+  if (result.artifactId !== undefined) console.log(`Vision result: ${result.artifactId}`);
+  console.log(result.analysis);
   return 0;
 }
 
@@ -1373,6 +1416,7 @@ interface AtlasCliConfig {
     readonly defaultProviderAlias?: string | undefined;
     readonly allowCloudCodeContext?: boolean | undefined;
     readonly allowCloudImages?: boolean | undefined;
+    readonly maxImageBytes?: number | undefined;
     readonly providers?: readonly Partial<AiProviderConfig>[] | undefined;
   } | undefined;
   readonly adapters?: {
@@ -1422,7 +1466,10 @@ function readConfiguredAiProviders(): AiProviderConfig[] {
       ...(typeof provider.tokenAlias === "string" ? { tokenAlias: provider.tokenAlias } : {}),
       ...(typeof provider.timeoutMs === "number" ? { timeoutMs: provider.timeoutMs } : {}),
       ...(typeof provider.maxInputTokens === "number" ? { maxInputTokens: provider.maxInputTokens } : {}),
-      ...(provider.preset === "hetzner-inference" ? { preset: provider.preset } : {})
+      ...(provider.preset === "hetzner-inference" ? { preset: provider.preset } : {}),
+      ...(Array.isArray(provider.capabilities)
+        ? { capabilities: provider.capabilities.filter((capability) => capability === "text" || capability === "vision") }
+        : {})
     };
     return [config];
   });

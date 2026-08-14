@@ -3,6 +3,7 @@ export const llmPackage = "@atlas/llm";
 export type AiProviderKind = "ollama" | "openai-compatible";
 export type AiProviderPreset = "hetzner-inference";
 export type AiDataKind = "code-context" | "image";
+export type AiCapability = "text" | "vision";
 
 export interface AiProviderConfig {
   readonly alias: string;
@@ -13,6 +14,7 @@ export interface AiProviderConfig {
   readonly timeoutMs?: number | undefined;
   readonly maxInputTokens?: number | undefined;
   readonly preset?: AiProviderPreset | undefined;
+  readonly capabilities?: readonly AiCapability[] | undefined;
 }
 
 export interface AiProviderHealth {
@@ -32,8 +34,15 @@ export interface AiModel {
 
 export interface AiCompletionMessage {
   readonly role: "system" | "user" | "assistant";
-  readonly content: string;
+  readonly content: string | readonly AiCompletionContentPart[];
 }
+
+export type AiCompletionContentPart =
+  | { readonly type: "text"; readonly text: string }
+  | {
+      readonly type: "image_url";
+      readonly image_url: { readonly url: string; readonly detail?: "auto" | "low" | "high" | undefined };
+    };
 
 export interface AiCompletionRequest {
   readonly provider: AiProviderConfig;
@@ -155,7 +164,7 @@ export async function createAiCompletion(input: AiCompletionRequest): Promise<Ai
         headers: { "content-type": "application/json", ...authHeaders(input.apiKey) },
         body: JSON.stringify({
           model: input.provider.model,
-          messages: input.messages,
+          messages: input.messages.map(toOpenAiMessage),
           temperature: input.temperature,
           response_format: input.responseFormat === "json" ? { type: "json_object" } : undefined
         })
@@ -185,7 +194,7 @@ export async function createAiCompletion(input: AiCompletionRequest): Promise<Ai
       body: JSON.stringify({
         model: input.provider.model,
         stream: false,
-        messages: input.messages,
+        messages: input.messages.map(toOllamaMessage),
         options: input.temperature === undefined ? undefined : { temperature: input.temperature },
         format: input.responseFormat === "json" ? "json" : undefined
       })
@@ -232,7 +241,8 @@ export function defaultHetznerProvider(input: {
     model: "Qwen/Qwen3.6-35B-A3B-FP8",
     tokenAlias: input.tokenAlias ?? "hetzner.default",
     timeoutMs: 120_000,
-    maxInputTokens: 120_000
+    maxInputTokens: 120_000,
+    capabilities: ["text", "vision"]
   };
 }
 
@@ -251,6 +261,10 @@ export function assertAiDataConsent(
   throw new Error(`Cloud AI provider ${provider.alias} requires explicit ${setting}=true consent`);
 }
 
+export function supportsAiCapability(provider: AiProviderConfig, capability: AiCapability): boolean {
+  return (provider.capabilities ?? ["text"]).includes(capability);
+}
+
 function validateProviderConfig(provider: AiProviderConfig): string | undefined {
   if (!/^[A-Za-z0-9_.:-]+$/.test(provider.alias)) return "Invalid provider alias";
   if (provider.provider !== "ollama" && provider.provider !== "openai-compatible") return "Invalid provider kind";
@@ -264,6 +278,9 @@ function validateProviderConfig(provider: AiProviderConfig): string | undefined 
   if (provider.timeoutMs !== undefined && provider.timeoutMs < 1) return "timeoutMs must be positive";
   if (provider.maxInputTokens !== undefined && provider.maxInputTokens < 1) return "maxInputTokens must be positive";
   if (provider.preset !== undefined && provider.preset !== "hetzner-inference") return "Invalid provider preset";
+  if (provider.capabilities?.some((capability) => capability !== "text" && capability !== "vision")) {
+    return "Invalid provider capability";
+  }
   return undefined;
 }
 
@@ -311,6 +328,34 @@ function normalizeOpenAiModel(value: unknown): AiModel {
 
 function authHeaders(apiKey: string | undefined): Record<string, string> {
   return apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
+}
+
+function toOpenAiMessage(message: AiCompletionMessage): AiCompletionMessage {
+  return message;
+}
+
+function toOllamaMessage(message: AiCompletionMessage): {
+  readonly role: AiCompletionMessage["role"];
+  readonly content: string;
+  readonly images?: readonly string[] | undefined;
+} {
+  if (typeof message.content === "string") return { role: message.role, content: message.content };
+  const text = message.content
+    .filter((part): part is Extract<AiCompletionContentPart, { type: "text" }> => part.type === "text")
+    .map((part) => part.text)
+    .join("\n");
+  const images = message.content
+    .filter((part): part is Extract<AiCompletionContentPart, { type: "image_url" }> => part.type === "image_url")
+    .map((part) => dataUrlPayload(part.image_url.url));
+  return { role: message.role, content: text, ...(images.length === 0 ? {} : { images }) };
+}
+
+function dataUrlPayload(url: string): string {
+  const match = /^data:image\/[A-Za-z0-9.+-]+;base64,([A-Za-z0-9+/=]+)$/.exec(url);
+  if (match?.[1] === undefined) {
+    throw new TypeError("Ollama vision inputs must be base64 image data URLs");
+  }
+  return match[1];
 }
 
 function asRecord(value: unknown, message: string): Record<string, unknown> {

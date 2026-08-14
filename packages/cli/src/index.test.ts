@@ -377,6 +377,64 @@ describe("cli", () => {
     }
   });
 
+  it("runs a vision capability test and records the result", async () => {
+    const root = tempRoot();
+    const repo = join(root, "repo");
+    const imagePath = join(root, "screen.png");
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(
+      imagePath,
+      Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXcAAAAASUVORK5CYII=", "base64")
+    );
+    writeFileSync(
+      join(repo, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          allowCloudImages: true,
+          providers: [
+            {
+              alias: "hetzner.default",
+              provider: "openai-compatible",
+              baseUrl: "https://inference.hetzner.com/api/v1",
+              model: "Qwen/Qwen3.6-35B-A3B-FP8",
+              capabilities: ["text", "vision"]
+            }
+          ]
+        }
+      })
+    );
+    const previousCwd = process.cwd();
+    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousFetch = globalThis.fetch;
+    const logs = captureLogs();
+
+    try {
+      process.chdir(repo);
+      process.env.ATLAS_HOME = join(root, "home");
+      globalThis.fetch = (async (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as { messages: Array<{ content: unknown[] }> };
+        expect(body.messages[0]?.content).toHaveLength(2);
+        return new Response(JSON.stringify({ choices: [{ message: { content: "The interface is visually stable." } }] }), {
+          status: 200
+        });
+      }) as typeof fetch;
+      await main(["start", "--manual", "--title", "Visual QA", "--objective", "Review the interface"]);
+      logs.length = 0;
+
+      const code = await main(["ai", "vision", "test", imagePath, "--provider", "hetzner.default"]);
+
+      expect(code).toBe(0);
+      expect(logs.some((line) => line.startsWith("Vision result: art_"))).toBe(true);
+      expect(logs).toContain("The interface is visually stable.");
+    } finally {
+      process.chdir(previousCwd);
+      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      globalThis.fetch = previousFetch;
+    }
+  });
+
   it("blocks cloud context build when project consent is absent", async () => {
     const root = tempRoot();
     const repo = join(root, "repo");

@@ -156,8 +156,64 @@ describe("LLM provider foundation", () => {
       model: "Qwen/Qwen3.6-35B-A3B-FP8",
       tokenAlias: "hetzner.default",
       timeoutMs: 120_000,
-      maxInputTokens: 120_000
+      maxInputTokens: 120_000,
+      capabilities: ["text", "vision"]
     });
+  });
+
+  it("sends multimodal content to OpenAI-compatible providers", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    await createAiCompletion({
+      provider: defaultHetznerProvider(),
+      apiKey: "hetzner_test_token_abcdefghijklmnopqrstuvwxyz",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Describe the UI" },
+            { type: "image_url", image_url: { url: "data:image/png;base64,aGVsbG8=" } }
+          ]
+        }
+      ],
+      fetchImpl: (async (_url, init) => {
+        calls.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return new Response(JSON.stringify({ choices: [{ message: { content: "A UI" } }] }), { status: 200 });
+      }) as typeof fetch
+    });
+
+    expect(calls[0]).toMatchObject({
+      model: "Qwen/Qwen3.6-35B-A3B-FP8",
+      messages: [
+        {
+          content: [
+            { type: "text", text: "Describe the UI" },
+            { type: "image_url", image_url: { url: "data:image/png;base64,aGVsbG8=" } }
+          ]
+        }
+      ]
+    });
+  });
+
+  it("maps base64 image content to Ollama image payloads", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    await createAiCompletion({
+      provider: { ...defaultOllamaProvider(), capabilities: ["text", "vision"] },
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Describe" },
+            { type: "image_url", image_url: { url: "data:image/png;base64,aGVsbG8=" } }
+          ]
+        }
+      ],
+      fetchImpl: (async (_url, init) => {
+        calls.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return new Response(JSON.stringify({ message: { content: "A UI" } }), { status: 200 });
+      }) as typeof fetch
+    });
+
+    expect(calls[0]).toMatchObject({ messages: [{ role: "user", content: "Describe", images: ["aGVsbG8="] }] });
   });
 
   it("requires explicit consent before sending code or images to cloud AI", () => {

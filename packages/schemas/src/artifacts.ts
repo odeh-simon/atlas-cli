@@ -11,6 +11,7 @@ export const artifactTypeSchema = z.enum([
   "context_manifest",
   "context_quality_report",
   "ai_planning_draft",
+  "ai_vision_result",
   "planning_package_metadata",
   "implementation_contract",
   "contract_approval",
@@ -163,6 +164,24 @@ export const aiPlanningDraftSchema = artifactEnvelopeSchema.extend({
   context_manifest_sha256: sha256Schema,
   draft_markdown: z.string().min(1),
   ready_label: z.enum(["draft", "blocked"])
+});
+
+export const aiVisionResultSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("ai_vision_result"),
+  provider_alias: idSchema,
+  model: z.string().min(1),
+  prompt: z.string().min(1),
+  image: z.object({
+    source_name: z.string().min(1),
+    media_type: z.enum(["image/png", "image/jpeg", "image/webp", "image/gif"]),
+    byte_length: z.number().int().positive(),
+    sha256: sha256Schema
+  }),
+  analysis: z.string().min(1),
+  data_egress: z.object({
+    destination: z.enum(["local", "cloud"]),
+    consent: z.boolean()
+  })
 });
 
 export const planningPackageMetadataSchema = artifactEnvelopeSchema.extend({
@@ -470,6 +489,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   contextManifestSchema,
   contextQualityReportSchema,
   aiPlanningDraftSchema,
+  aiVisionResultSchema,
   planningPackageMetadataSchema,
   implementationContractSchema,
   contractApprovalSchema,
@@ -495,6 +515,7 @@ export type ContextManifest = z.infer<typeof contextManifestSchema>;
 export type AiContextRecommendation = z.infer<typeof aiContextRecommendationSchema>;
 export type ContextQualityReport = z.infer<typeof contextQualityReportSchema>;
 export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;
+export type AiVisionResult = z.infer<typeof aiVisionResultSchema>;
 export type ImplementationContract = z.infer<typeof implementationContractSchema>;
 export type AgentRunLog = z.infer<typeof agentRunLogSchema>;
 export type CheckRunLog = z.infer<typeof checkRunLogSchema>;

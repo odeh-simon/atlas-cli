@@ -24,8 +24,9 @@ Hetzner's inference service is experimental. Register its OpenAI-compatible pres
 ```sh
 export HETZNER_INFERENCE_API_KEY="your-token"
 atlas auth add --provider ai --alias hetzner.default --value-env HETZNER_INFERENCE_API_KEY
-atlas ai providers add hetzner --token-alias hetzner.default --allow-cloud-code
+atlas ai providers add hetzner --token-alias hetzner.default --allow-cloud-code --allow-cloud-images
 atlas ai providers health
+atlas ai vision test screenshot.png --provider hetzner.default
 ```
 
-Omit `--allow-cloud-code` to keep cloud context transmission blocked. Image transmission has a separate `ai.allowCloudImages` setting and remains blocked by default.
+Omit `--allow-cloud-code` to keep cloud context transmission blocked. Image transmission has a separate `--allow-cloud-images` consent and remains blocked by default. Vision inputs are limited to PNG, JPEG, WebP, and GIF files under `ai.maxImageBytes` (5 MB by default).
