@@ -4,7 +4,14 @@ import {
   repoIdForPath,
   type RuntimeOptions
 } from "./runtime.js";
-import { listArtifactsForSession, listEvents, listSessionsForRepository, type SessionRecord } from "@atlas/persistence";
+import {
+  listArtifactsForSession,
+  listEvents,
+  listFindingsForSession,
+  listSessionsForRepository,
+  type FindingRecord,
+  type SessionRecord
+} from "@atlas/persistence";
 import { allowedCommands } from "@atlas/workflow-engine";
 
 export interface SessionStatus {
@@ -32,7 +39,7 @@ export async function getStatus(options: RuntimeOptions = {}): Promise<SessionSt
       session,
       artifactCount: listArtifactsForSession(runtime.db, session.sessionId).length,
       eventCount: listEvents(runtime.db, session.sessionId).length,
-      nextCommands: nextCommandsForSession(session)
+      nextCommands: nextCommandsForSession(session, listFindingsForSession(runtime.db, session.sessionId))
     };
   } finally {
     closeAtlasRuntime(runtime, false);
@@ -41,7 +48,7 @@ export async function getStatus(options: RuntimeOptions = {}): Promise<SessionSt
 
 export const resumeSession = getStatus;
 
-function nextCommandsForSession(session: SessionRecord): readonly string[] {
+function nextCommandsForSession(session: SessionRecord, findings: readonly FindingRecord[]): readonly string[] {
   if (session.disposition !== "active") {
     return [];
   }
@@ -54,15 +61,26 @@ function nextCommandsForSession(session: SessionRecord): readonly string[] {
     return ["atlas resume"];
   }
 
+  const hasOpenFindings = findings.some((finding) => finding.status === "open" || finding.status === "reopened");
   return [...allowedCommands(session.primaryState)]
-    .sort((left, right) => commandPriority(session.primaryState, left) - commandPriority(session.primaryState, right))
+    .sort(
+      (left, right) =>
+        commandPriority(session.primaryState, left, hasOpenFindings) -
+        commandPriority(session.primaryState, right, hasOpenFindings)
+    )
     .map(commandToCli);
 }
 
-function commandPriority(state: string, command: string): number {
+function commandPriority(state: string, command: string, hasOpenFindings: boolean): number {
   if (state === "planning_ready") {
     if (command === "import_contract") return 0;
     if (command === "export_plan") return 1;
+  }
+
+  if (state === "review_imported") {
+    if (command === "evaluate_completion") return hasOpenFindings ? 2 : 0;
+    if (command === "dispose_findings") return hasOpenFindings ? 0 : 2;
+    if (command === "prepare_fix_batch") return hasOpenFindings ? 1 : 3;
   }
 
   switch (command) {

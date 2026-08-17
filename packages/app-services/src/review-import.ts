@@ -162,7 +162,9 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
       reviewReportArtifactId: artifactId,
       findingIds: report.findings.map((finding) => finding.finding_id),
       state: next,
-      nextCommand: "atlas findings disposition <id>"
+      nextCommand: report.findings.some((finding) => finding.status === "open" || finding.status === "reopened")
+        ? "atlas findings disposition <id>"
+        : "atlas complete --check"
     };
   } catch (error) {
     if (error instanceof SyntaxError) {

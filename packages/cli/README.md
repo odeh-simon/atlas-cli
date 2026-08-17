@@ -17,6 +17,20 @@ For development without linking:
 pnpm atlas --help
 ```
 
+## OpenRouter
+
+OpenRouter is supported through the generic OpenAI-compatible provider. Store the API key under the configured alias and explicitly allow cloud code context before using AI context discovery or planning:
+
+```sh
+export OPENROUTER_API_KEY="your-token"
+atlas auth add --provider ai --alias openrouter.default --value-env OPENROUTER_API_KEY
+atlas ai providers health
+atlas context build --ai
+atlas plan --ai
+```
+
+The provider configuration is shown in `atlas.config.example.json`. `ai.allowCloudCodeContext` and `ai.allowCloudImages` are independent, deny-by-default permissions.
+
 ## Hetzner Inference
 
 Hetzner's inference service is experimental. Register its OpenAI-compatible preset and explicitly opt in before Atlas sends repository context to it:

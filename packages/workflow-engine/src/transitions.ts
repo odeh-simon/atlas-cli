@@ -85,6 +85,7 @@ const table: Partial<Record<WorkflowState, Partial<Record<TransitionCommand, Wor
   },
   review_imported: {
     import_contract: "contract_draft",
+    evaluate_completion: "completion_ready",
     dispose_findings: "findings_dispositioned",
     prepare_fix_batch: "fix_ready"
   },

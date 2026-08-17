@@ -60,6 +60,7 @@ stateDiagram-v2
     checks_completed --> review_ready: review prepare
     review_ready --> review_imported: review import
     review_imported --> findings_dispositioned: findings disposition
+    review_imported --> completion_ready: clean review completion evaluation
     findings_dispositioned --> fix_ready: actionable fixes
     findings_dispositioned --> completion_ready: no blocking work
     fix_ready --> implementation_ready: fix package
@@ -100,7 +101,7 @@ stateDiagram-v2
 | `import_review` | review_ready/review_imported | review_imported | `atlas review import` | Review package exists | Hash/context matches or stale draft | Review report | Findings records | Prior undispositioned findings superseded only by approval | Same content idempotent | draft/malformed review | Yes |
 | `dispose_findings` | review_imported/findings_dispositioned | findings_dispositioned | `atlas findings disposition` | Findings exist | Blocking dispositions valid | Disposition records | Finding status updates | Fix batches if changed | Idempotent per finding disposition version | blocked if incomplete | Yes by new disposition |
 | `create_fix_batch` | findings_dispositioned | fix_ready | `atlas fix prepare` | Approved actionable findings | Git/contract unchanged | Fix batch | Fix artifact | Older stale fix batch | Idempotent same findings/head | blocked if stale | Yes |
-| `evaluate_completion` | findings_dispositioned/checks_completed | completion_ready | `atlas complete --check` | Current contract/checks/findings | Non-overrideable gates pass | Gate evaluation | Completion draft | Older completion if facts changed | Idempotent | blocked with gate list | Yes |
+| `evaluate_completion` | review_imported/findings_dispositioned/checks_completed | completion_ready | `atlas complete --check` | Current contract/checks/findings | Non-overrideable gates pass | Gate evaluation | Completion draft | Older completion if facts changed | Idempotent | blocked with gate list | Yes |
 | `approve_completion` | completion_ready | completed | `atlas approve completion` | Gate eval current | User approval; allowed overrides recorded | Completion report/approval | Terminal completion event | None | Not duplicated | blocked if stale | No |
 | `pause` | any nonterminal | same + paused | `atlas pause` | Session exists | Owned run cancelled/interrupted first | Pause event | Overlay set | None | Idempotent | recovery_required if run unknown | Yes |
 | `resume_pause` | same + paused | same - paused | `atlas resume` | Session exists | Reconciliation complete | Resume event | Overlay cleared | Stale descendants as needed | Idempotent | recovery_required | Yes |

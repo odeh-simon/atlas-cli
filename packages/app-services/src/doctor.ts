@@ -11,7 +11,13 @@ import {
 } from "@atlas/persistence";
 import { hasCredential, type CredentialProvider } from "@atlas/security";
 
-import { closeAtlasRuntime, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import {
+  closeAtlasRuntime,
+  openAtlasRuntime,
+  repoIdForPath,
+  resolveAtlasPaths,
+  type RuntimeOptions
+} from "./runtime.js";
 
 export interface DoctorIssue {
   readonly severity: "error" | "warning";
@@ -22,21 +28,49 @@ export interface DoctorIssue {
 
 export interface DoctorResult {
   readonly status: "passed" | "failed";
+  readonly runtimeVersion: string;
+  readonly dataRoot: string;
   readonly sessionId: string | undefined;
   readonly artifactCount: number;
   readonly issues: readonly DoctorIssue[];
 }
 
-export async function runDoctor(options: RuntimeOptions = {}): Promise<DoctorResult> {
-  const runtime = await openAtlasRuntime(options);
+export interface DoctorOptions extends RuntimeOptions {
+  readonly runtimeVersion?: string | undefined;
+}
+
+export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorResult> {
+  const paths = resolveAtlasPaths(options);
+  const runtimeVersion = options.runtimeVersion ?? process.versions.node;
+  const issues: DoctorIssue[] = [
+    ...inspectRuntimeVersion(runtimeVersion),
+    ...inspectRecoveryFiles(paths.dbPath),
+    ...inspectConfiguredCredentialAliases(paths.cwd, options.env)
+  ];
+  if (issues.some((issue) => issue.code === "storage.interrupted_write")) {
+    return doctorResult({ runtimeVersion, dataRoot: paths.dataRoot, issues });
+  }
+
+  let runtime;
+  try {
+    runtime = await openAtlasRuntime(options);
+  } catch {
+    issues.push({
+      severity: "error",
+      code: "storage.open_failed",
+      summary: "Atlas could not open or migrate its local data store",
+      recovery: `Keep the current files intact, inspect backups under ${paths.backupDirectory}, and restore the newest known-good database before retrying.`
+    });
+    return doctorResult({ runtimeVersion, dataRoot: paths.dataRoot, issues });
+  }
+
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
     if (session === undefined) {
-      return { status: "passed", sessionId: undefined, artifactCount: 0, issues: [] };
+      return doctorResult({ runtimeVersion, dataRoot: paths.dataRoot, issues });
     }
 
-    const issues: DoctorIssue[] = [];
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     for (const artifact of artifacts) {
       issues.push(...inspectArtifact(runtime.paths.artifactRoot, artifact));
@@ -47,17 +81,67 @@ export async function runDoctor(options: RuntimeOptions = {}): Promise<DoctorRes
     ]) {
       if (lock !== undefined) issues.push(...inspectLock(lock, new Date()));
     }
-    issues.push(...inspectConfiguredCredentialAliases(runtime.paths.cwd, options.env));
-
-    return {
-      status: issues.some((issue) => issue.severity === "error") ? "failed" : "passed",
+    return doctorResult({
+      runtimeVersion,
+      dataRoot: paths.dataRoot,
       sessionId: session.sessionId,
       artifactCount: artifacts.length,
       issues
-    };
+    });
   } finally {
     closeAtlasRuntime(runtime, false);
   }
+}
+
+function doctorResult(input: {
+  readonly runtimeVersion: string;
+  readonly dataRoot: string;
+  readonly sessionId?: string | undefined;
+  readonly artifactCount?: number | undefined;
+  readonly issues: readonly DoctorIssue[];
+}): DoctorResult {
+  return {
+    status: input.issues.some((issue) => issue.severity === "error") ? "failed" : "passed",
+    runtimeVersion: input.runtimeVersion,
+    dataRoot: input.dataRoot,
+    sessionId: input.sessionId,
+    artifactCount: input.artifactCount ?? 0,
+    issues: input.issues
+  };
+}
+
+function inspectRuntimeVersion(version: string): DoctorIssue[] {
+  const major = Number.parseInt(version.split(".")[0] ?? "", 10);
+  if (Number.isInteger(major) && major >= 22) return [];
+  return [
+    {
+      severity: "error",
+      code: "runtime.unsupported_node",
+      summary: `Node.js ${version} is unsupported; Atlas requires Node.js 22 or newer`,
+      recovery: "Install or activate Node.js 22+, rebuild Atlas, and rerun atlas doctor."
+    }
+  ];
+}
+
+function inspectRecoveryFiles(dbPath: string): DoctorIssue[] {
+  const issues: DoctorIssue[] = [];
+  if (existsSync(`${dbPath}.tmp`)) {
+    issues.push({
+      severity: "error",
+      code: "storage.interrupted_write",
+      summary: "An interrupted database write file is present",
+      recovery: "Confirm no Atlas process is running, preserve the .tmp file, and rerun doctor before deciding whether recovery is required."
+    });
+  }
+  if (existsSync(`${dbPath}.failed`)) {
+    issues.push({
+      severity: "warning",
+      code: "storage.failed_migration_preserved",
+      summary: "A failed pre-restore database image is preserved",
+      recovery: "Keep the .failed file for diagnosis and verify the restored database and latest backup before removing it."
+    });
+  }
+  return issues;
 }
 
 function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv | undefined): DoctorIssue[] {
@@ -77,6 +161,15 @@ function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv 
     ];
   }
   const issues: DoctorIssue[] = [];
+  const aiProviders = Array.isArray(config.ai?.providers) ? config.ai.providers : [];
+  if (config.ai?.providers !== undefined && !Array.isArray(config.ai.providers)) {
+    issues.push({
+      severity: "error",
+      code: "config.ai_providers_invalid",
+      summary: "ai.providers must be an array",
+      recovery: "Replace ai.providers with an array of provider configuration objects."
+    });
+  }
   for (const provider of ["figma", "github", "linear"] as const) {
     const tokenAlias = config.adapters?.[provider]?.tokenAlias;
     if (typeof tokenAlias !== "string" || tokenAlias.length === 0) continue;
@@ -89,7 +182,7 @@ function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv 
       });
     }
   }
-  for (const aiProvider of config.ai?.providers ?? []) {
+  for (const aiProvider of aiProviders) {
     const tokenAlias = aiProvider.tokenAlias;
     if (typeof tokenAlias !== "string" || tokenAlias.length === 0) continue;
     if (!hasCredential({ env, alias: tokenAlias, provider: "ai" })) {
@@ -101,12 +194,69 @@ function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv 
       });
     }
   }
+  const providerAliases = aiProviders.flatMap((provider) =>
+    typeof provider.alias === "string" && provider.alias.length > 0 ? [provider.alias] : []
+  );
+  const duplicateAliases = providerAliases.filter((alias, index) => providerAliases.indexOf(alias) !== index);
+  for (const alias of [...new Set(duplicateAliases)]) {
+    issues.push({
+      severity: "error",
+      code: "config.duplicate_ai_provider",
+      summary: `AI provider alias is configured more than once: ${alias}`,
+      recovery: "Keep exactly one provider entry for each AI alias."
+    });
+  }
+  if (
+    typeof config.ai?.defaultProviderAlias === "string" &&
+    !providerAliases.includes(config.ai.defaultProviderAlias)
+  ) {
+    issues.push({
+      severity: "error",
+      code: "config.ai_default_missing",
+      summary: `Default AI provider is not configured: ${config.ai.defaultProviderAlias}`,
+      recovery: "Add the matching provider entry or change ai.defaultProviderAlias to an existing alias."
+    });
+  }
+  if (
+    aiProviders.some((provider) => provider.provider === "openai-compatible") &&
+    config.ai?.allowCloudCodeContext !== true
+  ) {
+    issues.push({
+      severity: "warning",
+      code: "cloud.code_context_disabled",
+      summary: "Cloud AI is configured, but repository context transmission is disabled",
+      recovery: "Leave this disabled for local-only operation, or explicitly set ai.allowCloudCodeContext to true after reviewing the provider policy."
+    });
+  }
+  if (
+    aiProviders.some(
+      (provider) => Array.isArray(provider.capabilities) && provider.capabilities.includes("vision")
+    ) &&
+    config.ai?.allowCloudImages !== true
+  ) {
+    issues.push({
+      severity: "warning",
+      code: "cloud.images_disabled",
+      summary: "A vision-capable cloud AI provider is configured, but image transmission is disabled",
+      recovery: "Leave this disabled when visual evidence must remain local, or explicitly set ai.allowCloudImages to true after reviewing the provider policy."
+    });
+  }
   return issues;
 }
 
 interface DoctorConfig {
   readonly adapters?: Partial<Record<CredentialProvider, { readonly tokenAlias?: unknown }>>;
-  readonly ai?: { readonly providers?: readonly { readonly tokenAlias?: unknown }[] };
+  readonly ai?: {
+    readonly defaultProviderAlias?: unknown;
+    readonly allowCloudCodeContext?: unknown;
+    readonly allowCloudImages?: unknown;
+    readonly providers?: readonly {
+      readonly alias?: unknown;
+      readonly provider?: unknown;
+      readonly tokenAlias?: unknown;
+      readonly capabilities?: unknown;
+    }[];
+  };
 }
 
 function inspectArtifact(artifactRoot: string, artifact: ArtifactRecord): DoctorIssue[] {

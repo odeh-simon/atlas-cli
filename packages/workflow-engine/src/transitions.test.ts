@@ -33,4 +33,8 @@ describe("workflow transitions", () => {
   it("reports allowed commands", () => {
     expect(allowedCommands("contract_draft")).toEqual(["import_contract", "approve_contract"]);
   });
+
+  it("allows a clean imported review to proceed directly to completion evaluation", () => {
+    expect(transition({ state: "review_imported", command: "evaluate_completion" }).to).toBe("completion_ready");
+  });
 });

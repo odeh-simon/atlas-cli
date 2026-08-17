@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -27,7 +27,7 @@ describe("runDoctor", () => {
     const root = tempRoot();
     const { cwd, env } = await prepareApprovedContract(root);
 
-    const result = await runDoctor({ cwd, env });
+    const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
 
     expect(result.status).toBe("passed");
     expect(result.issues).toHaveLength(0);
@@ -47,7 +47,7 @@ describe("runDoctor", () => {
     writeFileSync(path, `${original}\ncorrupt\n`);
     closeAtlasRuntime(runtime, false);
 
-    const result = await runDoctor({ cwd, env });
+    const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
 
     expect(result.status).toBe("failed");
     expect(result.issues.map((issue) => issue.code)).toContain("artifact.hash_mismatch");
@@ -58,7 +58,7 @@ describe("runDoctor", () => {
     const { cwd, env } = await prepareApprovedContract(root);
     writeFileSync(join(cwd, "atlas.config.json"), "{ nope");
 
-    const result = await runDoctor({ cwd, env });
+    const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
 
     expect(result.status).toBe("failed");
     expect(result.issues.map((issue) => issue.code)).toContain("config.invalid_json");
@@ -86,9 +86,100 @@ describe("runDoctor", () => {
       })
     );
 
-    const result = await runDoctor({ cwd, env });
+    const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
 
     expect(result.status).toBe("passed");
     expect(result.issues.map((issue) => issue.summary)).toContain("Configured AI credential alias is missing: ai.missing");
+  });
+
+  it("validates configuration before a session exists", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(join(cwd, "atlas.config.json"), "{ nope");
+
+    const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
+
+    expect(result.status).toBe("failed");
+    expect(result.sessionId).toBeUndefined();
+    expect(result.issues.map((issue) => issue.code)).toContain("config.invalid_json");
+  });
+
+  it("fails clearly on an unsupported Node.js runtime", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(cwd, { recursive: true });
+
+    const result = await runDoctor({ cwd, env, runtimeVersion: "20.19.0" });
+
+    expect(result.status).toBe("failed");
+    expect(result.issues.map((issue) => issue.code)).toContain("runtime.unsupported_node");
+  });
+
+  it("reports interrupted database sidecars without deleting them", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareApprovedContract(root);
+    const interruptedPath = join(env.ATLAS_HOME, "atlas.db.tmp");
+    writeFileSync(interruptedPath, "preserve me");
+
+    const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
+
+    expect(result.status).toBe("failed");
+    expect(result.issues.map((issue) => issue.code)).toContain("storage.interrupted_write");
+    expect(readFileSync(interruptedPath, "utf8")).toBe("preserve me");
+  });
+
+  it("reports invalid AI defaults and disabled cloud context separately", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(
+      join(cwd, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: {
+          defaultProviderAlias: "missing.default",
+          providers: [
+            {
+              alias: "cloud.default",
+              provider: "openai-compatible",
+              baseUrl: "https://api.example.test/v1",
+              model: "free-model"
+            }
+          ]
+        }
+      })
+    );
+
+    const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
+
+    expect(result.status).toBe("failed");
+    expect(result.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining(["config.ai_default_missing", "cloud.code_context_disabled"])
+    );
+  });
+
+  it("reports malformed AI provider collections without crashing", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(
+      join(cwd, "atlas.config.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        project: { name: "fixture", baseBranch: "main" },
+        ai: { providers: { alias: "not-an-array" } }
+      })
+    );
+
+    const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
+
+    expect(result.status).toBe("failed");
+    expect(result.issues.map((issue) => issue.code)).toContain("config.ai_providers_invalid");
   });
 });

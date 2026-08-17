@@ -84,7 +84,7 @@ import {
   type CredentialProvider
 } from "@atlas/security";
 
-const version = "0.0.0";
+const version = readCliVersion();
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   try {
@@ -300,6 +300,12 @@ function normalizeArgv(argv: string[]): string[] {
   return argv[0] === "--" ? argv.slice(1) : argv;
 }
 
+function readCliVersion(): string {
+  const packagePath = fileURLToPath(new URL("../package.json", import.meta.url));
+  const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as { version?: unknown };
+  return typeof packageJson.version === "string" ? packageJson.version : "0.0.0";
+}
+
 function reportCliError(error: unknown): number {
   if (error instanceof AtlasError) {
     console.error(error.message);
@@ -474,6 +480,8 @@ async function statusCommand(): Promise<number> {
 async function doctorCommand(): Promise<number> {
   const result = await runDoctor();
   console.log(`Doctor: ${result.status}`);
+  console.log(`Runtime: Node.js ${result.runtimeVersion}`);
+  console.log(`Data root: ${result.dataRoot}`);
   console.log(`Session: ${result.sessionId ?? "(none)"}`);
   console.log(`Artifacts: ${result.artifactCount}`);
   console.log(`Issues: ${result.issues.length}`);
