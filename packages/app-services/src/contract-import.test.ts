@@ -28,6 +28,7 @@ async function preparePlanning(root: string) {
   const cwd = join(root, "repo");
   const env = { ATLAS_HOME: join(root, "home") };
   mkdirSync(cwd, { recursive: true });
+  writeFileSync(join(cwd, "README.md"), "# Fixture\n");
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
   const manifestPath = join(root, "context.json");
   writeFileSync(

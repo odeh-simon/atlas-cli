@@ -51,6 +51,7 @@ const table: Partial<Record<WorkflowState, Partial<Record<TransitionCommand, Wor
     import_context: "context_ready"
   },
   context_ready: {
+    import_context: "context_ready",
     export_plan: "planning_ready"
   },
   planning_ready: {

@@ -10,6 +10,7 @@ export type CheckStatus = "passed" | "failed" | "skipped" | "blocked" | "cancell
 export interface CheckDefinition {
   readonly name: string;
   readonly required: boolean;
+  readonly alwaysRun?: boolean | undefined;
   readonly kind?: "command" | "design-scan" | "visual" | undefined;
   readonly command?: string | undefined;
   readonly args?: readonly string[] | undefined;
@@ -109,7 +110,7 @@ export async function runCheckSet(input: RunCheckSetInput): Promise<CheckSetResu
   for (const definition of definitions) {
     const dependencies = definition.dependsOn ?? [];
     const affected = definition.affected ?? [];
-    const skippedReason = affectedSkipReason(affected, input.changedFiles);
+    const skippedReason = definition.alwaysRun === true ? undefined : affectedSkipReason(affected, input.changedFiles);
     if (skippedReason !== undefined) {
       const result: CheckResult = {
         name: definition.name,
@@ -161,6 +162,10 @@ export async function runCheckSet(input: RunCheckSetInput): Promise<CheckSetResu
   const failedRequired = results
     .filter((result) => result.required && result.status !== "passed" && result.status !== "skipped")
     .map((result) => result.name);
+  const executedRequired = results.filter((result) => result.required && result.status !== "skipped");
+  if (results.some((result) => result.required) && executedRequired.length === 0) {
+    failedRequired.push("atlas/required-validation-executed");
+  }
   return {
     runId,
     status: failedRequired.length === 0 ? "passed" : "failed",

@@ -7,6 +7,7 @@ export * from "./contract-import.js";
 export * from "./checks.js";
 export * from "./completion.js";
 export * from "./context-build.js";
+export * from "./context-pack.js";
 export * from "./context-scout.js";
 export * from "./context-import.js";
 export * from "./context-inspect.js";

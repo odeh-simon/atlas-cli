@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { exportPlanningPackage, getStatus, importContextManifest, openAtlasRuntime, startManualTask } from "./index.js";
 import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { listArtifactsForSession, updateArtifactStatus } from "@atlas/persistence";
 
 const tempRoots: string[] = [];
 
@@ -27,6 +27,7 @@ describe("exportPlanningPackage", () => {
     const cwd = join(root, "repo");
     const env = { ATLAS_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
+    writeFileSync(join(cwd, "README.md"), "# Fixture\n");
     await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
     const manifestPath = join(root, "context.json");
     writeFileSync(
@@ -58,6 +59,7 @@ describe("exportPlanningPackage", () => {
     const cwd = join(root, "repo");
     const env = { ATLAS_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
+    writeFileSync(join(cwd, "README.md"), "# Fixture\n");
     await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
     const manifestPath = join(root, "context.json");
     writeFileSync(
@@ -110,5 +112,26 @@ describe("exportPlanningPackage", () => {
     expect(draftContent.context_manifest_artifact_id).toMatch(/^art_/);
     expect(draftContent.task_artifact_id).toMatch(/^art_/);
     expect(prompts[0]).toContain("Do not claim approval");
+  });
+
+  it("fails a legacy/incomplete session safely when its content pack is unavailable", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(join(cwd, "README.md"), "# Fixture\n");
+    await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-legacy" });
+    const manifestPath = join(root, "context.json");
+    writeFileSync(manifestPath, JSON.stringify({ sources: [{ uri: "README.md", kind: "file", reason: "Context", byte_length: 1, included: true }] }));
+    await importContextManifest({ cwd, env, filePath: manifestPath });
+    const runtime = await openAtlasRuntime({ cwd, env });
+    const pack = listArtifactsForSession(runtime.db, runtime.db.exec("SELECT session_id FROM sessions")[0]?.values[0]?.[0] as string)
+      .find((artifact) => artifact.type === "context_content_pack");
+    if (pack === undefined) throw new Error("Missing fixture content pack");
+    updateArtifactStatus(runtime.db, { artifactId: pack.artifactId, status: "stale" });
+    closeAtlasRuntime(runtime);
+
+    await expect(exportPlanningPackage({ cwd, env })).rejects.toThrow("legacy sessions must rerun atlas context build");
+    await expect(getStatus({ cwd, env })).resolves.toMatchObject({ nextCommands: ["atlas context build"] });
   });
 });

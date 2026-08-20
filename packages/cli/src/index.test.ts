@@ -258,6 +258,7 @@ describe("cli", () => {
     const root = tempRoot();
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
+    writeFileSync(join(repo, "README.md"), "# Planning fixture\n");
     const previousCwd = process.cwd();
     const previousAtlasHome = process.env.ATLAS_HOME;
     const logs = captureLogs();
@@ -855,6 +856,7 @@ describe("cli", () => {
     const root = tempRoot();
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
+    writeFileSync(join(repo, "README.md"), "# Planning fixture\n");
     writeFileSync(
       join(repo, "atlas.config.json"),
       JSON.stringify({

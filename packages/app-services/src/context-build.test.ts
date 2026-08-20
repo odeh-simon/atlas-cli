@@ -41,6 +41,9 @@ describe("buildContextManifest", () => {
     const qualityArtifacts = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "context_quality_report"
     );
+    const packs = listArtifactsForSession(runtime.db, result.sessionId).filter(
+      (artifact) => artifact.type === "context_content_pack"
+    );
     closeAtlasRuntime(runtime, false);
 
     expect(result.state).toBe("context_ready");
@@ -51,6 +54,46 @@ describe("buildContextManifest", () => {
     expect(contextArtifacts[0]?.status).toBe("valid");
     expect(qualityArtifacts).toHaveLength(1);
     expect(qualityArtifacts[0]?.artifactId).toBe(result.contextQualityReportArtifactId);
+    expect(packs[0]?.artifactId).toBe(result.contextContentPackArtifactId);
+    expect(packs[0]?.status).toBe("valid");
+  });
+
+  it("propagates scout gaps and blocks context readiness", async () => {
+    const root = tempRoot();
+    const cwd = join(root, "repo");
+    const env = { ATLAS_HOME: join(root, "home") };
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(join(cwd, "README.md"), "# Fixture\n");
+    await startManualTask({ cwd, env, title: "Auth", objective: "Change auth", taskKey: "manual-auth" });
+    const scout = await runAiContextScout({
+      cwd,
+      env,
+      provider: { alias: "ollama.local", provider: "ollama", baseUrl: "http://localhost:11434", model: "test" },
+      completionImpl: async () => ({
+        providerAlias: "ollama.local",
+        model: "test",
+        content: JSON.stringify({ recommendations: [], missing_context: ["authorization policy"], questions: ["Which tenant owns it?"] })
+      })
+    });
+
+    await expect(
+      buildContextManifest({ cwd, env, aiRecommendationArtifactId: scout.recommendationArtifactId })
+    ).rejects.toThrow("Context readiness gate failed");
+    const status = await getStatus({ cwd, env });
+    expect(status.session?.primaryState).toBe("intake_ready");
+    const runtime = await openAtlasRuntime({ cwd, env });
+    try {
+      const artifacts = listArtifactsForSession(runtime.db, status.session?.sessionId ?? "");
+      const manifestRecord = artifacts.find((artifact) => artifact.type === "context_manifest");
+      const manifest = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, manifestRecord?.storageUri ?? ""), "utf8")) as {
+        gaps: Array<{ severity: string; description: string }>;
+      };
+      expect(manifest.gaps).toHaveLength(2);
+      expect(manifest.gaps.every((gap) => gap.severity === "blocking")).toBe(true);
+      expect(artifacts.find((artifact) => artifact.type === "context_content_pack")?.status).toBe("rejected");
+    } finally {
+      closeAtlasRuntime(runtime, false);
+    }
   });
 
   it("builds a hybrid manifest from AI recommendations", async () => {

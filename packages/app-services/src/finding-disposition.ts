@@ -39,6 +39,9 @@ export async function disposeFinding(input: DisposeFindingInput): Promise<Dispos
     if (finding === undefined || finding.sessionId !== session.sessionId) {
       throw new ValidationError("Finding does not exist in the active session", { findingId: input.findingId });
     }
+    if (input.disposition === "resolve" && (input.evidence === undefined || input.evidence.length === 0)) {
+      throw new ValidationError("Resolving a finding requires explicit resolution evidence");
+    }
 
     const now = new Date().toISOString();
     const nextStatus = statusForDisposition(input.disposition);

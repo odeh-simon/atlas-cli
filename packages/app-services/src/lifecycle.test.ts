@@ -92,6 +92,8 @@ describe("lifecycle overlays", () => {
 async function prepareStartedSession(root: string) {
   const cwd = join(root, "repo");
   const env = { ATLAS_HOME: join(root, "home") };
+  mkdirSync(cwd, { recursive: true });
+  writeFileSync(join(cwd, "README.md"), "fixture\n");
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
   return { cwd, env };
 }

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError } from "@atlas/domain";
+import { GateFailedError, StateTransitionError } from "@atlas/domain";
 import { discoverContextSources } from "@atlas/context-discovery";
 import {
   addArtifactDependency,
@@ -17,6 +17,7 @@ import { aiContextRecommendationSchema, contextManifestSchema, contextQualityRep
 import { transition } from "@atlas/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
+import { createContextContentPack } from "./context-pack.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface BuildContextInput extends RuntimeOptions {
@@ -29,6 +30,7 @@ export interface BuildContextResult {
   readonly sessionId: string;
   readonly contextArtifactId: string;
   readonly contextQualityReportArtifactId: string;
+  readonly contextContentPackArtifactId: string;
   readonly contextReadiness: "ready" | "weak" | "blocked";
   readonly state: string;
   readonly sourceCount: number;
@@ -65,6 +67,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       recommendations: aiRecommendation?.recommendations,
       taskText: taskBriefText
     });
+    const gaps = gapsFromAiRecommendation(aiRecommendation);
     const manifest = contextManifestSchema.parse({
       artifact_id: artifactId,
       session_id: session.sessionId,
@@ -74,7 +77,10 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       created_at: now,
       producer: { type: "atlas" },
       sensitivity: "confidential",
-      parents: [],
+      parents: [
+        ...(taskBrief === undefined ? [] : [taskBrief.artifactId]),
+        ...(aiRecommendation === undefined ? [] : [aiRecommendation.artifact_id])
+      ],
       content_sha256: "0".repeat(64),
       metadata: {
         discovery: aiRecommendation === undefined ? "deterministic" : "hybrid",
@@ -102,7 +108,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       included_sources: discovery.includedSources,
       excluded_candidates: discovery.excludedCandidates,
       budgets: discovery.budgets,
-      gaps: [],
+      gaps,
       freshness: discovery.freshness
     });
     const next = transition({
@@ -121,7 +127,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       content: `${JSON.stringify(manifest, null, 2)}\n`
     });
 
-    createArtifactRecord(runtime.db, {
+    const contextRecord = createArtifactRecord(runtime.db, {
       artifactId,
       sessionId: session.sessionId,
       type: "context_manifest",
@@ -207,6 +213,36 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       });
     }
 
+    if (taskBrief === undefined || taskBrief.status !== "valid") {
+      throw new GateFailedError("Context content pack requires a valid task brief; restart or repair the session");
+    }
+    const contextPackRecord = createContextContentPack({
+      runtime,
+      sessionId: session.sessionId,
+      taskBrief,
+      contextManifest: contextRecord,
+      manifest,
+      git,
+      now,
+      contentVersion: artifacts.filter((artifact) => artifact.type === "context_content_pack").length + 1
+    });
+
+    if (qualityReport.readiness === "blocked") {
+      appendEvent(runtime.db, {
+        eventId: newId("evt"),
+        sessionId: session.sessionId,
+        eventType: "context.blocked",
+        actorType: "atlas",
+        occurredAt: now,
+        summary: "Context evidence is incomplete; session remains at intake",
+        metadata: { contextArtifactId: artifactId, contextContentPackArtifactId: contextPackRecord.artifactId, gaps }
+      });
+      throw new GateFailedError("Context readiness gate failed; resolve missing context/questions and rebuild", {
+        gaps: gaps.map((gap) => gap.description),
+        repair: "Rerun atlas context scout/build after resolving the listed gaps"
+      });
+    }
+
     updateSessionContextArtifact(runtime.db, { sessionId: session.sessionId, artifactId, primaryState: next, now });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
@@ -218,6 +254,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       metadata: {
         contextArtifactId: artifactId,
         contextQualityReportArtifactId: qualityArtifactId,
+        contextContentPackArtifactId: contextPackRecord.artifactId,
         contextReadiness: qualityReport.readiness,
         gitFingerprint: git?.base_fingerprint,
         scannedFileCount: discovery.scannedFileCount,
@@ -231,6 +268,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       sessionId: session.sessionId,
       contextArtifactId: artifactId,
       contextQualityReportArtifactId: qualityArtifactId,
+      contextContentPackArtifactId: contextPackRecord.artifactId,
       contextReadiness: qualityReport.readiness,
       state: next,
       sourceCount: discovery.sources.length,
@@ -267,6 +305,9 @@ function evaluateContextQuality(input: {
   if (input.aiRecommendation !== undefined && input.aiRecommendation.recommendations.length === 0) {
     issues.push({ code: "ai-no-recommendations", severity: "warning", summary: "AI scout returned no file recommendations." });
   }
+  for (const gap of gapsFromAiRecommendation(input.aiRecommendation)) {
+    issues.push({ code: gap.id, severity: gap.severity, summary: gap.description });
+  }
   const averageConfidence =
     input.aiRecommendation === undefined || input.aiRecommendation.recommendations.length === 0
       ? undefined
@@ -286,6 +327,24 @@ function evaluateContextQuality(input: {
       ? ["Proceed to atlas plan."]
       : issues.map((issue) => `Review ${issue.code}: ${issue.summary}`);
   return { readiness, issues, recommended_next_actions };
+}
+
+function gapsFromAiRecommendation(
+  recommendation: ReturnType<typeof aiContextRecommendationSchema.parse> | undefined
+): Array<{ id: string; severity: "blocking"; description: string }> {
+  if (recommendation === undefined) return [];
+  return [
+    ...recommendation.missing_context.map((description, index) => ({
+      id: `scout-missing-${String(index + 1).padStart(3, "0")}`,
+      severity: "blocking" as const,
+      description: `Missing required context: ${description}`
+    })),
+    ...recommendation.questions.map((description, index) => ({
+      id: `scout-question-${String(index + 1).padStart(3, "0")}`,
+      severity: "blocking" as const,
+      description: `Unresolved context question: ${description}`
+    }))
+  ];
 }
 
 function loadAiRecommendation(

@@ -13,7 +13,6 @@ import { orchestrationRunSchema } from "@atlas/schemas";
 
 import { buildContextManifest } from "./context-build.js";
 import { evaluateCompletion } from "./completion.js";
-import { disposeFinding } from "./finding-disposition.js";
 import { exportManualAgentPackage } from "./agent-package.js";
 import { exportPlanningPackage } from "./planning.js";
 import { importReviewReport, type ImportedReviewReportPayload } from "./review-import.js";
@@ -22,6 +21,7 @@ import { prepareFixBatch } from "./fix-batch.js";
 import { prepareReviewPackage } from "./review-prepare.js";
 import { runBasicCheck } from "./checks.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { readVerifiedArtifactText } from "./evidence.js";
 
 export type OrchestrateUntil = "context-ready" | "planning-ready" | "checks-completed" | "completion-ready";
 
@@ -31,11 +31,13 @@ export interface OrchestrateRunInput extends RuntimeOptions {
   readonly agentCommand?: string | undefined;
   readonly agentInvoker?: AgentInvoker | undefined;
   readonly reviewer?: ReviewRunner | undefined;
+  readonly reviewerActorId?: string | undefined;
   readonly maxIterations?: number | undefined;
 }
 
 export interface ReviewRunnerInput {
   readonly reviewPackageArtifactId: string;
+  readonly reviewPackageContent: string;
   readonly iteration: number;
 }
 
@@ -162,27 +164,27 @@ export async function orchestrateRun(input: OrchestrateRunInput): Promise<Orches
     if (state === "review_ready") {
       if (input.reviewer === undefined) {
         blockedReason = "Review-ready orchestration requires a reviewer or manual review import";
-        steps.push(step("atlas review import <file>", state, state, "blocked", blockedReason, []));
+        steps.push(step("atlas review import <file> --actor <trusted-reviewer-id>", state, state, "blocked", blockedReason, []));
         break;
       }
-      const blockersBefore = openBlockingFindingIds(snapshot.findings);
+      if (input.reviewerActorId === undefined || input.reviewerActorId.trim().length === 0) {
+        throw new GateFailedError("Orchestration reviewer requires a configured trusted reviewer actor identity");
+      }
+      const reviewPackageArtifactId = latestArtifactId(snapshot.artifacts, "review_package");
+      const reviewPackageContent = snapshot.artifactContents.get(reviewPackageArtifactId);
+      if (reviewPackageContent === undefined) throw new GateFailedError("Review package content is unavailable");
       const review = await input.reviewer({
-        reviewPackageArtifactId: latestArtifactId(snapshot.artifacts, "review_package"),
+        reviewPackageArtifactId,
+        reviewPackageContent,
         iteration: reviewIteration(snapshot.artifacts)
       });
-      const result = await importReviewReport({ ...input, report: review });
+      const result = await importReviewReport({
+        ...input,
+        report: review,
+        reviewerActorId: input.reviewerActorId,
+        reviewerRunId: `reviewrun_${runId}_${iteration + 1}`
+      });
       steps.push(step("atlas review import", state, result.state, "succeeded", "Review report imported", [result.reviewReportArtifactId]));
-      if ((review.findings ?? []).filter((finding) => finding.severity === "blocking").length === 0) {
-        for (const findingId of blockersBefore) {
-          const disposition = await disposeFinding({
-            ...input,
-            findingId,
-            disposition: "resolve",
-            reason: "Reviewer reported no blocking findings after fix iteration"
-          });
-          steps.push(step("atlas findings disposition", result.state, disposition.state, "succeeded", `Resolved ${findingId}`, []));
-        }
-      }
       continue;
     }
 
@@ -313,7 +315,15 @@ async function readWorkflowSnapshot(options: RuntimeOptions) {
     return {
       session,
       artifacts: session === undefined ? [] : listArtifactsForSession(runtime.db, session.sessionId),
-      findings: session === undefined ? [] : listFindingsForSession(runtime.db, session.sessionId)
+      findings: session === undefined ? [] : listFindingsForSession(runtime.db, session.sessionId),
+      artifactContents:
+        session === undefined
+          ? new Map<string, string>()
+          : new Map(
+              listArtifactsForSession(runtime.db, session.sessionId)
+                .filter((artifact) => artifact.type === "review_package" && artifact.status === "valid")
+                .map((artifact) => [artifact.artifactId, readVerifiedArtifactText(runtime.paths.artifactRoot, artifact)])
+            )
     };
   } finally {
     closeAtlasRuntime(runtime, false);

@@ -16,13 +16,14 @@ import {
   getStatus,
   importContract,
   importExecutionResult,
+  importReviewReport,
   openAtlasRuntime,
   runBasicCheck,
   startManualTask
 } from "./index.js";
 import { closeAtlasRuntime } from "./runtime.js";
 import { listApprovalsForSession, listArtifactsForSession } from "@atlas/persistence";
-import { prepareExecution, prepareReviewImported } from "./test-support.js";
+import { prepareCheckedImplementation, prepareExecution, prepareReviewImported, prepareReviewReady } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
@@ -47,7 +48,8 @@ describe("completion approval", () => {
       env,
       findingId: "REV-001",
       disposition: "resolve",
-      reason: "Regression evidence added"
+      reason: "Regression evidence added",
+      evidence: ["human:test-evidence"]
     });
 
     const evaluated = await evaluateCompletion({ cwd, env });
@@ -75,6 +77,41 @@ describe("completion approval", () => {
     const { cwd, env } = await prepareReviewImported(root);
 
     await expect(evaluateCompletion({ cwd, env })).rejects.toThrow("Completion gates failed");
+  });
+
+  it("blocks direct completion when no independent review exists", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareCheckedImplementation(root);
+
+    await expect(evaluateCompletion({ cwd, env })).rejects.toThrow("Completion gates failed");
+  });
+
+  it("rejects a review bound to a stale implementation diff and Git fingerprint", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareReviewReady(root);
+    await importReviewReport({
+      cwd,
+      env,
+      reviewerActorId: "human:completion-reviewer",
+      report: { summary: "Independent review passed.", findings: [] }
+    });
+
+    writeFileSync(join(cwd, "README.md"), "Changed after independent review\n");
+
+    let failure: unknown;
+    try {
+      await evaluateCompletion({ cwd, env });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toMatchObject({
+      details: {
+        failures: expect.arrayContaining([
+          "independent review is legacy, stale, self-reviewed, or not bound to the current contract/diff/checks",
+          "implementation diff is stale or not safely reviewable"
+        ])
+      }
+    });
   });
 
   it("blocks completion when the passing check result is stale against Git", async () => {

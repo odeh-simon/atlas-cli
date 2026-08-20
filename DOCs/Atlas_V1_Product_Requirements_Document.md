@@ -28,6 +28,8 @@ The V1 product replaces a fragile copy-and-paste workflow with a durable, task-c
 
 V1 is deliberately human-in-the-loop. ChatGPT planning and review are human-mediated unless the user separately configures an officially supported API. Atlas may open an application or URL and copy prepared Markdown, but it does not control a consumer ChatGPT browser session. Product decisions, material architecture choices, contract approval, accepted deviations, destructive Git actions, and final completion remain under explicit developer control.
 
+Production-hardening amendment: artifact identifiers alone are never sufficient handoff evidence. Atlas creates a bounded, hash-verified context content pack for planning and implementation, captures an immutable reviewable Git diff for each execution, supplies substantive contract/diff/check evidence to an independently identified reviewer, and requires that fresh review plus the current contract, diff, checks, and Git state before completion. A later generic clean review never resolves an earlier finding; resolution requires explicit human evidence or finding-specific evidence from a fresh independent review. See `DOCs/M0_Engineering_Design/15_evidence_and_independent_review_gates.md`.
+
 The V1 outcome is successful when an engineer can stop and resume a complex task without reconstructing context, can see exactly which contract and code state are under review, and spends materially less time moving information between tools without weakening quality or control.
 
 ## 3. Product vision

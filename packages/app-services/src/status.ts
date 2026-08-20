@@ -35,11 +35,12 @@ export async function getStatus(options: RuntimeOptions = {}): Promise<SessionSt
       };
     }
 
+    const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     return {
       session,
-      artifactCount: listArtifactsForSession(runtime.db, session.sessionId).length,
+      artifactCount: artifacts.length,
       eventCount: listEvents(runtime.db, session.sessionId).length,
-      nextCommands: nextCommandsForSession(session, listFindingsForSession(runtime.db, session.sessionId))
+      nextCommands: nextCommandsForSession(session, listFindingsForSession(runtime.db, session.sessionId), artifacts)
     };
   } finally {
     closeAtlasRuntime(runtime, false);
@@ -48,7 +49,11 @@ export async function getStatus(options: RuntimeOptions = {}): Promise<SessionSt
 
 export const resumeSession = getStatus;
 
-function nextCommandsForSession(session: SessionRecord, findings: readonly FindingRecord[]): readonly string[] {
+function nextCommandsForSession(
+  session: SessionRecord,
+  findings: readonly FindingRecord[],
+  artifacts: readonly { readonly type: string; readonly status: string }[]
+): readonly string[] {
   if (session.disposition !== "active") {
     return [];
   }
@@ -61,8 +66,16 @@ function nextCommandsForSession(session: SessionRecord, findings: readonly Findi
     return ["atlas resume"];
   }
 
+  if (
+    session.primaryState === "context_ready" &&
+    !artifacts.some((artifact) => artifact.type === "context_content_pack" && artifact.status === "valid")
+  ) {
+    return ["atlas context build"];
+  }
+
   const hasOpenFindings = findings.some((finding) => finding.status === "open" || finding.status === "reopened");
   return [...allowedCommands(session.primaryState)]
+    .filter((command) => !(session.primaryState === "context_ready" && command === "import_context"))
     .sort(
       (left, right) =>
         commandPriority(session.primaryState, left, hasOpenFindings) -
@@ -123,7 +136,7 @@ function commandToCli(command: string): string {
     case "prepare_review":
       return "atlas review prepare";
     case "import_review":
-      return "atlas review import <file>";
+      return "atlas review import <file> --actor <trusted-reviewer-id>";
     case "dispose_findings":
       return "atlas findings disposition <id>";
     case "prepare_fix_batch":

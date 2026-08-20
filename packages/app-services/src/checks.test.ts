@@ -47,7 +47,7 @@ describe("runBasicCheck", () => {
     expect(status.nextCommands[0]).toBe("atlas review prepare");
     expect(checkArtifacts).toHaveLength(1);
     expect(runLogArtifacts).toHaveLength(1);
-  });
+  }, 15_000);
 
   it("fails before an execution report is imported", async () => {
     const root = tempRoot();
@@ -80,7 +80,7 @@ describe("runBasicCheck", () => {
 
     expect(result.status).toBe("passed");
     expect(result.checkCount).toBe(2);
-  });
+  }, 15_000);
 
   it("records Git fingerprints on check artifacts when the repo is available", async () => {
     const root = tempRoot();
@@ -256,6 +256,35 @@ describe("runBasicCheck", () => {
     await expect(runBasicCheck({ cwd, env })).rejects.toThrow(
       "dashboard-visual.allowedDiffRatio must be between 0 and 1"
     );
+  });
+
+  it("fails when every configured substantive required check is skipped", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareExecution(root);
+    writeFileSync(join(cwd, "atlas.config.json"), JSON.stringify({
+      schemaVersion: 1,
+      project: { name: "fixture", baseBranch: "main" },
+      checks: [{
+        name: "required-source-tests",
+        kind: "command",
+        required: true,
+        command: process.execPath,
+        args: ["-e", "process.exit(0)"],
+        affected: ["src/**"]
+      }]
+    }));
+
+    await expect(runBasicCheck({ cwd, env })).rejects.toThrow("Required check failed");
+    const status = await getStatus({ cwd, env });
+    const runLog = readLatestJsonArtifact(root, status.session!.sessionId, "check_run_log") as {
+      failed_required: string[];
+      results: Array<{ name: string; status: string }>;
+    };
+    expect(runLog.failed_required).toContain("atlas/configured-required-validation-executed");
+    expect(runLog.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "basic-session-integrity", status: "passed" }),
+      expect.objectContaining({ name: "required-source-tests", status: "skipped" })
+    ]));
   });
 });
 

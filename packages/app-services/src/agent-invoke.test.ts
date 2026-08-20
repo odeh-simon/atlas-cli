@@ -1,11 +1,14 @@
-import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { exportManualAgentPackage, getStatus, invokeImplementationAgent } from "./index.js";
+import { exportManualAgentPackage, getStatus, invokeImplementationAgent, openAtlasRuntime } from "./index.js";
 import { prepareApprovedContract } from "./test-support.js";
+import { closeAtlasRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@atlas/persistence";
 
 describe("invokeImplementationAgent", () => {
   it("invokes an exported implementation package and records an execution report", async () => {
@@ -34,6 +37,63 @@ describe("invokeImplementationAgent", () => {
     const status = await getStatus(prepared);
     expect(status.session?.primaryState).toBe("implementation_reconciled");
     expect(status.artifactCount).toBeGreaterThanOrEqual(7);
+  }, 10_000);
+
+  it.each([
+    ["secret", ".env", "API_TOKEN=sk_abcdefghijklmnop\n"],
+    ["binary", "asset.bin", Buffer.from([0, 1, 2, 3])]
+  ] as const)("rejects a non-reviewable %s implementation diff without storing its contents", async (_kind, path, content) => {
+    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const prepared = await prepareApprovedContract(root);
+    await exportManualAgentPackage(prepared);
+
+    await expect(
+      invokeImplementationAgent({
+        ...prepared,
+        provider: "codex",
+        agentInvoker: async (input) => {
+          writeFileSync(join(input.package.cwd, path), content);
+          return {
+            provider: "codex",
+            process: {
+              runId: `run_${_kind}`,
+              command: "codex",
+              args: [],
+              cwd: input.package.cwd,
+              status: "succeeded",
+              exitCode: 0,
+              signal: undefined,
+              stdout: "",
+              stderr: "",
+              timedOut: false,
+              startedAt: "2026-07-12T12:00:00.000Z",
+              endedAt: "2026-07-12T12:00:01.000Z",
+              durationMs: 1_000,
+              stdoutTruncated: false,
+              stderrTruncated: false,
+              redacted: false
+            }
+          };
+        }
+      })
+    ).rejects.toThrow("Implementation diff is not safely reviewable");
+
+    const runtime = await openAtlasRuntime(prepared);
+    try {
+      const status = await getStatus(prepared);
+      const diffRecord = listArtifactsForSession(runtime.db, status.session?.sessionId ?? "")
+        .find((artifact) => artifact.type === "implementation_diff");
+      expect(diffRecord?.status).toBe("rejected");
+      const diff = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, diffRecord?.storageUri ?? ""), "utf8")) as {
+        patch: string;
+        has_binary: boolean;
+        has_secret_risk: boolean;
+      };
+      expect(diff.patch).not.toContain("sk_abcdefghijklmnop");
+      expect(diff.has_binary || diff.has_secret_risk).toBe(true);
+    } finally {
+      closeAtlasRuntime(runtime, false);
+    }
   });
 
   it("records an agent run log and parses explicit completion reports", async () => {
@@ -73,7 +133,7 @@ describe("invokeImplementationAgent", () => {
       packageArtifactId: exported.packageArtifactId,
       processStatus: "succeeded",
       agentClaimsComplete: true,
-      changedFiles: ["src/table-cell.tsx"]
+      changedFiles: []
     });
 
     const runLog = readLatestJsonArtifact(root, result.sessionId, "agent_run_log");
@@ -82,6 +142,60 @@ describe("invokeImplementationAgent", () => {
     expect(runLog.package_artifact_id).toBe(exported.packageArtifactId);
     expect(runLog.process.status).toBe("succeeded");
     expect(runLog.parsed_completion_report.agent_claims_complete).toBe(true);
+  });
+
+  it("fails on a dirty worktree before invoking the implementation agent", async () => {
+    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const prepared = await prepareApprovedContract(root);
+    await exportManualAgentPackage(prepared);
+    writeFileSync(join(prepared.cwd, "unexpected.ts"), "export const unexpected = true;\n");
+    let invoked = false;
+
+    await expect(invokeImplementationAgent({
+      ...prepared,
+      provider: "codex",
+      agentInvoker: async () => {
+        invoked = true;
+        throw new Error("must not run");
+      }
+    })).rejects.toThrow("exact clean Git base");
+    expect(invoked).toBe(false);
+  });
+
+  it("fails before invocation when the branch changes after package export", async () => {
+    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const prepared = await prepareApprovedContract(root);
+    await exportManualAgentPackage(prepared);
+    execFileSync("git", ["checkout", "-b", "unexpected-branch"], { cwd: prepared.cwd, stdio: "ignore" });
+    let invoked = false;
+
+    await expect(invokeImplementationAgent({
+      ...prepared,
+      provider: "codex",
+      agentInvoker: async () => {
+        invoked = true;
+        throw new Error("must not run");
+      }
+    })).rejects.toThrow("branch, HEAD, or repository root changed");
+    expect(invoked).toBe(false);
+  });
+
+  it("fails before invocation when HEAD changes after package export", async () => {
+    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const prepared = await prepareApprovedContract(root);
+    await exportManualAgentPackage(prepared);
+    execFileSync("git", ["commit", "--allow-empty", "-m", "unexpected-head"], { cwd: prepared.cwd, stdio: "ignore" });
+    let invoked = false;
+
+    await expect(invokeImplementationAgent({
+      ...prepared,
+      provider: "codex",
+      agentInvoker: async () => {
+        invoked = true;
+        throw new Error("must not run");
+      }
+    })).rejects.toThrow("branch, HEAD, or repository root changed");
+    expect(invoked).toBe(false);
   });
 });
 

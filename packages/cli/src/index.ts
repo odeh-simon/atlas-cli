@@ -347,8 +347,8 @@ Usage:
   atlas checks run
   atlas checks design-scan [--root <path>]
   atlas review prepare
-  atlas review import <file>
-  atlas findings disposition <id> --resolve --reason <reason>
+  atlas review import <file> --actor <trusted-reviewer-id>
+  atlas findings disposition <id> --resolve --reason <reason> --evidence <artifact-or-reference>
   atlas fix prepare
   atlas complete --check
   atlas approve completion --yes
@@ -1480,8 +1480,9 @@ async function reviewImportCommand(args: string[]): Promise<number> {
     console.error("atlas review import requires a file path");
     return 2;
   }
+  const reviewerActorId = readOption(args, "--actor");
 
-  const result = await importReviewReport({ filePath });
+  const result = await importReviewReport({ filePath, reviewerActorId });
   console.log(`Review report: ${result.reviewReportArtifactId}`);
   console.log(`Findings: ${result.findingIds.join(", ") || "none"}`);
   console.log(`State: ${result.state}`);
@@ -1497,7 +1498,12 @@ async function findingDispositionCommand(args: string[]): Promise<number> {
   }
   const reason = readOption(args, "--reason") ?? "Accepted in walking skeleton";
   const disposition = args.includes("--resolve") ? "resolve" : "reject";
-  const result = await disposeFinding({ findingId, disposition, reason });
+  const evidence = readOption(args, "--evidence", false);
+  if (disposition === "resolve" && evidence === undefined) {
+    console.error("atlas findings disposition --resolve requires --evidence <artifact-or-reference>");
+    return 2;
+  }
+  const result = await disposeFinding({ findingId, disposition, reason, ...(evidence === undefined ? {} : { evidence: [evidence] }) });
   console.log(`Finding: ${result.findingId}`);
   console.log(`Status: ${result.status}`);
   console.log(`State: ${result.state}`);

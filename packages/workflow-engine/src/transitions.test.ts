@@ -34,6 +34,10 @@ describe("workflow transitions", () => {
     expect(allowedCommands("contract_draft")).toEqual(["import_contract", "approve_contract"]);
   });
 
+  it("allows legacy context-ready sessions to refresh their context evidence", () => {
+    expect(transition({ state: "context_ready", command: "import_context" }).to).toBe("context_ready");
+  });
+
   it("allows a clean imported review to proceed directly to completion evaluation", () => {
     expect(transition({ state: "review_imported", command: "evaluate_completion" }).to).toBe("completion_ready");
   });
