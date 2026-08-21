@@ -120,7 +120,7 @@ export async function importContextManifest(input: ImportContextInput): Promise<
       contextArtifactId: artifactId,
       contextContentPackArtifactId: contextPackRecord.artifactId,
       state: next,
-      nextCommand: "atlas plan"
+      nextCommand: "atlas context build"
     };
   } catch (error) {
     if (error instanceof SyntaxError) {

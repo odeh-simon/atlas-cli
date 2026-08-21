@@ -5,6 +5,10 @@
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@atlas/security": "workspace:*",
+    "typescript": "^5.7.0"
+  },
   "scripts": {
     "build": "tsc -b",
     "check": "tsc -b --pretty false"

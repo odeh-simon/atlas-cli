@@ -4,10 +4,10 @@ import { execFileSync } from "node:child_process";
 
 import {
   approveContract,
+  buildContextManifest,
   exportManualAgentPackage,
   exportPlanningPackage,
   importExecutionResult,
-  importContextManifest,
   importContract,
   prepareReviewPackage,
   importReviewReport,
@@ -30,14 +30,7 @@ export async function prepareApprovedContract(
   execFileSync("git", ["add", "."], { cwd, stdio: "ignore" });
   execFileSync("git", ["commit", "-m", "fixture"], { cwd, stdio: "ignore" });
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
-  const manifestPath = join(root, "context.json");
-  writeFileSync(
-    manifestPath,
-    JSON.stringify({
-      sources: [{ uri: "README.md", kind: "file", reason: "Context", byte_length: 1, included: true }]
-    })
-  );
-  await importContextManifest({ cwd, env, filePath: manifestPath });
+  await buildContextManifest({ cwd, env });
   await exportPlanningPackage({ cwd, env });
   const contractPath = join(root, "contract.json");
   writeFileSync(

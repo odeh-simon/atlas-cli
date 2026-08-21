@@ -30,6 +30,8 @@ V1 is deliberately human-in-the-loop. ChatGPT planning and review are human-medi
 
 Production-hardening amendment: artifact identifiers alone are never sufficient handoff evidence. Atlas creates a bounded, hash-verified context content pack for planning and implementation, captures an immutable reviewable Git diff for each execution, supplies substantive contract/diff/check evidence to an independently identified reviewer, and requires that fresh review plus the current contract, diff, checks, and Git state before completion. A later generic clean review never resolves an earlier finding; resolution requires explicit human evidence or finding-specific evidence from a fresh independent review. See `DOCs/M0_Engineering_Design/15_evidence_and_independent_review_gates.md`.
 
+Context-semantic amendment: production planning and implementation require a fresh manifest/content-pack v3 generated from deterministic repository evidence. Atlas records TypeScript symbols and local-module relationships, applicable root-to-scope repository instructions, test associations, verified line-range fragments, explainable selection scores, explicit gaps, effective budgets/configuration, and input hashes. AI may rerank real candidates but cannot create repository facts. Legacy manifests remain inspectable and require refresh. See `DOCS/M0_Engineering_Design/16_context_manifest_v3_semantic_discovery.md`.
+
 The V1 outcome is successful when an engineer can stop and resume a complex task without reconstructing context, can see exactly which contract and code state are under review, and spends materially less time moving information between tools without weakening quality or control.
 
 ## 3. Product vision

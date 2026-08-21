@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { listArtifactsForSession } from "@atlas/persistence";
 
 import { closeAtlasRuntime, openAtlasRuntime } from "./runtime.js";
-import { runAiContextScout, startManualTask } from "./index.js";
+import { buildContextManifest, inspectContextManifest, runAiContextScout, startManualTask } from "./index.js";
 
 const tempRoots: string[] = [];
 
@@ -119,7 +119,7 @@ describe("runAiContextScout", () => {
     ).rejects.toThrow("AI context scout returned malformed JSON");
   });
 
-  it("accepts fenced JSON and ignores invented recommendation paths", async () => {
+  it("accepts fenced JSON and preserves invented paths for deterministic gap reporting", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
     const env = { ATLAS_HOME: join(root, "home") };
@@ -152,7 +152,11 @@ describe("runAiContextScout", () => {
       })
     });
 
-    expect(result.recommendationCount).toBe(1);
+    expect(result.recommendationCount).toBe(2);
+    await buildContextManifest({ cwd, env, aiRecommendationArtifactId: result.recommendationArtifactId });
+    await expect(inspectContextManifest({ cwd, env })).resolves.toMatchObject({
+      gaps: expect.arrayContaining([expect.objectContaining({ severity: "warning", description: expect.stringContaining("unknown repository candidate") })])
+    });
   });
 
   it("limits candidate snippets by provider input budget", async () => {

@@ -51,7 +51,7 @@ describe("importContextManifest", () => {
     expect(result.state).toBe("context_ready");
     expect(status.session?.primaryState).toBe("context_ready");
     expect(status.artifactCount).toBe(3);
-    expect(status.nextCommands).toEqual(["atlas plan"]);
+    expect(status.nextCommands).toEqual(["atlas context build"]);
   });
 
   it("rejects invalid JSON without advancing state", async () => {

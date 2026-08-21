@@ -19,7 +19,6 @@ import {
   listArtifactsForSession,
   listSessionsForRepository
 } from "@atlas/persistence";
-import { redactSecretText } from "@atlas/security";
 import { aiContextRecommendationSchema } from "@atlas/schemas";
 
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
@@ -79,10 +78,12 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       taskText: taskBriefText
     });
     const promptSources = buildPromptSources({
-      rootPath: runtime.paths.cwd,
       maxInputTokens: input.provider.maxInputTokens,
       taskBriefText,
-      sources: discovery.includedSources
+      sources: discovery.includedSources,
+      fragments: discovery.evidenceFragments,
+      symbols: discovery.symbols,
+      relations: discovery.relations
     });
     const prompt = buildScoutPrompt({
       taskBriefText,
@@ -107,7 +108,7 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
             temperature: 0
           })
         : await input.completionImpl(prompt);
-    const parsed = parseScoutResponse(completion.content, new Set(promptSources.map((source) => source.uri)));
+    const parsed = parseScoutResponse(completion.content);
     const now = new Date().toISOString();
     const artifactId = newId("art");
     const recommendation = aiContextRecommendationSchema.parse({
@@ -202,7 +203,12 @@ function buildScoutPrompt(input: {
     readonly kind: string;
     readonly reason: string;
     readonly byteLength: number;
-    readonly snippet: string;
+    readonly category: string;
+    readonly deterministicScore: number;
+    readonly selectionReasons: readonly string[];
+    readonly symbols: readonly string[];
+    readonly relations: readonly string[];
+    readonly evidence: readonly { readonly lineStart: number; readonly lineEnd: number; readonly excerpt: string; readonly truncated: boolean }[];
   }[];
 }): string {
   return JSON.stringify(
@@ -224,59 +230,71 @@ function buildScoutPrompt(input: {
 }
 
 function buildPromptSources(input: {
-  readonly rootPath: string;
   readonly maxInputTokens: number | undefined;
   readonly taskBriefText: string;
   readonly sources: readonly {
     readonly uri: string;
     readonly kind: string;
+    readonly category: string;
     readonly reason: string;
     readonly byte_length: number;
+    readonly deterministic_score: number;
+    readonly selection_reasons: readonly string[];
   }[];
+  readonly fragments: readonly { readonly source_uri: string; readonly line_start: number; readonly line_end: number; readonly excerpt: string; readonly excerpt_truncated: boolean }[];
+  readonly symbols: readonly { readonly source_uri: string; readonly name: string; readonly kind: string }[];
+  readonly relations: readonly { readonly kind: string; readonly from_uri: string; readonly to_uri: string; readonly rule: string }[];
 }): Array<{
   readonly uri: string;
   readonly kind: string;
   readonly reason: string;
   readonly byteLength: number;
-  readonly snippet: string;
+  readonly category: string;
+  readonly deterministicScore: number;
+  readonly selectionReasons: readonly string[];
+  readonly symbols: readonly string[];
+  readonly relations: readonly string[];
+  readonly evidence: readonly { readonly lineStart: number; readonly lineEnd: number; readonly excerpt: string; readonly truncated: boolean }[];
 }> {
   const maxPromptChars = (input.maxInputTokens ?? 12_000) * 4;
   const reservedChars = input.taskBriefText.length + 4_000;
   const sourceBudget = Math.max(2_000, maxPromptChars - reservedChars);
   const perSourceCap = Math.max(500, Math.min(4_000, Math.floor(sourceBudget / Math.max(1, input.sources.length))));
-  const promptSources: Array<{
-    uri: string;
-    kind: string;
-    reason: string;
-    byteLength: number;
-    snippet: string;
-  }> = [];
+  const promptSources: ReturnType<typeof buildPromptSources> = [];
   let usedChars = 0;
 
   for (const source of input.sources) {
     if (usedChars >= sourceBudget) break;
     const remaining = sourceBudget - usedChars;
-    const snippet = readSafeSnippet(input.rootPath, source.uri, Math.min(perSourceCap, remaining));
-    promptSources.push({
+    const evidence = input.fragments.filter((fragment) => fragment.source_uri === source.uri).map((fragment) => ({
+      lineStart: fragment.line_start,
+      lineEnd: fragment.line_end,
+      excerpt: fragment.excerpt,
+      truncated: fragment.excerpt_truncated
+    }));
+    const summary = {
       uri: source.uri,
       kind: source.kind,
       reason: source.reason,
       byteLength: source.byte_length,
-      snippet
-    });
-    usedChars += snippet.length;
+      category: source.category,
+      deterministicScore: source.deterministic_score,
+      selectionReasons: source.selection_reasons,
+      symbols: input.symbols.filter((symbol) => symbol.source_uri === source.uri).slice(0, 20).map((symbol) => `${symbol.kind}:${symbol.name}`),
+      relations: input.relations.filter((relation) => relation.from_uri === source.uri || relation.to_uri === source.uri).slice(0, 20).map((relation) => `${relation.kind}:${relation.from_uri}->${relation.to_uri}:${relation.rule}`),
+      evidence
+    };
+    const bounded = boundCandidateSummary(summary, Math.min(perSourceCap, remaining));
+    promptSources.push(bounded);
+    usedChars += JSON.stringify(bounded).length;
   }
 
   return promptSources;
 }
 
-function parseScoutResponse(content: string, candidateUris: ReadonlySet<string>): z.infer<typeof scoutResponseSchema> {
+function parseScoutResponse(content: string): z.infer<typeof scoutResponseSchema> {
   try {
-    const parsed = scoutResponseSchema.parse(JSON.parse(extractJsonObject(content)));
-    return {
-      ...parsed,
-      recommendations: parsed.recommendations.filter((recommendation) => candidateUris.has(recommendation.uri))
-    };
+    return scoutResponseSchema.parse(JSON.parse(extractJsonObject(content)));
   } catch (error) {
     throw new ValidationError("AI context scout returned malformed JSON", {
       cause: error instanceof Error ? error.message : String(error)
@@ -323,7 +341,13 @@ function extractJsonObject(content: string): string {
   return trimmed;
 }
 
-function readSafeSnippet(rootPath: string, uri: string, maxChars = 4_000): string {
-  const text = readFileSync(join(rootPath, uri), "utf8");
-  return redactSecretText(text).slice(0, maxChars);
+function boundCandidateSummary<T extends { readonly evidence: readonly { readonly excerpt: string }[] }>(summary: T, maxChars: number): T {
+  const fixedLength = JSON.stringify({ ...summary, evidence: [] }).length;
+  let remaining = Math.max(0, maxChars - fixedLength);
+  const evidence = summary.evidence.map((fragment) => {
+    const excerpt = [...fragment.excerpt].slice(0, remaining).join("");
+    remaining -= excerpt.length;
+    return { ...fragment, excerpt };
+  });
+  return { ...summary, evidence };
 }

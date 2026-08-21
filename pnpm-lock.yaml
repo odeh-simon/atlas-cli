@@ -161,7 +161,14 @@ importers:
 
   packages/config: {}
 
-  packages/context-discovery: {}
+  packages/context-discovery:
+    dependencies:
+      '@atlas/security':
+        specifier: workspace:*
+        version: link:../security
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
   packages/diagnostics: {}
 

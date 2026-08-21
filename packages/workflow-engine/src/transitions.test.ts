@@ -31,11 +31,13 @@ describe("workflow transitions", () => {
   });
 
   it("reports allowed commands", () => {
-    expect(allowedCommands("contract_draft")).toEqual(["import_contract", "approve_contract"]);
+    expect(allowedCommands("contract_draft")).toEqual(["import_context", "import_contract", "approve_contract"]);
   });
 
   it("allows legacy context-ready sessions to refresh their context evidence", () => {
     expect(transition({ state: "context_ready", command: "import_context" }).to).toBe("context_ready");
+    expect(transition({ state: "planning_ready", command: "import_context" }).to).toBe("context_ready");
+    expect(transition({ state: "contract_approved", command: "import_context" }).to).toBe("context_ready");
   });
 
   it("allows a clean imported review to proceed directly to completion evaluation", () => {

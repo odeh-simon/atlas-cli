@@ -21,6 +21,7 @@ import { transition } from "@atlas/workflow-engine";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { readVerifiedArtifactText } from "./evidence.js";
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
+import { assertContextManifestFresh } from "./context-pack.js";
 
 export interface ExportPlanningPackageResult {
   readonly sessionId: string;
@@ -68,6 +69,22 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
     const parsedManifest = contextManifestSchema.parse(JSON.parse(contextManifestText) as unknown);
     const parsedPack = contextContentPackSchema.parse(JSON.parse(contextPackText) as unknown);
     const currentGit = readWorkflowGitSnapshot(runtime.paths.cwd);
+    if (
+      parsedManifest.schema_version < 3 ||
+      parsedManifest.semantic_complete !== true ||
+      parsedPack.schema_version < 3 ||
+      parsedPack.semantic_complete !== true ||
+      parsedPack.manifest_schema_version !== 3 ||
+      parsedPack.discovery_config_sha256 !== parsedManifest.repository_snapshot?.discovery_config_sha256
+    ) {
+      throw new GateFailedError("Legacy context cannot claim semantic completeness; rerun atlas context build before planning");
+    }
+    assertContextManifestFresh({
+      rootPath: runtime.paths.cwd,
+      manifest: parsedManifest,
+      taskBriefSha256: taskBrief.sha256,
+      git: currentGit
+    });
     const stalePack =
       parsedPack.task_artifact_id !== taskBrief.artifactId ||
       parsedPack.task_artifact_sha256 !== taskBrief.sha256 ||

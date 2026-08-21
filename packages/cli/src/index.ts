@@ -384,6 +384,8 @@ Usage:
   atlas telemetry preview
   atlas telemetry enable
   atlas telemetry disable
+
+Context discovery uses the strict atlas.config.json "context" section. Planning and implementation require a current semantic-complete v3 manifest; legacy or stale context is repaired with atlas context build.
 `);
 }
 
@@ -473,6 +475,12 @@ async function statusCommand(): Promise<number> {
   console.log(`State: ${status.session.primaryState}`);
   console.log(`Artifacts: ${status.artifactCount}`);
   console.log(`Events: ${status.eventCount}`);
+  if (status.context !== undefined) {
+    console.log(`Context: v${status.context.schemaVersion} ${status.context.semanticComplete && status.context.fresh ? "semantic-complete/current" : "refresh-required"}`);
+    if (status.context.discoveryAlgorithm !== undefined) console.log(`Context discovery: ${status.context.discoveryAlgorithm}`);
+    if (status.context.effectiveConfigSha256 !== undefined) console.log(`Context config: ${status.context.effectiveConfigSha256}`);
+    console.log(`Context gaps: blocking=${status.context.blockingGapCount}, warnings=${status.context.warningGapCount}, budget-pressure=${status.context.budgetPressure ? "yes" : "no"}`);
+  }
   console.log(`Next: ${status.nextCommands[0] ?? "no next command"}`);
   return 0;
 }
@@ -1120,7 +1128,11 @@ async function contextInspectCommand(args: string[], summaryOnly: boolean): Prom
   }
 
   console.log(`Context: ${inspection.artifactId}`);
+  console.log(`Schema: v${inspection.schemaVersion} (${inspection.semanticComplete ? "semantic-complete" : "legacy/refresh-required"})`);
   console.log(`Discovery: ${inspection.discovery}`);
+  if (inspection.discoveryAlgorithm !== undefined) {
+    console.log(`Algorithm: ${inspection.discoveryAlgorithm.name} ${inspection.discoveryAlgorithm.version}`);
+  }
   console.log(`Freshness: ${inspection.freshness}`);
   console.log(`Scanned files: ${inspection.scannedFileCount}`);
   console.log(`Candidates: ${inspection.candidateFileCount}`);
@@ -1130,12 +1142,34 @@ async function contextInspectCommand(args: string[], summaryOnly: boolean): Prom
   console.log(
     `Budget: ${inspection.budgets.used_files}/${inspection.budgets.max_files} files, ${inspection.budgets.used_bytes}/${inspection.budgets.max_bytes} bytes`
   );
+  console.log(`Task terms: ${inspection.taskTerms.join(", ") || "(none)"}`);
+  console.log(`Seeds: ${inspection.seeds.length}`);
+  console.log(`Instruction chain: ${inspection.instructionChain.length}`);
+  console.log(`Symbols: ${inspection.symbolCount}`);
+  console.log(`Relations: ${Object.entries(inspection.relationCounts).map(([kind, count]) => `${kind}=${count}`).join(", ") || "(none)"}`);
+  console.log(`Evidence fragments: ${inspection.evidenceFragmentCount}`);
+  console.log(`Gaps: blocking=${inspection.gaps.filter((gap) => gap.severity === "blocking").length}, warnings=${inspection.gaps.filter((gap) => gap.severity === "warning").length}`);
+  if (inspection.effectiveConfigSha256 !== undefined) console.log(`Context config: ${inspection.effectiveConfigSha256}`);
   if (summaryOnly) return 0;
 
   const showIncluded = !args.includes("--excluded") || args.includes("--included") || args.includes("--all");
   const showExcluded = args.includes("--excluded") || args.includes("--all");
   if (showIncluded) printContextSources("Included", inspection.includedSources);
   if (showExcluded) printContextSources("Excluded", inspection.excludedCandidates);
+  if (inspection.instructionChain.length > 0) {
+    console.log("Instructions (root to scope):");
+    for (const instruction of inspection.instructionChain) {
+      console.log(`${instruction.precedence} ${instruction.uri} scope=${instruction.scope_directory} applies=${instruction.applies_to.length}${instruction.truncated ? " [truncated]" : ""}`);
+    }
+  }
+  if (inspection.gaps.length > 0) {
+    console.log("Context gaps:");
+    for (const gap of inspection.gaps) console.log(`${gap.severity.toUpperCase()} ${gap.id}: ${gap.description}`);
+  }
+  if (inspection.pinsExclusions !== undefined) {
+    console.log(`Pins: ${inspection.pinsExclusions.pinned_sources.join(", ") || "(none)"}`);
+    console.log(`Exclusions: ${inspection.pinsExclusions.exclusions.join(", ") || "(none)"}`);
+  }
   return 0;
 }
 
@@ -1169,8 +1203,9 @@ async function contextBuildCommand(args: string[]): Promise<number> {
   const useAi = args.includes("--ai");
   const aiProviderAlias = readOption(args, "--ai-provider", false);
   const status = await getStatus();
-  if (status.session !== undefined && status.session.primaryState !== "intake_ready") {
-    console.error(`atlas context build requires state intake_ready; current state is ${status.session.primaryState}`);
+  const refreshableStates = new Set(["intake_ready", "context_ready", "planning_ready", "contract_draft", "contract_approved"]);
+  if (status.session !== undefined && !refreshableStates.has(status.session.primaryState)) {
+    console.error(`atlas context build cannot safely refresh from state ${status.session.primaryState}`);
     console.log(`Next: ${status.nextCommands[0] ?? "no next command"}`);
     return 2;
   }

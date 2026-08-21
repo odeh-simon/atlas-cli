@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   aiVisualReviewSchema,
+  contextContentPackSchema,
   contextManifestSchema,
   figmaVisualEvidenceSchema,
   implementationContractSchema,
@@ -92,6 +93,70 @@ describe("walking skeleton artifact schemas", () => {
 
     expect(result.sources).toBeUndefined();
     expect(result.included_sources).toHaveLength(1);
+  });
+
+  it("accepts manifest/content-pack v3 semantic evidence without changing v2 parsing", () => {
+    const fragment = {
+      id: "frag_1",
+      source_uri: "src/index.ts",
+      source_sha256: "b".repeat(64),
+      line_start: 1,
+      line_end: 2,
+      excerpt: "export const value = 1;",
+      excerpt_truncated: true,
+      reason: "Task symbol",
+      classification: "fact" as const
+    };
+    const manifest = contextManifestSchema.parse({
+      ...envelope,
+      artifact_id: "art_context_v3",
+      type: "context_manifest",
+      schema_version: 3,
+      included_sources: [{
+        uri: "src/index.ts", kind: "file", category: "source", reason: "Task source", selection_reasons: ["Path match"],
+        score_features: [{ feature: "task-path-term", score: 12, evidence: "Path matches index" }], relation_to_seeds: [],
+        sha256: "b".repeat(64), byte_length: 30, included: true, rank: 1, deterministic_score: 12, required: false, pinned: false
+      }],
+      excluded_candidates: [],
+      budgets: { max_files: 5, max_bytes: 1000, used_files: 1, used_bytes: 30 },
+      gaps: [],
+      freshness: "fresh",
+      semantic_complete: true,
+      repository_snapshot: { task_brief_sha256: "c".repeat(64), discovery_config_sha256: "d".repeat(64) },
+      discovery_algorithm: { name: "atlas-semantic-context", version: "3.0.0" },
+      effective_context_config_sha256: "e".repeat(64),
+      task_terms: ["index"],
+      seeds: [{ uri: "src/index.ts", score: 12, reasons: ["Path matches index"] }],
+      evidence_fragments: [fragment],
+      invalidation: { source_hashes: { "src/index.ts": "b".repeat(64) }, instruction_hashes: {}, relevant_inputs_sha256: "f".repeat(64) }
+    });
+    const pack = contextContentPackSchema.parse({
+      ...envelope,
+      artifact_id: "art_pack_v3",
+      type: "context_content_pack",
+      schema_version: 3,
+      parents: ["art_task_1", "art_context_v3"],
+      task_artifact_id: "art_task_1",
+      task_artifact_sha256: "c".repeat(64),
+      context_manifest_artifact_id: "art_context_v3",
+      context_manifest_sha256: "a".repeat(64),
+      max_bytes: 1000,
+      used_bytes: 30,
+      truncated: false,
+      blocking_gaps: [],
+      manifest_schema_version: 3,
+      semantic_complete: true,
+      repository_snapshot: manifest.repository_snapshot,
+      discovery_config_sha256: "d".repeat(64),
+      evidence_fragments: [fragment],
+      sources: [{
+        uri: "src/index.ts", kind: "file", category: "source", reason: "Task source", sha256: "b".repeat(64),
+        byte_length: 30, included_bytes: 30, truncated: false, redacted: false, content: "export const value = 1;\n"
+      }]
+    });
+
+    expect(manifest.semantic_complete).toBe(true);
+    expect(pack.evidence_fragments?.[0]?.excerpt_truncated).toBe(true);
   });
 
   it("validates Figma evidence and structured AI visual reviews", () => {

@@ -100,7 +100,71 @@ export const contextSourceRecordSchema = z.object({
   exclusion_reason: z.string().min(1).optional(),
   rank: z.number().int().positive().optional(),
   deterministic_score: z.number().nonnegative().optional(),
-  ai_confidence: z.number().min(0).max(1).optional()
+  ai_confidence: z.number().min(0).max(1).optional(),
+  category: z.enum(["source", "test", "architecture", "contract", "schema", "migration", "operation", "config", "instruction"]).optional(),
+  selection_reasons: z.array(z.string().min(1)).optional(),
+  score_features: z.array(z.object({
+    feature: z.string().min(1),
+    score: z.number(),
+    evidence: z.string().min(1)
+  })).optional(),
+  relation_to_seeds: z.array(z.string().min(1)).optional(),
+  required: z.boolean().optional(),
+  pinned: z.boolean().optional(),
+  package_boundary: z.string().min(1).optional()
+});
+
+const semanticSymbolSchema = z.object({
+  id: idSchema,
+  source_uri: z.string().min(1),
+  name: z.string().min(1),
+  kind: z.string().min(1),
+  exported: z.boolean(),
+  line_start: z.number().int().positive(),
+  line_end: z.number().int().positive()
+}).refine((value) => value.line_end >= value.line_start, { message: "symbol line_end must be >= line_start" });
+
+const contextRelationSchema = z.object({
+  id: idSchema,
+  kind: z.enum(["import", "re-export", "test-association", "instruction-scope"]),
+  from_uri: z.string().min(1),
+  to_uri: z.string().min(1),
+  rule: z.string().min(1),
+  evidence_fragment_id: idSchema.optional()
+});
+
+const evidenceFragmentSchema = z.object({
+  id: idSchema,
+  source_uri: z.string().min(1),
+  source_sha256: sha256Schema,
+  line_start: z.number().int().positive(),
+  line_end: z.number().int().positive(),
+  symbol_name: z.string().min(1).optional(),
+  symbol_kind: z.string().min(1).optional(),
+  excerpt: z.string(),
+  excerpt_truncated: z.boolean().optional(),
+  reason: z.string().min(1),
+  classification: z.enum(["fact", "inference"])
+}).refine((value) => value.line_end >= value.line_start, { message: "fragment line_end must be >= line_start" });
+
+const instructionEvidenceSchema = z.object({
+  uri: z.string().min(1),
+  sha256: sha256Schema,
+  scope_directory: z.string().min(1),
+  precedence: z.number().int().nonnegative(),
+  filename: z.string().min(1),
+  applies_to: z.array(z.string().min(1)),
+  byte_length: z.number().int().nonnegative(),
+  included_bytes: z.number().int().nonnegative(),
+  truncated: z.boolean()
+});
+
+const contextRepositorySnapshotSchema = z.object({
+  root_path_hash: sha256Schema.optional(),
+  git_base_fingerprint: sha256Schema.optional(),
+  git_head_sha: z.string().min(1).optional(),
+  task_brief_sha256: sha256Schema,
+  discovery_config_sha256: sha256Schema
 });
 
 export const contextManifestSchema = artifactEnvelopeSchema.extend({
@@ -130,7 +194,39 @@ export const contextManifestSchema = artifactEnvelopeSchema.extend({
       description: z.string().min(1)
     })
   ).default([]),
-  freshness: z.enum(["fresh", "stale", "partial"])
+  freshness: z.enum(["fresh", "stale", "partial"]),
+  semantic_complete: z.boolean().optional(),
+  repository_snapshot: contextRepositorySnapshotSchema.optional(),
+  discovery_algorithm: z.object({ name: z.string().min(1), version: z.string().min(1) }).optional(),
+  effective_context_config: z.record(z.string(), z.unknown()).optional(),
+  effective_context_config_sha256: sha256Schema.optional(),
+  task_terms: z.array(z.string().min(1)).optional(),
+  seeds: z.array(z.object({ uri: z.string().min(1), score: z.number().nonnegative(), reasons: z.array(z.string().min(1)) })).optional(),
+  instruction_chain: z.array(instructionEvidenceSchema).optional(),
+  symbols: z.array(semanticSymbolSchema).optional(),
+  relations: z.array(contextRelationSchema).optional(),
+  evidence_fragments: z.array(evidenceFragmentSchema).optional(),
+  pins_exclusions: z.object({
+    pinned_sources: z.array(z.string().min(1)),
+    exclusions: z.array(z.string().min(1)),
+    required_source_globs: z.array(z.string().min(1)),
+    required_categories: z.array(z.string().min(1))
+  }).optional(),
+  semantic_budgets: z.object({
+    max_graph_nodes: z.number().int().positive(),
+    used_graph_nodes: z.number().int().nonnegative(),
+    max_graph_edges: z.number().int().positive(),
+    used_graph_edges: z.number().int().nonnegative(),
+    max_evidence_fragments: z.number().int().positive(),
+    used_evidence_fragments: z.number().int().nonnegative(),
+    instruction_max_bytes: z.number().int().positive(),
+    instruction_used_bytes: z.number().int().nonnegative()
+  }).optional(),
+  invalidation: z.object({
+    source_hashes: z.record(z.string(), sha256Schema),
+    instruction_hashes: z.record(z.string(), sha256Schema),
+    relevant_inputs_sha256: sha256Schema
+  }).optional()
 });
 
 export const contextContentPackSchema = artifactEnvelopeSchema.extend({
@@ -145,6 +241,14 @@ export const contextContentPackSchema = artifactEnvelopeSchema.extend({
   used_bytes: z.number().int().nonnegative(),
   truncated: z.boolean(),
   blocking_gaps: z.array(idSchema).default([]),
+  manifest_schema_version: z.number().int().positive().optional(),
+  semantic_complete: z.boolean().optional(),
+  repository_snapshot: contextRepositorySnapshotSchema.optional(),
+  discovery_config_sha256: sha256Schema.optional(),
+  instruction_chain: z.array(instructionEvidenceSchema).optional(),
+  symbols: z.array(semanticSymbolSchema).optional(),
+  relations: z.array(contextRelationSchema).optional(),
+  evidence_fragments: z.array(evidenceFragmentSchema).optional(),
   sources: z.array(z.object({
     uri: z.string().min(1),
     kind: contextSourceRecordSchema.shape.kind,
@@ -154,7 +258,11 @@ export const contextContentPackSchema = artifactEnvelopeSchema.extend({
     included_bytes: z.number().int().nonnegative(),
     truncated: z.boolean(),
     redacted: z.boolean(),
-    content: z.string()
+    content: z.string(),
+    category: z.string().min(1).optional(),
+    required: z.boolean().optional(),
+    pinned: z.boolean().optional(),
+    selection_reasons: z.array(z.string().min(1)).optional()
   }))
 });
 

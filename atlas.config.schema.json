@@ -31,6 +31,31 @@
       },
       "additionalProperties": false
     },
+    "context": {
+      "type": "object",
+      "properties": {
+        "maxFiles": { "type": "integer", "minimum": 1 },
+        "maxBytes": { "type": "integer", "minimum": 1 },
+        "maxScannedFiles": { "type": "integer", "minimum": 1 },
+        "maxGraphNodes": { "type": "integer", "minimum": 1 },
+        "maxGraphEdges": { "type": "integer", "minimum": 1 },
+        "maxEvidenceFragments": { "type": "integer", "minimum": 1 },
+        "maxExcerptBytes": { "type": "integer", "minimum": 1 },
+        "instructionMaxBytes": { "type": "integer", "minimum": 1 },
+        "graphDepth": { "type": "integer", "minimum": 0 },
+        "pinnedSources": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "exclusions": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "requiredSourceGlobs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "requiredCategories": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["source", "test", "architecture", "contract", "schema", "migration", "operation", "config", "instruction"] },
+          "uniqueItems": true
+        },
+        "instructionFallbackFilenames": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "requireResolvedImports": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "visualQa": {
       "type": "object",
       "properties": {

@@ -12,12 +12,13 @@ import {
   listSessionsForRepository,
   updateSessionState
 } from "@atlas/persistence";
-import { agentImplementationPackageSchema, contextContentPackSchema, implementationContractSchema } from "@atlas/schemas";
+import { agentImplementationPackageSchema, contextContentPackSchema, contextManifestSchema, implementationContractSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { readVerifiedArtifactText } from "./evidence.js";
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
+import { assertContextManifestFresh } from "./context-pack.js";
 
 export interface ExportManualAgentPackageResult {
   readonly sessionId: string;
@@ -62,10 +63,17 @@ export async function exportManualAgentPackage(options: RuntimeOptions = {}): Pr
     const parsedContract = implementationContractSchema.parse(JSON.parse(contractContent) as unknown);
     const contextManifestContent = readVerifiedArtifactText(runtime.paths.artifactRoot, contextManifest);
     const contextPackContent = readVerifiedArtifactText(runtime.paths.artifactRoot, contextPack);
+    const parsedManifest = contextManifestSchema.parse(JSON.parse(contextManifestContent) as unknown);
     const parsedPack = contextContentPackSchema.parse(JSON.parse(contextPackContent) as unknown);
     if (
+      parsedManifest.schema_version < 3 ||
+      parsedManifest.semantic_complete !== true ||
+      parsedPack.schema_version < 3 ||
+      parsedPack.manifest_schema_version !== 3 ||
+      parsedPack.semantic_complete !== true ||
       parsedPack.context_manifest_artifact_id !== contextManifest.artifactId ||
       parsedPack.context_manifest_sha256 !== contextManifest.sha256 ||
+      parsedPack.discovery_config_sha256 !== parsedManifest.repository_snapshot?.discovery_config_sha256 ||
       parsedPack.blocking_gaps.length > 0
     ) {
       throw new StateTransitionError("Agent package context evidence is stale or blocked; rerun atlas context build");
@@ -77,6 +85,12 @@ export async function exportManualAgentPackage(options: RuntimeOptions = {}): Pr
     if (git.dirty) {
       throw new StateTransitionError("Agent package export requires a clean Git worktree so implementation ownership is unambiguous");
     }
+    assertContextManifestFresh({
+      rootPath: runtime.paths.cwd,
+      manifest: parsedManifest,
+      taskBriefSha256: parsedPack.task_artifact_sha256,
+      git
+    });
     if (parsedPack.git_base_fingerprint !== git.base_fingerprint) {
       throw new StateTransitionError("Agent package context pack is stale against Git HEAD; rerun atlas context build");
     }

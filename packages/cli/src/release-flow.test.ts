@@ -27,16 +27,9 @@ describe("release workflow smoke", () => {
     execFileSync("git", ["config", "user.name", "Atlas Tests"], { cwd: repository, stdio: "ignore" });
     execFileSync("git", ["add", "README.md"], { cwd: repository, stdio: "ignore" });
     execFileSync("git", ["commit", "-m", "fixture"], { cwd: repository, stdio: "ignore" });
-    const contextPath = join(root, "context.json");
     const contractPath = join(root, "contract.json");
     const executionPath = join(root, "execution.json");
     const reviewPath = join(root, "review.json");
-    writeFileSync(
-      contextPath,
-      JSON.stringify({
-        sources: [{ uri: "README.md", kind: "file", reason: "Release fixture", byte_length: 23, included: true }]
-      })
-    );
     writeFileSync(contractPath, JSON.stringify(validContract()));
     writeFileSync(
       executionPath,
@@ -60,7 +53,7 @@ describe("release workflow smoke", () => {
       process.env.ATLAS_HOME = atlasHome;
       const commands: readonly string[][] = [
         ["start", "--manual", "--title", "Release smoke", "--objective", "Prove the complete CLI flow"],
-        ["context", "import", contextPath],
+        ["context", "build"],
         ["plan"],
         ["contract", "import", contractPath],
         ["approve", "contract", "--yes"],
