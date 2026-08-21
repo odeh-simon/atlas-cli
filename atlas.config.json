@@ -6,6 +6,25 @@
     "baseBranch": "main"
   },
   "telemetry": {
-    "enabled": false
+    "enabled": true
+  },
+  "ai": {
+    "defaultProviderAlias": "openrouter.free",
+    "providers": [
+      {
+        "alias": "openrouter.free",
+        "provider": "openai-compatible",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "model": "openrouter/free",
+        "tokenAlias": "openrouter.default",
+        "timeoutMs": 120000,
+        "maxInputTokens": 12000
+      }
+    ]
+  },
+  "adapters": {
+    "linear": {
+      "tokenAlias": "linear.default"
+    }
   }
 }
