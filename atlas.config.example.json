@@ -11,6 +11,11 @@
   "writebacks": {
     "enabled": false
   },
+  "index": {
+    "enabled": false,
+    "maxIndexBytes": 50000000,
+    "analyzers": ["typescript-semantic"]
+  },
   "context": {
     "maxFiles": 40,
     "maxBytes": 200000,

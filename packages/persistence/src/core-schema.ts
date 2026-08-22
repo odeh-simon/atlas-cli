@@ -195,5 +195,187 @@ CREATE TABLE decision_records (
 
 CREATE INDEX idx_decision_records_session_kind ON decision_records(session_id, kind);
 `
+  },
+  {
+    version: 7,
+    name: "evidence_index_core",
+    sql: `
+CREATE TABLE IF NOT EXISTS evidence_repositories (
+  repository_id TEXT PRIMARY KEY,
+  root_path_hash TEXT NOT NULL UNIQUE,
+  remote_url_hash TEXT,
+  display_name TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS evidence_git_snapshots (
+  snapshot_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  fingerprint TEXT NOT NULL,
+  base_fingerprint TEXT NOT NULL,
+  branch TEXT,
+  head_sha TEXT,
+  dirty INTEGER NOT NULL CHECK (dirty IN (0, 1)),
+  snapshot_json TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_git_snapshots_repo ON evidence_git_snapshots(repository_id, created_at);
+
+CREATE TABLE IF NOT EXISTS evidence_files (
+  file_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  uri TEXT NOT NULL,
+  content_sha256 TEXT NOT NULL,
+  byte_length INTEGER NOT NULL CHECK (byte_length >= 0),
+  last_seen_snapshot_id TEXT NOT NULL,
+  deleted_at_snapshot_id TEXT,
+  UNIQUE (repository_id, uri)
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_files_repo_uri ON evidence_files(repository_id, uri);
+CREATE INDEX IF NOT EXISTS idx_evidence_files_content ON evidence_files(content_sha256);
+
+CREATE TABLE IF NOT EXISTS evidence_contents (
+  content_sha256 TEXT PRIMARY KEY,
+  byte_length INTEGER NOT NULL CHECK (byte_length >= 0),
+  media_type TEXT NOT NULL,
+  binary INTEGER NOT NULL CHECK (binary IN (0, 1)),
+  redacted INTEGER NOT NULL CHECK (redacted IN (0, 1)),
+  sensitivity TEXT NOT NULL DEFAULT 'internal' CHECK (sensitivity IN ('public', 'internal', 'confidential', 'secret-redacted')),
+  storage_uri TEXT
+);
+
+CREATE TABLE IF NOT EXISTS evidence_classifications (
+  classification_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  file_id TEXT REFERENCES evidence_files(file_id),
+  uri TEXT NOT NULL,
+  source_sha256 TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('source', 'test', 'architecture', 'contract', 'schema', 'migration', 'operation', 'config', 'instruction')),
+  sensitivity TEXT NOT NULL DEFAULT 'internal' CHECK (sensitivity IN ('public', 'internal', 'confidential', 'secret-redacted')),
+  is_secret INTEGER NOT NULL CHECK (is_secret IN (0, 1)),
+  binary_check INTEGER NOT NULL CHECK (binary_check IN (0, 1)),
+  excluded INTEGER NOT NULL CHECK (excluded IN (0, 1)),
+  excluded_reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_classifications_repo_uri ON evidence_classifications(repository_id, uri);
+CREATE INDEX IF NOT EXISTS idx_evidence_classifications_category ON evidence_classifications(repository_id, category);
+
+CREATE TABLE IF NOT EXISTS evidence_symbols (
+  symbol_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  file_id TEXT NOT NULL REFERENCES evidence_files(file_id),
+  uri TEXT NOT NULL,
+  source_sha256 TEXT NOT NULL,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  exported INTEGER NOT NULL CHECK (exported IN (0, 1)),
+  line_start INTEGER NOT NULL CHECK (line_start > 0),
+  line_end INTEGER NOT NULL CHECK (line_end > 0 AND line_end >= line_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_symbols_repo_file ON evidence_symbols(repository_id, file_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_symbols_repo_name ON evidence_symbols(repository_id, name);
+
+CREATE TABLE IF NOT EXISTS evidence_edges (
+  edge_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  kind TEXT NOT NULL CHECK (kind IN ('import', 're-export', 'test-association', 'caller', 'callee')),
+  from_file_id TEXT NOT NULL REFERENCES evidence_files(file_id),
+  to_file_id TEXT NOT NULL REFERENCES evidence_files(file_id),
+  from_uri TEXT NOT NULL,
+  to_uri TEXT NOT NULL,
+  rule TEXT NOT NULL,
+  resolution TEXT NOT NULL DEFAULT 'heuristic' CHECK (resolution IN ('static', 'heuristic'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_edges_repo_from ON evidence_edges(repository_id, from_file_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_edges_repo_to ON evidence_edges(repository_id, to_file_id);
+
+CREATE TABLE IF NOT EXISTS evidence_test_associations (
+  association_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  test_file_id TEXT NOT NULL REFERENCES evidence_files(file_id),
+  source_file_id TEXT NOT NULL REFERENCES evidence_files(file_id),
+  test_uri TEXT NOT NULL,
+  source_uri TEXT NOT NULL,
+  rule TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_test_assoc_repo_source ON evidence_test_associations(repository_id, source_file_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_test_assoc_repo_test ON evidence_test_associations(repository_id, test_file_id);
+
+CREATE TABLE IF NOT EXISTS evidence_config_evidence (
+  config_evidence_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  uri TEXT NOT NULL,
+  source_sha256 TEXT NOT NULL,
+  byte_length INTEGER NOT NULL CHECK (byte_length >= 0),
+  format TEXT NOT NULL,
+  secret_redacted INTEGER NOT NULL CHECK (secret_redacted IN (0, 1))
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_config_repo_uri ON evidence_config_evidence(repository_id, uri);
+
+CREATE TABLE IF NOT EXISTS evidence_api_evidence (
+  api_evidence_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  file_id TEXT NOT NULL REFERENCES evidence_files(file_id),
+  uri TEXT NOT NULL,
+  source_sha256 TEXT NOT NULL,
+  name TEXT NOT NULL,
+  surface TEXT NOT NULL CHECK (surface IN ('cli-command', 'exported-function', 'http-endpoint')),
+  line_start INTEGER NOT NULL CHECK (line_start > 0),
+  line_end INTEGER NOT NULL CHECK (line_end > 0 AND line_end >= line_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_api_repo_file ON evidence_api_evidence(repository_id, file_id);
+
+CREATE TABLE IF NOT EXISTS evidence_analyzer_capabilities (
+  capability_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  analyzer_name TEXT NOT NULL,
+  analyzer_version TEXT NOT NULL,
+  capability_json TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_evidence_capabilities_identity
+  ON evidence_analyzer_capabilities(repository_id, analyzer_name, analyzer_version);
+
+CREATE TABLE IF NOT EXISTS evidence_index_snapshots (
+  snapshot_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  git_snapshot_id TEXT,
+  status TEXT NOT NULL CHECK (status IN ('building', 'current', 'superseded', 'invalid')),
+  supersedes_snapshot_id TEXT,
+  schema_version INTEGER NOT NULL CHECK (schema_version > 0),
+  relevant_inputs_sha256 TEXT NOT NULL,
+  entry_counts_json TEXT NOT NULL,
+  analyzer_capabilities_json TEXT NOT NULL DEFAULT '[]',
+  payload_json TEXT NOT NULL,
+  payload_sha256 TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_evidence_snapshots_current
+  ON evidence_index_snapshots(repository_id) WHERE status = 'current';
+
+CREATE INDEX IF NOT EXISTS idx_evidence_snapshots_repo_created ON evidence_index_snapshots(repository_id, created_at);
+
+CREATE TABLE IF NOT EXISTS evidence_invalidation (
+  invalidation_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('file', 'content', 'classification', 'symbol', 'edge', 'test_association', 'config_evidence', 'api_evidence')),
+  entity_id TEXT NOT NULL,
+  valid_from_snapshot_id TEXT NOT NULL,
+  invalidated_in_snapshot_id TEXT,
+  reason TEXT NOT NULL CHECK (reason IN ('file-changed', 'file-deleted', 'git-reset', 'config-changed', 'manual-rebuild')),
+  recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_invalidation_entity ON evidence_invalidation(repository_id, entity_type, entity_id);
+`
   }
 ] as const;

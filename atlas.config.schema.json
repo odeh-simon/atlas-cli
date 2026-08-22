@@ -31,6 +31,15 @@
       },
       "additionalProperties": false
     },
+    "index": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "maxIndexBytes": { "type": "integer", "minimum": 1 },
+        "analyzers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      },
+      "additionalProperties": false
+    },
     "context": {
       "type": "object",
       "properties": {

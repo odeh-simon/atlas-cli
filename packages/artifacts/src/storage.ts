@@ -111,6 +111,97 @@ export function writeImmutableArtifactContent(input: WriteArtifactContentInput):
   };
 }
 
+export interface WrittenContentAddressedBlob {
+  readonly namespace: string;
+  readonly storageUri: string;
+  readonly absolutePath: string;
+  readonly sha256: string;
+  readonly byteLength: number;
+}
+
+export function writeContentAddressedBlob(
+  rootDir: string,
+  namespace: string,
+  bytes: Uint8Array,
+  fs: ArtifactFilesystem = nodeArtifactFilesystem
+): WrittenContentAddressedBlob {
+  assertSafeSegment(namespace, "namespace");
+
+  const root = resolve(rootDir);
+  const sha256 = sha256Bytes(bytes);
+  const finalPath = resolve(root, namespace, sha256);
+  const stagedPath = resolve(root, ".staging", namespace, `${sha256.slice(0, 16)}.tmp`);
+
+  assertInsideRoot(root, finalPath);
+  assertInsideRoot(root, stagedPath);
+
+  fs.mkdirp(dirname(finalPath));
+  fs.mkdirp(dirname(stagedPath));
+  fs.writeFile(stagedPath, bytes);
+
+  if (fs.exists(finalPath)) {
+    const existingHash = sha256Bytes(fs.readFile(finalPath));
+    fs.remove(stagedPath);
+    if (existingHash !== sha256) {
+      throw new ArtifactIntegrityError("Content-addressed blob path exists with different content", {
+        finalPath,
+        expectedSha256: sha256,
+        actualSha256: existingHash
+      });
+    }
+  } else {
+    fs.rename(stagedPath, finalPath);
+  }
+
+  return {
+    namespace,
+    storageUri: `${namespace}/${sha256}`,
+    absolutePath: finalPath,
+    sha256,
+    byteLength: bytes.byteLength
+  };
+}
+
+export function readVerifiedBlob(
+  rootDir: string,
+  storageUri: string,
+  fs: ArtifactFilesystem = nodeArtifactFilesystem
+): Uint8Array {
+  const segments = storageUri.split("/");
+  if (segments.length !== 2) {
+    throw new TypeError("Blob storage URI must be <namespace>/<sha256>");
+  }
+
+  const [namespace, digest] = segments;
+  if (namespace === undefined || digest === undefined) {
+    throw new TypeError("Blob storage URI must be <namespace>/<sha256>");
+  }
+  assertSafeSegment(namespace, "namespace");
+  if (!/^[a-f0-9]{64}$/.test(digest)) {
+    throw new TypeError("Blob digest must be a lowercase SHA-256 hex string");
+  }
+
+  const root = resolve(rootDir);
+  const path = resolve(root, namespace, digest);
+  assertInsideRoot(root, path);
+
+  if (!fs.exists(path)) {
+    throw new ArtifactIntegrityError("Content-addressed blob does not exist", { path });
+  }
+
+  const bytes = fs.readFile(path);
+  const actualSha256 = sha256Bytes(bytes);
+  if (actualSha256 !== digest) {
+    throw new ArtifactIntegrityError("Content-addressed blob failed integrity verification", {
+      path,
+      expectedSha256: digest,
+      actualSha256
+    });
+  }
+
+  return bytes;
+}
+
 function extensionForMediaType(mediaType: string): string {
   if (mediaType === "application/json") {
     return ".json";

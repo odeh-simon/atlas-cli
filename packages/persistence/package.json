@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@atlas/domain": "workspace:*",
+    "@atlas/schemas": "workspace:*",
     "sql.js": "^1.14.1"
   },
   "devDependencies": {
+    "@atlas/test-utils": "workspace:*",
     "@types/sql.js": "^1.4.11"
   }
 }
