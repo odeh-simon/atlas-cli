@@ -377,5 +377,35 @@ CREATE TABLE IF NOT EXISTS evidence_invalidation (
 
 CREATE INDEX IF NOT EXISTS idx_evidence_invalidation_entity ON evidence_invalidation(repository_id, entity_type, entity_id);
 `
+  },
+  {
+    version: 8,
+    name: "evidence_index_build_state",
+    sql: `
+CREATE TABLE IF NOT EXISTS evidence_index_builds (
+  build_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  state TEXT NOT NULL CHECK (state IN ('running', 'completed', 'failed', 'abandoned')),
+  pid INTEGER NOT NULL,
+  hostname TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  heartbeat_at TEXT NOT NULL,
+  finished_at TEXT,
+  metrics_json TEXT,
+  error_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_builds_repo_state ON evidence_index_builds(repository_id, state);
+
+CREATE TABLE IF NOT EXISTS evidence_scan_cache (
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  uri TEXT NOT NULL,
+  size INTEGER NOT NULL CHECK (size >= 0),
+  mtime_ms REAL NOT NULL,
+  content_sha256 TEXT NOT NULL,
+  scanned_snapshot_id TEXT NOT NULL,
+  PRIMARY KEY (repository_id, uri)
+);
+`
   }
 ] as const;

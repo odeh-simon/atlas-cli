@@ -184,6 +184,7 @@ export interface EvidenceInvalidationRow {
 export interface CommitIndexSnapshotInput {
   readonly repository: EvidenceRepositoryIdentityInput;
   readonly gitSnapshot?: CreateEvidenceGitSnapshotInput | undefined;
+  readonly engine?: EvidenceEngineState | undefined;
   readonly relevantInputsSha256: string;
   readonly analyzers?: readonly AnalyzerCapability[] | undefined;
   readonly files?: readonly EvidenceFileRow[] | undefined;
@@ -197,6 +198,17 @@ export interface CommitIndexSnapshotInput {
   readonly invalidations?: readonly EvidenceInvalidationRow[] | undefined;
   readonly supersedesSnapshotId?: string | undefined;
   readonly createdAt: string;
+}
+
+export interface EvidenceEngineState {
+  readonly engineVersion: number;
+  readonly k0: string;
+  readonly configSha256?: string | undefined;
+}
+
+export interface CommitIndexSnapshotResult {
+  readonly snapshot: EvidenceIndexSnapshot;
+  readonly payloadBytes: number;
 }
 
 export interface CurrentEvidenceIndexSnapshot {
@@ -216,14 +228,14 @@ export function withImmediateTransaction<T>(db: SqlDatabase, fn: () => T): T {
   }
 }
 
-export function commitIndexSnapshot(db: SqlDatabase, input: CommitIndexSnapshotInput): EvidenceIndexSnapshot {
+export function commitIndexSnapshot(db: SqlDatabase, input: CommitIndexSnapshotInput): CommitIndexSnapshotResult {
   return withImmediateTransaction(db, () => commitIndexSnapshotInsideTransaction(db, input));
 }
 
 function commitIndexSnapshotInsideTransaction(
   db: SqlDatabase,
   input: CommitIndexSnapshotInput
-): EvidenceIndexSnapshot {
+): CommitIndexSnapshotResult {
   if (!SHA256_PATTERN.test(input.relevantInputsSha256)) {
     throw new PersistenceError("relevant_inputs_sha256 must be a lowercase SHA-256 hex digest");
   }
@@ -387,11 +399,21 @@ function commitIndexSnapshotInsideTransaction(
         : { invalidated_in_snapshot_id: invalidation.invalidatedInSnapshotId }),
       reason: invalidation.reason,
       recorded_at: invalidation.recordedAt
-    }))
+    })),
+    ...(input.engine === undefined
+      ? {}
+      : {
+          engine: {
+            engine_version: input.engine.engineVersion,
+            k0: input.engine.k0,
+            ...(input.engine.configSha256 === undefined ? {} : { config_sha256: input.engine.configSha256 })
+          }
+        })
   };
 
   const payload = indexPayloadSchema.parse(payloadCandidate);
   const payloadJson = canonicalJson(payload);
+  const payloadBytes = Buffer.byteLength(payloadJson, "utf8");
   const payloadSha256 = createHash("sha256").update(payloadJson, "utf8").digest("hex");
 
   const snapshotId = deriveId("idxsnap", [
@@ -412,7 +434,7 @@ function commitIndexSnapshotInsideTransaction(
         recomputedPayloadSha256: payloadSha256
       });
     }
-    return parseStoredSnapshotHeader(existing);
+    return { snapshot: parseStoredSnapshotHeader(existing), payloadBytes: Buffer.byteLength(requiredString(existing, "payload_json"), "utf8") };
   }
 
   const priorCurrent = queryOne(
@@ -475,7 +497,7 @@ function commitIndexSnapshotInsideTransaction(
     ]
   );
 
-  return header;
+  return { snapshot: header, payloadBytes };
 }
 
 function rejectForeignRepositoryRows(
@@ -666,6 +688,206 @@ export function assertSupportedIndexSchema(db: SqlDatabase): void {
       supportedSchemaVersion: EVIDENCE_INDEX_SCHEMA_VERSION
     });
   }
+}
+
+export function ensureEvidenceRepository(
+  db: SqlDatabase,
+  input: EvidenceRepositoryIdentityInput,
+  now: string
+): DerivedEvidenceRepositoryIdentity {
+  return upsertEvidenceRepository(db, deriveEvidenceRepositoryIdentity(input), now);
+}
+
+export type EvidenceIndexSnapshotOrder = "asc" | "desc";
+
+export interface ListEvidenceIndexSnapshotsOptions {
+  readonly limit?: number | undefined;
+  readonly order?: EvidenceIndexSnapshotOrder | undefined;
+}
+
+export function listEvidenceIndexSnapshots(
+  db: SqlDatabase,
+  repositoryId: string,
+  options: ListEvidenceIndexSnapshotsOptions = {}
+): EvidenceIndexSnapshot[] {
+  const limit = options.limit === undefined ? 50 : Math.max(1, Math.floor(options.limit));
+  const order = options.order === "asc" ? "ASC" : "DESC";
+  return queryAll(
+    db,
+    `SELECT * FROM evidence_index_snapshots WHERE repository_id = ? ORDER BY created_at ${order}, snapshot_id ${order} LIMIT ?`,
+    [repositoryId, limit]
+  ).map(parseStoredSnapshotHeader);
+}
+
+export function getEvidenceIndexSnapshotPayload(
+  db: SqlDatabase,
+  snapshotId: string
+): CurrentEvidenceIndexSnapshot | undefined {
+  const row = queryOne(db, "SELECT * FROM evidence_index_snapshots WHERE snapshot_id = ?", [snapshotId]);
+  if (row === undefined) {
+    return undefined;
+  }
+
+  verifyStoredSnapshotIntegrity(row);
+  const parsedPayload = indexPayloadSchema.safeParse(JSON.parse(requiredString(row, "payload_json")));
+  if (!parsedPayload.success) {
+    throw new ArtifactIntegrityError("Stored evidence index payload failed validation", {
+      snapshotId: requiredString(row, "snapshot_id"),
+      issues: parsedPayload.error.issues.slice(0, 5)
+    });
+  }
+
+  return { snapshot: parseStoredSnapshotHeader(row), payload: parsedPayload.data };
+}
+
+export interface EvidenceScanCacheEntry {
+  readonly repositoryId: string;
+  readonly uri: string;
+  readonly size: number;
+  readonly mtimeMs: number;
+  readonly contentSha256: string;
+  readonly scannedSnapshotId: string;
+}
+
+export function getEvidenceScanCacheEntries(db: SqlDatabase, repositoryId: string): EvidenceScanCacheEntry[] {
+  return queryAll(db, "SELECT * FROM evidence_scan_cache WHERE repository_id = ? ORDER BY uri", [
+    repositoryId
+  ]).map(mapEvidenceScanCacheEntry);
+}
+
+export function upsertEvidenceScanCacheEntries(
+  db: SqlDatabase,
+  entries: readonly EvidenceScanCacheEntry[]
+): void {
+  for (const entry of entries) {
+    db.run(
+      `INSERT INTO evidence_scan_cache (repository_id, uri, size, mtime_ms, content_sha256, scanned_snapshot_id)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(repository_id, uri) DO UPDATE SET
+         size = excluded.size,
+         mtime_ms = excluded.mtime_ms,
+         content_sha256 = excluded.content_sha256,
+         scanned_snapshot_id = excluded.scanned_snapshot_id`,
+      [entry.repositoryId, entry.uri, entry.size, entry.mtimeMs, entry.contentSha256, entry.scannedSnapshotId]
+    );
+  }
+}
+
+export function deleteEvidenceScanCacheEntries(db: SqlDatabase, repositoryId: string, uris: readonly string[]): void {
+  for (const uri of uris) {
+    db.run("DELETE FROM evidence_scan_cache WHERE repository_id = ? AND uri = ?", [repositoryId, uri]);
+  }
+}
+
+export type EvidenceIndexBuildState = "running" | "completed" | "failed" | "abandoned";
+
+export interface EvidenceIndexBuildRecord {
+  readonly buildId: string;
+  readonly repositoryId: string;
+  readonly state: EvidenceIndexBuildState;
+  readonly pid: number;
+  readonly hostname: string;
+  readonly startedAt: string;
+  readonly heartbeatAt: string;
+  readonly finishedAt?: string | undefined;
+  readonly metricsJson?: string | undefined;
+  readonly errorJson?: string | undefined;
+}
+
+export interface StartEvidenceIndexBuildInput {
+  readonly buildId: string;
+  readonly repositoryId: string;
+  readonly pid: number;
+  readonly hostname: string;
+  readonly now: string;
+}
+
+export function startEvidenceIndexBuild(db: SqlDatabase, input: StartEvidenceIndexBuildInput): EvidenceIndexBuildRecord {
+  db.run(
+    `INSERT INTO evidence_index_builds (build_id, repository_id, state, pid, hostname, started_at, heartbeat_at)
+     VALUES (?, ?, 'running', ?, ?, ?, ?)
+     ON CONFLICT(build_id) DO NOTHING`,
+    [input.buildId, input.repositoryId, input.pid, input.hostname, input.now, input.now]
+  );
+
+  const row = queryOne(db, "SELECT * FROM evidence_index_builds WHERE build_id = ?", [input.buildId]);
+  if (row === undefined) {
+    throw new PersistenceError("Evidence index build marker was not created", { buildId: input.buildId });
+  }
+  return mapEvidenceIndexBuild(row);
+}
+
+export function finishEvidenceIndexBuild(
+  db: SqlDatabase,
+  input: {
+    readonly buildId: string;
+    readonly state: Exclude<EvidenceIndexBuildState, "running" | "abandoned">;
+    readonly finishedAt: string;
+    readonly metricsJson?: string | undefined;
+    readonly errorJson?: string | undefined;
+  }
+): EvidenceIndexBuildRecord | undefined {
+  db.run(
+    `UPDATE evidence_index_builds
+     SET state = ?, finished_at = ?, metrics_json = COALESCE(?, metrics_json), error_json = COALESCE(?, error_json)
+     WHERE build_id = ? AND state = 'running'`,
+    [input.state, input.finishedAt, input.metricsJson ?? null, input.errorJson ?? null, input.buildId]
+  );
+  const row = queryOne(db, "SELECT * FROM evidence_index_builds WHERE build_id = ?", [input.buildId]);
+  return row === undefined ? undefined : mapEvidenceIndexBuild(row);
+}
+
+export function abandonForeignRunningBuilds(
+  db: SqlDatabase,
+  input: { readonly repositoryId: string; readonly pid: number; readonly hostname: string; readonly abandonedAt: string }
+): number {
+  db.run(
+    `UPDATE evidence_index_builds
+     SET state = 'abandoned', finished_at = ?
+     WHERE repository_id = ? AND state = 'running' AND (pid != ? OR hostname != ?)`,
+    [input.abandonedAt, input.repositoryId, input.pid, input.hostname]
+  );
+  const row = queryOne(
+    db,
+    "SELECT COUNT(*) AS count FROM evidence_index_builds WHERE repository_id = ? AND state = 'abandoned'",
+    [input.repositoryId]
+  );
+  return row === undefined ? 0 : Number(row.count ?? 0);
+}
+
+function mapEvidenceScanCacheEntry(row: Record<string, initSqlJs.SqlValue>): EvidenceScanCacheEntry {
+  return {
+    repositoryId: requiredString(row, "repository_id"),
+    uri: requiredString(row, "uri"),
+    size: requiredNumber(row, "size"),
+    mtimeMs: Number(row.mtime_ms),
+    contentSha256: requiredString(row, "content_sha256"),
+    scannedSnapshotId: requiredString(row, "scanned_snapshot_id")
+  };
+}
+
+function mapEvidenceIndexBuild(row: Record<string, initSqlJs.SqlValue>): EvidenceIndexBuildRecord {
+  const state = requiredString(row, "state");
+  if (!isEvidenceIndexBuildState(state)) {
+    throw new PersistenceError("Stored evidence index build has invalid state", { state });
+  }
+
+  return {
+    buildId: requiredString(row, "build_id"),
+    repositoryId: requiredString(row, "repository_id"),
+    state,
+    pid: requiredNumber(row, "pid"),
+    hostname: requiredString(row, "hostname"),
+    startedAt: requiredString(row, "started_at"),
+    heartbeatAt: requiredString(row, "heartbeat_at"),
+    finishedAt: optionalString(row, "finished_at"),
+    metricsJson: optionalString(row, "metrics_json"),
+    errorJson: optionalString(row, "error_json")
+  };
+}
+
+function isEvidenceIndexBuildState(value: string): value is EvidenceIndexBuildState {
+  return ["running", "completed", "failed", "abandoned"].includes(value);
 }
 
 export function getEvidenceRepository(db: SqlDatabase, repositoryId: string): EvidenceRepositoryRecord | undefined {

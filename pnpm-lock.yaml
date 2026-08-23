@@ -174,6 +174,25 @@ importers:
 
   packages/domain: {}
 
+  packages/evidence-index:
+    dependencies:
+      '@atlas/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@atlas/git':
+        specifier: workspace:*
+        version: link:../git
+      '@atlas/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@atlas/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+    devDependencies:
+      '@atlas/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
+
   packages/git:
     dependencies:
       '@atlas/domain':

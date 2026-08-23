@@ -4,24 +4,25 @@ import { idSchema, isoDateTimeSchema, sensitivitySchema, sha256Schema } from "./
 
 export const EVIDENCE_INDEX_SCHEMA_VERSION = 1;
 
-const SAFE_SEGMENT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export const SAFE_SEGMENT_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+export function isSafeUriSegments(uri: string): boolean {
+  if (uri.includes("\\") || uri.startsWith("/") || /^[A-Za-z]:/.test(uri)) {
+    return false;
+  }
+  const segments = uri.split("/");
+  return segments.length > 0 && segments.every((segment) => SAFE_SEGMENT_PATTERN.test(segment));
+}
 
 const repoRelativeUriSchema = z
   .string()
   .min(1)
-  .refine(
-    (value) => {
-      if (value.includes("\\") || value.startsWith("/") || /^[A-Za-z]:/.test(value)) {
-        return false;
-      }
-      const segments = value.split("/");
-      return segments.length > 0 && segments.every((segment) => SAFE_SEGMENT_PATTERN.test(segment));
-    },
-    { message: "uri must be a repository-relative forward-slash path with safe segments" }
-  );
+  .refine(isSafeUriSegments, {
+    message: "uri must be a repository-relative forward-slash path with safe segments"
+  });
 
-const gitStatusTokenSchema = z.string().regex(SAFE_SEGMENT_PATTERN, {
-  message: "git status token must be a short safe segment without path separators"
+const gitStatusTokenSchema = z.string().regex(/^[ A-Z?!]{1,2}$/, {
+  message: "git status token must be a short porcelain status code"
 });
 
 const storageUriSchema = z.string().min(1).refine(
@@ -238,9 +239,16 @@ export const evidenceEntryCountsSchema = z.object({
   api_evidence: z.number().int().nonnegative()
 });
 
+export const evidenceEngineStateSchema = z.object({
+  engine_version: z.literal(1),
+  k0: sha256Schema,
+  config_sha256: sha256Schema.optional()
+});
+
 export const indexPayloadSchema = z.object({
   repository: evidenceRepositoryIdentitySchema,
   git_snapshot: evidenceGitSnapshotSchema.optional(),
+  engine: evidenceEngineStateSchema.optional(),
   files: z.array(evidenceFileRecordSchema).default([]),
   contents: z.array(evidenceContentRecordSchema).default([]),
   classifications: z.array(evidenceSourceClassificationSchema).default([]),
@@ -280,4 +288,6 @@ export type AnalyzerCapability = z.infer<typeof analyzerCapabilitySchema>;
 export type InvalidationMetadata = z.infer<typeof invalidationMetadataSchema>;
 export type EvidenceEntryCounts = z.infer<typeof evidenceEntryCountsSchema>;
 export type EvidenceIndexPayload = z.infer<typeof indexPayloadSchema>;
+export type EvidenceInvalidationReason = z.infer<typeof evidenceInvalidationReasonSchema>;
+export type EvidenceSensitivity = z.infer<typeof sensitivitySchema>;
 export type EvidenceIndexSnapshot = z.infer<typeof indexSnapshotSchema>;

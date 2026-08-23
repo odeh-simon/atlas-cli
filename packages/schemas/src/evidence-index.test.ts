@@ -328,7 +328,7 @@ describe("evidence index schemas", () => {
     expect(
       evidenceGitSnapshotSchema.safeParse({
         ...validGitSnapshot,
-        changed_files: [{ path: "src/renamed.ts", index: "R100", working_tree: "M", original_path: "src/old.ts" }]
+        changed_files: [{ path: "src/renamed.ts", index: "R", working_tree: "M", original_path: "src/old.ts" }]
       }).success
     ).toBe(true);
   });

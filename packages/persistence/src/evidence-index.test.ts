@@ -92,18 +92,18 @@ describe("deterministic evidence index commits", () => {
     const headerA = commitIndexSnapshot(first.db, input);
     const headerB = commitIndexSnapshot(second.db, input);
 
-    expect(headerA.snapshot_id).toBe(headerB.snapshot_id);
-    expect(headerA.repository_id).toBe(headerB.repository_id);
+    expect(headerA.snapshot.snapshot_id).toBe(headerB.snapshot.snapshot_id);
+    expect(headerA.snapshot.repository_id).toBe(headerB.snapshot.repository_id);
 
     const rowA = queryOne(
       first.db,
       "SELECT snapshot_id, payload_json, payload_sha256 FROM evidence_index_snapshots WHERE snapshot_id = ?",
-      [headerA.snapshot_id]
+      [headerA.snapshot.snapshot_id]
     );
     const rowB = queryOne(
       second.db,
       "SELECT snapshot_id, payload_json, payload_sha256 FROM evidence_index_snapshots WHERE snapshot_id = ?",
-      [headerB.snapshot_id]
+      [headerB.snapshot.snapshot_id]
     );
 
     expect(rowA).toEqual(rowB);
@@ -114,8 +114,8 @@ describe("deterministic evidence index commits", () => {
     const header = commitIndexSnapshot(opened.db, sampleEvidenceIndexInput());
     const reopened = await saveAndReopen(opened);
 
-    const reread = requireCurrent(reopened, header.repository_id);
-    expect(reread.snapshot.snapshot_id).toBe(header.snapshot_id);
+    const reread = requireCurrent(reopened, header.snapshot.repository_id);
+    expect(reread.snapshot.snapshot_id).toBe(header.snapshot.snapshot_id);
     expect(reread.payload.files.map((file) => file.uri)).toEqual([
       "AGENTS.md",
       "atlas.config.json",
@@ -135,10 +135,10 @@ describe("fail-closed schema policy", () => {
     const header = commitIndexSnapshot(opened.db, sampleEvidenceIndexInput());
 
     opened.db.run("UPDATE evidence_index_snapshots SET schema_version = 2 WHERE snapshot_id = ?", [
-      header.snapshot_id
+      header.snapshot.snapshot_id
     ]);
 
-    expect(() => readCurrentIndexSnapshot(opened.db, header.repository_id)).toThrow(MigrationError);
+    expect(() => readCurrentIndexSnapshot(opened.db, header.snapshot.repository_id)).toThrow(MigrationError);
   });
 
   it("refuses index access when the database was migrated by a newer Atlas version", async () => {
@@ -202,7 +202,7 @@ describe("fail-closed schema policy", () => {
       now: () => new Date(FIXTURE_NOW_ISO),
       migrations: coreMigrations
     });
-    expect(upgrade.applied.map((migration) => migration.version)).toEqual([7]);
+    expect(upgrade.applied.map((migration) => migration.version)).toEqual([7, 8]);
 
     const reopened = await openDatabase(dbPath);
     expect(getRepository(reopened, "repo_legacy")).toEqual(repository);
@@ -233,7 +233,7 @@ describe("transactional snapshot commits", () => {
     expect(queryOne(reopened.db, "SELECT COUNT(*) AS count FROM evidence_contents WHERE content_sha256 = ?", [
       "b".repeat(64)
     ])).toEqual({ count: 0 });
-    expect(requireCurrent(reopened, header.repository_id).snapshot.status).toBe("current");
+    expect(requireCurrent(reopened, header.snapshot.repository_id).snapshot.status).toBe("current");
   });
 
   it("keeps the previous snapshot current when commitIndexSnapshot fails mid-entry", async () => {
@@ -245,7 +245,7 @@ describe("transactional snapshot commits", () => {
     const brokenEdges = [
       {
         edgeId: "evedge_broken00000000000000",
-        repositoryId: first.repository_id,
+        repositoryId: first.snapshot.repository_id,
         kind: "import",
         fromFileId: "evfile_missing000000000001",
         toFileId: "evfile_missing000000000002",
@@ -259,13 +259,13 @@ describe("transactional snapshot commits", () => {
     expect(() => commitIndexSnapshot(opened.db, { ...mutated, edges: brokenEdges })).toThrow();
 
     const reopened = await saveAndReopen(opened);
-    expect(requireCurrent(reopened, first.repository_id).snapshot.snapshot_id).toBe(first.snapshot_id);
+    expect(requireCurrent(reopened, first.snapshot.repository_id).snapshot.snapshot_id).toBe(first.snapshot.snapshot_id);
     expect(
       queryOne(reopened.db, "SELECT COUNT(*) AS count FROM evidence_edges WHERE edge_id = ?", [
         "evedge_broken00000000000000"
       ])
     ).toMatchObject({ count: 0 });
-    expect(listEvidenceFiles(reopened.db, first.repository_id).map((file) => file.uri)).toContain("src/util.ts");
+    expect(listEvidenceFiles(reopened.db, first.snapshot.repository_id).map((file) => file.uri)).toContain("src/util.ts");
   });
 
   it("supersedes the previous snapshot only after a fully successful commit", async () => {
@@ -277,7 +277,7 @@ describe("transactional snapshot commits", () => {
     });
     const second = commitIndexSnapshot(opened.db, grown);
 
-    expect(second.snapshot_id).not.toBe(first.snapshot_id);
+    expect(second.snapshot.snapshot_id).not.toBe(first.snapshot.snapshot_id);
     const statuses = queryAll(
       opened.db,
       "SELECT snapshot_id, status FROM evidence_index_snapshots ORDER BY status",
@@ -286,14 +286,14 @@ describe("transactional snapshot commits", () => {
 
     expect(statuses).toEqual(
       expect.arrayContaining([
-        { snapshot_id: first.snapshot_id, status: "superseded" },
-        { snapshot_id: second.snapshot_id, status: "current" }
+        { snapshot_id: first.snapshot.snapshot_id, status: "superseded" },
+        { snapshot_id: second.snapshot.snapshot_id, status: "current" }
       ])
     );
 
     const reopened = await saveAndReopen(opened);
-    expect(requireCurrent(reopened, first.repository_id).snapshot.snapshot_id).toBe(second.snapshot_id);
-    expect(getEvidenceFileByUri(reopened.db, first.repository_id, "docs/new.md")).toBeDefined();
+    expect(requireCurrent(reopened, first.snapshot.repository_id).snapshot.snapshot_id).toBe(second.snapshot.snapshot_id);
+    expect(getEvidenceFileByUri(reopened.db, first.snapshot.repository_id, "docs/new.md")).toBeDefined();
   });
 
   it("auto-derives the supersedes chain and rejects caller-supplied disagreements", async () => {
@@ -303,12 +303,12 @@ describe("transactional snapshot commits", () => {
       files: [...DEFAULT_FIXTURE_FILES, { path: "docs/new.md", content: "# New\n" }]
     }));
 
-    expect(second.supersedes_snapshot_id).toBe(first.snapshot_id);
+    expect(second.snapshot.supersedes_snapshot_id).toBe(first.snapshot.snapshot_id);
 
     const third = commitIndexSnapshot(opened.db, sampleEvidenceIndexInput({
       files: [...DEFAULT_FIXTURE_FILES, { path: "docs/newer.md", content: "# Newer\n" }]
     }));
-    expect(third.supersedes_snapshot_id).toBe(second.snapshot_id);
+    expect(third.snapshot.supersedes_snapshot_id).toBe(second.snapshot.snapshot_id);
 
     expect(() =>
       commitIndexSnapshot(opened.db, {
@@ -319,7 +319,7 @@ describe("transactional snapshot commits", () => {
       })
     ).toThrow(/Superseded chain mismatch/u);
 
-    expect(requireCurrent(opened, first.repository_id).snapshot.snapshot_id).toBe(third.snapshot_id);
+    expect(requireCurrent(opened, first.snapshot.repository_id).snapshot.snapshot_id).toBe(third.snapshot.snapshot_id);
   });
 
   it("returns the stored header unchanged when an identical snapshot is replayed verbatim", async () => {
@@ -331,26 +331,26 @@ describe("transactional snapshot commits", () => {
       files: [...DEFAULT_FIXTURE_FILES, { path: "docs/new.md", content: "# New\n" }]
     });
     const headerB = commitIndexSnapshot(opened.db, inputB);
-    expect(headerB.supersedes_snapshot_id).toBe(headerA.snapshot_id);
+    expect(headerB.snapshot.supersedes_snapshot_id).toBe(headerA.snapshot.snapshot_id);
 
     const rowABeforeReplay = queryOne(
       opened.db,
       "SELECT created_at, status FROM evidence_index_snapshots WHERE snapshot_id = ?",
-      [headerA.snapshot_id]
+      [headerA.snapshot.snapshot_id]
     );
     const replayed = commitIndexSnapshot(opened.db, inputA);
 
-    expect(replayed.snapshot_id).toBe(headerA.snapshot_id);
-    expect(replayed.created_at).toBe(headerA.created_at);
-    expect(replayed.status).toBe("superseded");
+    expect(replayed.snapshot.snapshot_id).toBe(headerA.snapshot.snapshot_id);
+    expect(replayed.snapshot.created_at).toBe(headerA.snapshot.created_at);
+    expect(replayed.snapshot.status).toBe("superseded");
 
     expect(queryOne(opened.db, "SELECT created_at, status FROM evidence_index_snapshots WHERE snapshot_id = ?", [
-      headerA.snapshot_id
+      headerA.snapshot.snapshot_id
     ])).toEqual(rowABeforeReplay);
     expect(String(rowABeforeReplay?.status)).toBe("superseded");
 
-    const current = requireCurrent(opened, headerB.repository_id);
-    expect(current.snapshot.snapshot_id).toBe(headerB.snapshot_id);
+    const current = requireCurrent(opened, headerB.snapshot.repository_id);
+    expect(current.snapshot.snapshot_id).toBe(headerB.snapshot.snapshot_id);
     expect(current.payload.files.map((file) => file.uri)).toContain("docs/new.md");
     expect(queryOne(opened.db, "SELECT COUNT(*) AS count FROM evidence_index_snapshots")).toMatchObject({ count: 2 });
   });
@@ -362,13 +362,13 @@ describe("transactional snapshot commits", () => {
 
     opened.db.run("UPDATE evidence_index_snapshots SET payload_json = ? WHERE snapshot_id = ?", [
       '{"repository":{"repository_id":"forged"}}',
-      headerA.snapshot_id
+      headerA.snapshot.snapshot_id
     ]);
 
     expect(() => commitIndexSnapshot(opened.db, inputA)).toThrow(ArtifactIntegrityError);
 
     opened.db.run("UPDATE evidence_index_snapshots SET status = 'invalid' WHERE snapshot_id = ?", [
-      headerA.snapshot_id
+      headerA.snapshot.snapshot_id
     ]);
     opened.db.run(
       `INSERT INTO evidence_index_snapshots
@@ -377,7 +377,7 @@ describe("transactional snapshot commits", () => {
        VALUES (?, ?, NULL, 'current', NULL, 1, ?, '{}', '[]', ?, ?, ?)`,
       [
         "idxsnap_forged00000000000",
-        headerA.repository_id,
+        headerA.snapshot.repository_id,
         "a".repeat(64),
         '{"repository":{"repository_id":"forged"}}',
         "b".repeat(64),
@@ -385,7 +385,7 @@ describe("transactional snapshot commits", () => {
       ]
     );
 
-    expect(() => readCurrentIndexSnapshot(opened.db, headerA.repository_id)).toThrow(ArtifactIntegrityError);
+    expect(() => readCurrentIndexSnapshot(opened.db, headerA.snapshot.repository_id)).toThrow(ArtifactIntegrityError);
   });
 });
 
@@ -397,7 +397,7 @@ describe("cross-repository evidence policy", () => {
 
     const poisoned = sampleEvidenceIndexInput({ seed: "alpha", rootPath: "/repos/alpha" });
     const poisonedFiles = (poisoned.files ?? []).map((file, index) =>
-      index === 0 ? { ...file, repositoryId: beta.repository_id } : file
+      index === 0 ? { ...file, repositoryId: beta.snapshot.repository_id } : file
     );
 
     expect(() => commitIndexSnapshot(opened.db, { ...poisoned, files: poisonedFiles })).toThrow(
@@ -407,14 +407,14 @@ describe("cross-repository evidence policy", () => {
     const reopened = await saveAndReopen(opened);
     expect(
       queryOne(reopened.db, "SELECT COUNT(*) AS count FROM evidence_index_snapshots WHERE repository_id = ?", [
-        alpha.repository_id
+        alpha.snapshot.repository_id
       ])
     ).toMatchObject({ count: 1 });
-    expect(requireCurrent(reopened, alpha.repository_id).snapshot.snapshot_id).toBe(alpha.snapshot_id);
-    expect(listEvidenceFiles(reopened.db, alpha.repository_id)).toHaveLength(8);
-    expect(listEvidenceFiles(reopened.db, beta.repository_id)).toHaveLength(8);
-    expect(getEvidenceFileByUri(reopened.db, beta.repository_id, "AGENTS.md")?.contentSha256).toBe(
-      getEvidenceFileByUri(reopened.db, alpha.repository_id, "AGENTS.md")?.contentSha256
+    expect(requireCurrent(reopened, alpha.snapshot.repository_id).snapshot.snapshot_id).toBe(alpha.snapshot.snapshot_id);
+    expect(listEvidenceFiles(reopened.db, alpha.snapshot.repository_id)).toHaveLength(8);
+    expect(listEvidenceFiles(reopened.db, beta.snapshot.repository_id)).toHaveLength(8);
+    expect(getEvidenceFileByUri(reopened.db, beta.snapshot.repository_id, "AGENTS.md")?.contentSha256).toBe(
+      getEvidenceFileByUri(reopened.db, alpha.snapshot.repository_id, "AGENTS.md")?.contentSha256
     );
   });
 
@@ -427,32 +427,32 @@ describe("cross-repository evidence policy", () => {
     const poisonedGitSnapshot =
       poisoned.gitSnapshot === undefined
         ? undefined
-        : { ...poisoned.gitSnapshot, repositoryId: beta.repository_id };
+        : { ...poisoned.gitSnapshot, repositoryId: beta.snapshot.repository_id };
 
     expect(() =>
       commitIndexSnapshot(opened.db, { ...poisoned, gitSnapshot: poisonedGitSnapshot })
     ).toThrow(/Cross-repository evidence rejected/u);
-    expect(requireCurrent(opened, alpha.repository_id).snapshot.snapshot_id).toBe(alpha.snapshot_id);
+    expect(requireCurrent(opened, alpha.snapshot.repository_id).snapshot.snapshot_id).toBe(alpha.snapshot.snapshot_id);
   });
 
   it("refuses to rewrite an evidence_files primary key on uri conflict", async () => {
     const opened = await openedFixtureDb();
     const header = commitIndexSnapshot(opened.db, sampleEvidenceIndexInput());
 
-    const stored = getEvidenceFileByUri(opened.db, header.repository_id, "src/util.ts");
+    const stored = getEvidenceFileByUri(opened.db, header.snapshot.repository_id, "src/util.ts");
     expect(stored).toBeDefined();
 
     expect(() =>
       upsertEvidenceFile(opened.db, {
         fileId: "evfile_forged00000000001",
-        repositoryId: header.repository_id,
+        repositoryId: header.snapshot.repository_id,
         uri: "src/util.ts",
         contentSha256: "a".repeat(64),
         byteLength: 1,
-        lastSeenSnapshotId: header.snapshot_id
+        lastSeenSnapshotId: header.snapshot.snapshot_id
       })
     ).toThrow(/file identity conflict/u);
-    expect(getEvidenceFileByUri(opened.db, header.repository_id, "src/util.ts")).toEqual(stored);
+    expect(getEvidenceFileByUri(opened.db, header.snapshot.repository_id, "src/util.ts")).toEqual(stored);
   });
 
   it("persists real sensitivity on content records instead of a fabricated constant", async () => {
@@ -501,7 +501,7 @@ describe("repository identity collision policy", () => {
     const first = commitIndexSnapshot(opened.db, input);
     const second = commitIndexSnapshot(opened.db, input);
 
-    expect(second.repository_id).toBe(first.repository_id);
+    expect(second.snapshot.repository_id).toBe(first.snapshot.repository_id);
     expect(queryOne(opened.db, "SELECT COUNT(*) AS count FROM evidence_repositories")).toMatchObject({ count: 1 });
   });
 
@@ -510,11 +510,11 @@ describe("repository identity collision policy", () => {
     const alpha = commitIndexSnapshot(opened.db, sampleEvidenceIndexInput({ seed: "alpha", rootPath: "/repos/alpha" }));
     const beta = commitIndexSnapshot(opened.db, sampleEvidenceIndexInput({ seed: "beta", rootPath: "/repos/beta" }));
 
-    expect(alpha.repository_id).not.toBe(beta.repository_id);
-    expect(requireCurrent(opened, alpha.repository_id).snapshot.repository_id).toBe(alpha.repository_id);
-    expect(requireCurrent(opened, beta.repository_id).snapshot.repository_id).toBe(beta.repository_id);
-    expect(getEvidenceRepository(opened.db, alpha.repository_id)?.rootPathHash).not.toBe(
-      getEvidenceRepository(opened.db, beta.repository_id)?.rootPathHash
+    expect(alpha.snapshot.repository_id).not.toBe(beta.snapshot.repository_id);
+    expect(requireCurrent(opened, alpha.snapshot.repository_id).snapshot.repository_id).toBe(alpha.snapshot.repository_id);
+    expect(requireCurrent(opened, beta.snapshot.repository_id).snapshot.repository_id).toBe(beta.snapshot.repository_id);
+    expect(getEvidenceRepository(opened.db, alpha.snapshot.repository_id)?.rootPathHash).not.toBe(
+      getEvidenceRepository(opened.db, beta.snapshot.repository_id)?.rootPathHash
     );
   });
 
@@ -530,7 +530,7 @@ describe("repository identity collision policy", () => {
     expect(() => commitIndexSnapshot(opened.db, { ...foreign, files })).toThrow();
 
     const reopened = await saveAndReopen(opened);
-    expect(requireCurrent(reopened, header.repository_id).snapshot.snapshot_id).toBe(header.snapshot_id);
+    expect(requireCurrent(reopened, header.snapshot.repository_id).snapshot.snapshot_id).toBe(header.snapshot.snapshot_id);
     expect(getEvidenceFileByUri(reopened.db, "evrepo_foreign0000000000", "src/util.ts")).toBeUndefined();
   });
 });
@@ -541,7 +541,7 @@ describe("classification persistence", () => {
     const header = commitIndexSnapshot(opened.db, sampleEvidenceIndexInput());
     const reopened = await saveAndReopen(opened);
 
-    const stored = listEvidenceClassifications(reopened.db, header.repository_id);
+    const stored = listEvidenceClassifications(reopened.db, header.snapshot.repository_id);
     const parsedStored = stored.map((classification) =>
       evidenceSourceClassificationSchema.parse({
         classification_id: classification.classificationId,
@@ -575,7 +575,7 @@ describe("classification persistence", () => {
     expect(plain).toMatchObject({ secret: false, binary: false, excluded: false, category: "source" });
 
     expect(stored).toHaveLength(8);
-    expect(stored.every((classification) => classification.repositoryId === header.repository_id)).toBe(true);
+    expect(stored.every((classification) => classification.repositoryId === header.snapshot.repository_id)).toBe(true);
   });
 });
 
@@ -587,10 +587,10 @@ describe("payload corruption detection", () => {
 
     reopened.db.run(
       "UPDATE evidence_index_snapshots SET payload_json = REPLACE(payload_json, '\"files\"', '\"filez\"') WHERE snapshot_id = ?",
-      [header.snapshot_id]
+      [header.snapshot.snapshot_id]
     );
 
-    expect(() => readCurrentIndexSnapshot(reopened.db, header.repository_id)).toThrow(ArtifactIntegrityError);
+    expect(() => readCurrentIndexSnapshot(reopened.db, header.snapshot.repository_id)).toThrow(ArtifactIntegrityError);
   });
 
   it("throws ArtifactIntegrityError when the payload hash column itself is tampered with", async () => {
@@ -600,9 +600,9 @@ describe("payload corruption detection", () => {
 
     reopened.db.run(
       "UPDATE evidence_index_snapshots SET payload_sha256 = ? WHERE snapshot_id = ?",
-      ["e".repeat(64), header.snapshot_id]
+      ["e".repeat(64), header.snapshot.snapshot_id]
     );
 
-    expect(() => readCurrentIndexSnapshot(reopened.db, header.repository_id)).toThrow(ArtifactIntegrityError);
+    expect(() => readCurrentIndexSnapshot(reopened.db, header.snapshot.repository_id)).toThrow(ArtifactIntegrityError);
   });
 });

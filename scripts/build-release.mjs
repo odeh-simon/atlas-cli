@@ -66,7 +66,7 @@ try {
   mkdirSync(outputDirectory, { recursive: true });
   rmSync(archivePath, { force: true });
   rmSync(checksumPath, { force: true });
-  run("tar", ["-czf", archivePath, "-C", stageDirectory, "."], workspaceRoot);
+  run("tar", ["--force-local", "-czf", archivePath.replace(/\\/g, "/"), "-C", stageDirectory.replace(/\\/g, "/"), "."], workspaceRoot);
   const checksum = createHash("sha256").update(readFileSync(archivePath)).digest("hex");
   writeFileSync(checksumPath, `${checksum}  ${basename(archivePath)}\n`);
 

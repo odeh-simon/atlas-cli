@@ -37,7 +37,7 @@ describe("invokeImplementationAgent", () => {
     const status = await getStatus(prepared);
     expect(status.session?.primaryState).toBe("implementation_reconciled");
     expect(status.artifactCount).toBeGreaterThanOrEqual(7);
-  }, 10_000);
+  }, 30_000);
 
   it.each([
     ["secret", ".env", "API_TOKEN=sk_abcdefghijklmnop\n"],

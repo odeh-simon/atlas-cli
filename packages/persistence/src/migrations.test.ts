@@ -98,8 +98,9 @@ describe("evidence index core migration (v7)", () => {
       migrations: coreMigrations
     });
 
-    expect(result.applied.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(result.applied.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(result.applied.find((migration) => migration.version === 7)?.name).toBe("evidence_index_core");
+    expect(result.applied.find((migration) => migration.version === 8)?.name).toBe("evidence_index_build_state");
 
     const db = await openDatabase(dbPath);
     const tables = db.exec(
@@ -114,13 +115,52 @@ describe("evidence index core migration (v7)", () => {
       "evidence_edges",
       "evidence_files",
       "evidence_git_snapshots",
+      "evidence_index_builds",
       "evidence_index_snapshots",
       "evidence_invalidation",
       "evidence_repositories",
+      "evidence_scan_cache",
       "evidence_symbols",
       "evidence_test_associations"
     ]);
     db.close();
+  });
+
+  it("applies v8 on a pre-existing v7 database and preserves evidence rows", async () => {
+    const root = tempRoot();
+    const dbPath = join(root, "atlas.db");
+
+    await applyMigrations({
+      dbPath,
+      backupDirectory: join(root, "backups"),
+      now,
+      migrations: coreMigrations.filter((migration) => migration.version <= 7)
+    });
+
+    const v7Db = await openDatabase(dbPath);
+    v7Db.run(
+      `INSERT INTO evidence_repositories (repository_id, root_path_hash, display_name, created_at)
+       VALUES ('evrepo_v7legacy', ?, 'Legacy Evidence Repo', ?)`,
+      ["a".repeat(64), now().toISOString()]
+    );
+    saveDatabase(dbPath, v7Db);
+    v7Db.close();
+
+    const upgrade = await applyMigrations({
+      dbPath,
+      backupDirectory: join(root, "backups"),
+      now,
+      migrations: coreMigrations
+    });
+    expect(upgrade.applied.map((migration) => migration.version)).toEqual([8]);
+
+    const reopened = await openDatabase(dbPath);
+    expect(readAppliedMigrations(reopened).map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(
+      reopened.exec("SELECT display_name FROM evidence_repositories WHERE repository_id = 'evrepo_v7legacy'")[0]
+        ?.values
+    ).toEqual([["Legacy Evidence Repo"]]);
+    reopened.close();
   });
 
   it("applies v7 on a pre-existing v6 database and preserves legacy rows", async () => {
@@ -155,10 +195,10 @@ describe("evidence index core migration (v7)", () => {
       migrations: coreMigrations
     });
 
-    expect(upgrade.applied.map((migration) => migration.version)).toEqual([7]);
+    expect(upgrade.applied.map((migration) => migration.version)).toEqual([7, 8]);
 
     const reopened = await openDatabase(dbPath);
-    expect(readAppliedMigrations(reopened).map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(readAppliedMigrations(reopened).map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     expect(
       reopened.exec("SELECT repo_id, display_name FROM repositories WHERE repo_id = 'repo_legacy'")[0]?.values
     ).toEqual([["repo_legacy", "Legacy Repo"]]);
