@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { PNG } from "pngjs";
 
-import { getStatus, openAtlasRuntime, prepareReviewPackage, runBasicCheck } from "./index.js";
+import { approveContract, getStatus, importContract, openAtlasRuntime, prepareReviewPackage, runBasicCheck } from "./index.js";
 import { closeAtlasRuntime } from "./runtime.js";
 import { listArtifactsForSession } from "@atlas/persistence";
 import { prepareCheckedImplementation, prepareExecution } from "./test-support.js";
@@ -38,7 +38,7 @@ describe("prepareReviewPackage", () => {
 
     expect(result.state).toBe("review_ready");
     expect(status.session?.primaryState).toBe("review_ready");
-    expect(status.nextCommands[0]).toBe("atlas review import <file>");
+    expect(status.nextCommands[0]).toBe("atlas review import <file> --actor <trusted-reviewer-id>");
     expect(reviewPackages).toHaveLength(1);
   });
 
@@ -47,31 +47,32 @@ describe("prepareReviewPackage", () => {
     const { cwd, env } = await prepareExecution(root);
 
     await expect(prepareReviewPackage({ cwd, env })).rejects.toThrow(
-      "Review package requires approved contract, execution report, and passing check result"
+      "Review package requires the current approved contract, execution report, and passing check result"
     );
   });
 
   it("includes visual check evidence in the review package", async () => {
     const root = tempRoot();
-    const { cwd, env } = await prepareExecution(root);
     const png = pngFixture();
-    writeFileSync(join(cwd, "baseline.png"), png);
-    writeFileSync(
-      join(cwd, "atlas.config.json"),
-      JSON.stringify({
-        schemaVersion: 1,
-        project: { name: "fixture", baseBranch: "main" },
-        checks: [
-          {
-            name: "visual",
-            kind: "visual",
-            required: true,
-            url: "http://127.0.0.1:3000",
-            referencePath: "baseline.png"
-          }
-        ]
-      })
-    );
+    const { cwd, env } = await prepareExecution(root, ({ cwd: fixtureCwd }) => {
+      writeFileSync(join(fixtureCwd, "baseline.png"), png);
+      writeFileSync(
+        join(fixtureCwd, "atlas.config.json"),
+        JSON.stringify({
+          schemaVersion: 1,
+          project: { name: "fixture", baseBranch: "main" },
+          checks: [
+            {
+              name: "visual",
+              kind: "visual",
+              required: true,
+              url: "http://127.0.0.1:3000",
+              referencePath: "baseline.png"
+            }
+          ]
+        })
+      );
+    });
     await runBasicCheck({
       cwd,
       env,
@@ -97,6 +98,23 @@ describe("prepareReviewPackage", () => {
 
     expect(review.visual_evidence_artifact_ids?.length).toBeGreaterThanOrEqual(5);
     expect(review.parents).toEqual(expect.arrayContaining(review.visual_evidence_artifact_ids ?? []));
+  });
+
+  it("rejects old execution evidence after the approved contract is superseded", async () => {
+    const root = tempRoot();
+    const { cwd, env } = await prepareCheckedImplementation(root);
+    const runtime = await openAtlasRuntime({ cwd, env });
+    const artifacts = listArtifactsForSession(runtime.db, runtime.db.exec("SELECT session_id FROM sessions")[0]?.values[0]?.[0] as string);
+    const oldContract = artifacts.filter((artifact) => artifact.type === "implementation_contract" && artifact.status === "approved").at(-1);
+    const oldContent = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, oldContract?.storageUri ?? ""), "utf8")) as Record<string, any>;
+    closeAtlasRuntime(runtime, false);
+    oldContent.objective = { heading: "Objective", body_markdown: "Superseding objective requiring new execution." };
+    const contractPath = join(root, "superseding-contract.json");
+    writeFileSync(contractPath, JSON.stringify(oldContent));
+    await importContract({ cwd, env, filePath: contractPath });
+    await approveContract({ cwd, env, actorId: "tester" });
+
+    await expect(prepareReviewPackage({ cwd, env })).rejects.toThrow("superseded contract");
   });
 });
 

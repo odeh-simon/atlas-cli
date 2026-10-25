@@ -5,6 +5,18 @@
     "rootDir": "src",
     "outDir": "dist"
   },
-  "include": ["src/**/*.ts"],
-  "references": [{ "path": "../domain" }]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../domain"
+    },
+    {
+      "path": "../schemas"
+    },
+    {
+      "path": "../test-utils"
+    }
+  ]
 }

@@ -161,11 +161,43 @@ importers:
 
   packages/config: {}
 
-  packages/context-discovery: {}
+  packages/context-discovery:
+    dependencies:
+      '@atlas/security':
+        specifier: workspace:*
+        version: link:../security
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
   packages/diagnostics: {}
 
   packages/domain: {}
+
+  packages/evidence-index:
+    dependencies:
+      '@atlas/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@atlas/git':
+        specifier: workspace:*
+        version: link:../git
+      '@atlas/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@atlas/schemas':
+        specifier: workspace:*
+        version: link:../schemas
+      '@atlas/security':
+        specifier: workspace:*
+        version: link:../security
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+    devDependencies:
+      '@atlas/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
 
   packages/git:
     dependencies:
@@ -180,10 +212,16 @@ importers:
       '@atlas/domain':
         specifier: workspace:*
         version: link:../domain
+      '@atlas/schemas':
+        specifier: workspace:*
+        version: link:../schemas
       sql.js:
         specifier: ^1.14.1
         version: 1.14.1
     devDependencies:
+      '@atlas/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       '@types/sql.js':
         specifier: ^1.4.11
         version: 1.4.11
@@ -195,10 +233,18 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+    devDependencies:
+      '@atlas/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/security: {}
 
-  packages/test-utils: {}
+  packages/test-utils:
+    dependencies:
+      '@atlas/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/visual-qa:
     dependencies:

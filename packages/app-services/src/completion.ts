@@ -5,6 +5,7 @@ import { GateFailedError, StateTransitionError } from "@atlas/domain";
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import {
   appendEvent,
+  addArtifactDependency,
   createApproval,
   createArtifactRecord,
   listArtifactsForSession,
@@ -16,11 +17,13 @@ import {
   type SessionRecord
 } from "@atlas/persistence";
 import { completionReportSchema } from "@atlas/schemas";
+import { implementationDiffSchema, reviewPackageSchema, reviewReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { hasStaleGitFingerprint, readWorkflowGitSnapshot, type WorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { visualCheckConfigFingerprint } from "./visual-gates.js";
+import { readVerifiedArtifactText } from "./evidence.js";
 
 export interface EvaluateCompletionResult {
   readonly sessionId: string;
@@ -110,20 +113,24 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
       artifact_id: artifactId,
       session_id: session.sessionId,
       type: "completion_report",
-      schema_version: 1,
+      schema_version: 2,
       content_version: 1,
       created_at: now,
       producer: { type: "atlas" },
       sensitivity: "confidential",
       parents: [
         gates.contractArtifact.artifactId,
-        ...gates.checkResultArtifacts.map((artifact) => artifact.artifactId)
+        ...gates.checkResultArtifacts.map((artifact) => artifact.artifactId),
+        gates.reviewReportArtifact.artifactId,
+        gates.implementationDiffArtifact.artifactId
       ],
       content_sha256: "0".repeat(64),
       metadata: {},
       contract_artifact_id: gates.contractArtifact.artifactId,
       contract_sha256: gates.contractArtifact.sha256,
       check_result_artifact_ids: gates.checkResultArtifacts.map((artifact) => artifact.artifactId),
+      review_report_artifact_id: gates.reviewReportArtifact.artifactId,
+      implementation_diff_artifact_id: gates.implementationDiffArtifact.artifactId,
       unresolved_blocking_findings: gates.unresolvedBlockingFindings.map((finding) => finding.findingId),
       approved_by: actorId,
       approved_at: now,
@@ -143,7 +150,7 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
       artifactId,
       sessionId: session.sessionId,
       type: "completion_report",
-      schemaVersion: 1,
+      schemaVersion: 2,
       contentVersion: artifacts.filter((artifact) => artifact.type === "completion_report").length + 1,
       storageUri: written.storageUri,
       sha256: written.sha256,
@@ -155,6 +162,9 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
       createdAt: now,
       approvedAt: now
     });
+    for (const dependsOnArtifactId of completionReport.parents) {
+      addArtifactDependency(runtime.db, { artifactId, dependsOnArtifactId, dependencyKind: "evidence" });
+    }
     const approval = createApproval(runtime.db, {
       approvalId: newId("appr"),
       sessionId: session.sessionId,
@@ -204,11 +214,13 @@ function assertCompletionGates(
   readonly contractArtifact: ArtifactRecord;
   readonly checkResultArtifacts: readonly ArtifactRecord[];
   readonly unresolvedBlockingFindings: readonly FindingRecord[];
+  readonly reviewReportArtifact: ArtifactRecord;
+  readonly implementationDiffArtifact: ArtifactRecord;
   readonly failures: readonly string[];
 } {
   const failures: string[] = [];
   const contractArtifact = artifacts.find(
-    (artifact) => artifact.type === "implementation_contract" && artifact.status === "approved"
+    (artifact) => artifact.artifactId === session.currentContractArtifactId && artifact.type === "implementation_contract" && artifact.status === "approved"
   );
   if (contractArtifact === undefined) {
     failures.push("approved contract missing");
@@ -223,6 +235,49 @@ function assertCompletionGates(
   }
   failures.push(...gitFreshnessFailures({ session, artifacts, checkResultArtifacts, artifactRoot, currentGit, cwd }));
 
+  const reviewReportArtifact = artifacts.filter((artifact) => artifact.type === "review_report" && artifact.status === "valid").at(-1);
+  let implementationDiffArtifact: ArtifactRecord | undefined;
+  if (reviewReportArtifact === undefined) {
+    failures.push("fresh independent review report missing; run atlas review prepare/import");
+  } else if (contractArtifact !== undefined) {
+    try {
+      const review = reviewReportSchema.parse(JSON.parse(readVerifiedArtifactText(artifactRoot, reviewReportArtifact)) as unknown);
+      const reviewPackageArtifact = artifacts.find((artifact) => artifact.artifactId === review.review_package_artifact_id && artifact.status === "valid");
+      if (reviewPackageArtifact === undefined || reviewPackageArtifact.sha256 !== review.review_package_sha256) {
+        failures.push("review report package binding is invalid");
+      } else {
+        const reviewPackage = reviewPackageSchema.parse(JSON.parse(readVerifiedArtifactText(artifactRoot, reviewPackageArtifact)) as unknown);
+        implementationDiffArtifact = artifacts.find(
+          (artifact) => artifact.artifactId === reviewPackage.implementation_diff_artifact_id && artifact.type === "implementation_diff" && artifact.status === "valid"
+        );
+        if (
+          review.reviewer_actor_id === undefined ||
+          review.reviewer_run_id === undefined ||
+          review.reviewed_contract_sha256 !== contractArtifact.sha256 ||
+          review.reviewed_diff_sha256 !== implementationDiffArtifact?.sha256 ||
+          review.reviewed_git_fingerprint !== currentGit?.fingerprint ||
+          reviewPackage.contract_artifact_id !== contractArtifact.artifactId ||
+          reviewPackage.contract_sha256 !== contractArtifact.sha256 ||
+          reviewPackage.implementation_actor_id === undefined ||
+          reviewPackage.implementation_run_id === undefined ||
+          review.reviewer_actor_id === reviewPackage.implementation_actor_id ||
+          review.reviewer_run_id === reviewPackage.implementation_run_id ||
+          !reviewPackage.check_result_artifact_ids.includes(latestCheckResult?.artifactId ?? "")
+        ) {
+          failures.push("independent review is legacy, stale, self-reviewed, or not bound to the current contract/diff/checks");
+        }
+        if (implementationDiffArtifact !== undefined) {
+          const diff = implementationDiffSchema.parse(JSON.parse(readVerifiedArtifactText(artifactRoot, implementationDiffArtifact)) as unknown);
+          if (!diff.reviewable || diff.result_fingerprint !== currentGit?.fingerprint) {
+            failures.push("implementation diff is stale or not safely reviewable");
+          }
+        }
+      }
+    } catch (error) {
+      failures.push(`independent review evidence is invalid: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   const unresolvedBlockingFindings = findings.filter(
     (finding) => finding.severity === "blocking" && (finding.status === "open" || finding.status === "reopened")
   );
@@ -230,7 +285,7 @@ function assertCompletionGates(
     failures.push(`unresolved blocking findings: ${unresolvedBlockingFindings.map((finding) => finding.findingId).join(", ")}`);
   }
 
-  if (contractArtifact === undefined || failures.length > 0) {
+  if (contractArtifact === undefined || reviewReportArtifact === undefined || implementationDiffArtifact === undefined || failures.length > 0) {
     throw new GateFailedError("Completion gates failed", { failures });
   }
 
@@ -238,6 +293,8 @@ function assertCompletionGates(
     contractArtifact,
     checkResultArtifacts,
     unresolvedBlockingFindings,
+    reviewReportArtifact,
+    implementationDiffArtifact,
     failures
   };
 }

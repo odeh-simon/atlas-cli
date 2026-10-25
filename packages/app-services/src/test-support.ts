@@ -1,12 +1,13 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 
 import {
   approveContract,
+  buildContextManifest,
   exportManualAgentPackage,
   exportPlanningPackage,
   importExecutionResult,
-  importContextManifest,
   importContract,
   prepareReviewPackage,
   importReviewReport,
@@ -14,19 +15,22 @@ import {
   startManualTask
 } from "./index.js";
 
-export async function prepareApprovedContract(root: string) {
+export async function prepareApprovedContract(
+  root: string,
+  beforeStart?: (prepared: { cwd: string; env: { ATLAS_HOME: string } }) => void | Promise<void>
+) {
   const cwd = join(root, "repo");
   const env = { ATLAS_HOME: join(root, "home") };
   mkdirSync(cwd, { recursive: true });
+  writeFileSync(join(cwd, "README.md"), "# Atlas test fixture\n");
+  await beforeStart?.({ cwd, env });
+  execFileSync("git", ["init", "-b", "main"], { cwd, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "atlas-tests@example.invalid"], { cwd, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "Atlas Tests"], { cwd, stdio: "ignore" });
+  execFileSync("git", ["add", "."], { cwd, stdio: "ignore" });
+  execFileSync("git", ["commit", "-m", "fixture"], { cwd, stdio: "ignore" });
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
-  const manifestPath = join(root, "context.json");
-  writeFileSync(
-    manifestPath,
-    JSON.stringify({
-      sources: [{ uri: "README.md", kind: "file", reason: "Context", byte_length: 1, included: true }]
-    })
-  );
-  await importContextManifest({ cwd, env, filePath: manifestPath });
+  await buildContextManifest({ cwd, env });
   await exportPlanningPackage({ cwd, env });
   const contractPath = join(root, "contract.json");
   writeFileSync(
@@ -55,8 +59,11 @@ export async function prepareApprovedContract(root: string) {
   return { cwd, env };
 }
 
-export async function prepareExecution(root: string) {
-  const prepared = await prepareApprovedContract(root);
+export async function prepareExecution(
+  root: string,
+  beforeExecution?: (prepared: { cwd: string; env: { ATLAS_HOME: string } }) => void | Promise<void>
+) {
+  const prepared = await prepareApprovedContract(root, beforeExecution);
   await exportManualAgentPackage(prepared);
   const executionPath = join(root, "execution.json");
   writeFileSync(
@@ -105,6 +112,6 @@ export async function prepareReviewImported(root: string) {
       ]
     })
   );
-  await importReviewReport({ ...prepared, filePath: reviewPath });
+  await importReviewReport({ ...prepared, filePath: reviewPath, reviewerActorId: "human:test-reviewer" });
   return prepared;
 }

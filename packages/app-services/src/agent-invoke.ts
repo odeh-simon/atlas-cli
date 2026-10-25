@@ -1,17 +1,16 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { invokeClaudeCode } from "@atlas/adapters-claude-code";
 import { invokeCodex } from "@atlas/adapters-codex";
 import { StateTransitionError } from "@atlas/domain";
-import { appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
+import { addArtifactDependency, appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
 import { type ProcessRunResult } from "@atlas/process-runner";
 import { agentRunLogSchema, executionReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { readWorkflowGitSnapshot, type WorkflowGitChangedFile, type WorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { captureImplementationDiff } from "./implementation-diff.js";
+import { assertImplementationGitBase, readAndValidateImplementationPackage } from "./implementation-bindings.js";
 
 export type ImplementationAgentProvider = "codex" | "claude";
 
@@ -28,6 +27,7 @@ export interface InvokeImplementationAgentResult {
   readonly packageArtifactId: string;
   readonly agentRunLogArtifactId: string;
   readonly executionReportArtifactId: string;
+  readonly implementationDiffArtifactId: string;
   readonly processStatus: string;
   readonly agentClaimsComplete: boolean;
   readonly changedFiles: readonly string[];
@@ -73,10 +73,19 @@ export async function invokeImplementationAgent(
       throw new StateTransitionError("Agent invocation requires an exported implementation package");
     }
 
-    const packagePath = join(runtime.paths.artifactRoot, ...implementationPackage.storageUri.split("/"));
-    const instructions = readFileSync(packagePath, "utf8");
-    const mode = instructions.includes("Mode: fix") ? "fix" : "implement";
-    const gitBefore = readWorkflowGitSnapshot(runtime.paths.cwd);
+    const parsedPackage = readAndValidateImplementationPackage({ runtime, session, artifacts, implementationPackage });
+    const instructions = parsedPackage.instructions_markdown;
+    const mode = parsedPackage.mode;
+    const gitBefore = assertImplementationGitBase({
+      package: parsedPackage,
+      git: readWorkflowGitSnapshot(runtime.paths.cwd),
+      requireClean: true
+    });
+    const next = transition({
+      state: session.primaryState,
+      command: "import_execution_result",
+      overlay: { paused: session.paused, archived: session.archived, disposition: session.disposition }
+    }).to;
     const invocationPackage = {
       mode,
       instructions,
@@ -97,10 +106,7 @@ export async function invokeImplementationAgent(
           });
     const gitAfter = readWorkflowGitSnapshot(runtime.paths.cwd);
     const parsedCompletionReport = parseAgentCompletionReport(invocation.process.stdout, invocation.process.stderr);
-    const changedFiles =
-      parsedCompletionReport.changedFiles.length > 0
-        ? parsedCompletionReport.changedFiles
-        : changedFilesIntroduced(gitBefore, gitAfter);
+    const changedFiles = changedFilesIntroduced(gitBefore, gitAfter);
 
     const now = new Date().toISOString();
     const runLogArtifactId = newId("art");
@@ -154,18 +160,29 @@ export async function invokeImplementationAgent(
       producerType: "agent",
       createdAt: now
     });
+    const diffRecord = captureImplementationDiff({
+      runtime,
+      sessionId: session.sessionId,
+      runId: invocation.process.runId,
+      before: gitBefore,
+      after: gitAfter,
+      parentArtifactIds: [implementationPackage.artifactId, runLogArtifactId],
+      contentVersion: artifacts.filter((artifact) => artifact.type === "implementation_diff").length + 1,
+      now,
+      requireCleanBase: true
+    });
 
     const artifactId = newId("art");
     const report = executionReportSchema.parse({
       artifact_id: artifactId,
       session_id: session.sessionId,
       type: "execution_report",
-      schema_version: 1,
+      schema_version: 2,
       content_version: artifacts.filter((artifact) => artifact.type === "execution_report").length + 1,
       created_at: now,
       producer: { type: "agent", id: invocation.provider },
       sensitivity: "confidential",
-      parents: [implementationPackage.artifactId, runLogArtifactId],
+      parents: [implementationPackage.artifactId, runLogArtifactId, diffRecord.artifactId],
       content_sha256: "0".repeat(64),
       metadata: {
         provider: invocation.provider,
@@ -178,16 +195,20 @@ export async function invokeImplementationAgent(
         gitAfterHead: gitAfter?.head_sha
       },
       run_id: invocation.process.runId,
+      implementation_actor_id: invocation.provider,
+      implementation_diff_artifact_id: diffRecord.artifactId,
+      implementation_diff_sha256: diffRecord.sha256,
+      implementation_package_artifact_id: implementationPackage.artifactId,
+      implementation_package_sha256: implementationPackage.sha256,
+      contract_artifact_id: parsedPackage.contract_artifact_id,
+      contract_sha256: parsedPackage.contract_sha256,
+      context_content_pack_artifact_id: parsedPackage.context_content_pack_artifact_id,
+      context_content_pack_sha256: parsedPackage.context_content_pack_sha256,
       process_status: invocation.process.status,
       agent_claims_complete: parsedCompletionReport.agentClaimsComplete,
       changed_files: changedFiles,
       limitations: limitationsForProcess(invocation.process.status, invocation.process.stderr, parsedCompletionReport.limitations)
     });
-    const next = transition({
-      state: session.primaryState,
-      command: "import_execution_result",
-      overlay: { paused: session.paused, archived: session.archived, disposition: session.disposition }
-    }).to;
     const written = writeImmutableArtifactContent({
       rootDir: runtime.paths.artifactRoot,
       sessionId: session.sessionId,
@@ -201,7 +222,7 @@ export async function invokeImplementationAgent(
       artifactId,
       sessionId: session.sessionId,
       type: "execution_report",
-      schemaVersion: 1,
+      schemaVersion: 2,
       contentVersion: report.content_version,
       storageUri: written.storageUri,
       sha256: written.sha256,
@@ -212,6 +233,9 @@ export async function invokeImplementationAgent(
       producerType: "agent",
       createdAt: now
     });
+    for (const dependsOnArtifactId of report.parents) {
+      addArtifactDependency(runtime.db, { artifactId, dependsOnArtifactId, dependencyKind: "parent" });
+    }
     updateSessionState(runtime.db, { sessionId: session.sessionId, primaryState: next, now });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
@@ -226,6 +250,7 @@ export async function invokeImplementationAgent(
         packageArtifactId: implementationPackage.artifactId,
         agentRunLogArtifactId: runLogArtifactId,
         executionReportArtifactId: artifactId,
+        implementationDiffArtifactId: diffRecord.artifactId,
         runId: invocation.process.runId,
         processStatus: invocation.process.status,
         agentClaimsComplete: report.agent_claims_complete,
@@ -241,6 +266,7 @@ export async function invokeImplementationAgent(
       packageArtifactId: implementationPackage.artifactId,
       agentRunLogArtifactId: runLogArtifactId,
       executionReportArtifactId: artifactId,
+      implementationDiffArtifactId: diffRecord.artifactId,
       processStatus: invocation.process.status,
       agentClaimsComplete: report.agent_claims_complete ?? false,
       changedFiles: report.changed_files,

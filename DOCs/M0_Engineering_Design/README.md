@@ -27,6 +27,8 @@
 | L. Requirement Traceability Matrix | `12_requirement_traceability_matrix.md` |
 | M. Implementation Backlog | `13_implementation_backlog.md` |
 | N. Walking-Skeleton Specification | `14_walking_skeleton_specification.md` |
+| O. Evidence and Independent Review Gates | `15_evidence_and_independent_review_gates.md` |
+| P. Context Manifest v3 and Semantic Discovery | `16_context_manifest_v3_semantic_discovery.md` |
 | M0 Review Decisions | `M0_Review_Decisions.md` |
 
 ## Review Guidance

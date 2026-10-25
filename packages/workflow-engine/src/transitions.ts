@@ -51,17 +51,21 @@ const table: Partial<Record<WorkflowState, Partial<Record<TransitionCommand, Wor
     import_context: "context_ready"
   },
   context_ready: {
+    import_context: "context_ready",
     export_plan: "planning_ready"
   },
   planning_ready: {
+    import_context: "context_ready",
     import_contract: "contract_draft",
     export_plan: "planning_ready"
   },
   contract_draft: {
+    import_context: "context_ready",
     import_contract: "contract_draft",
     approve_contract: "contract_approved"
   },
   contract_approved: {
+    import_context: "context_ready",
     import_contract: "contract_draft",
     export_agent_package: "implementation_ready"
   },

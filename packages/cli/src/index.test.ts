@@ -258,6 +258,7 @@ describe("cli", () => {
     const root = tempRoot();
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
+    writeFileSync(join(repo, "README.md"), "# Planning fixture\n");
     const previousCwd = process.cwd();
     const previousAtlasHome = process.env.ATLAS_HOME;
     const logs = captureLogs();
@@ -802,7 +803,7 @@ describe("cli", () => {
     }
   });
 
-  it("does not invoke AI context scout after context is already ready", async () => {
+  it("refreshes deterministic context after context is already ready", async () => {
     const root = tempRoot();
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
@@ -839,10 +840,10 @@ describe("cli", () => {
 
       await main(["start", "--manual", "--title", "Target", "--objective", "Update target source"]);
       await main(["context", "build", "--max-files", "1", "--max-bytes", "1000"]);
-      const code = await main(["context", "build", "--ai", "--max-files", "1", "--max-bytes", "1000"]);
+      const code = await main(["context", "build", "--max-files", "1", "--max-bytes", "1000"]);
 
-      expect(code).toBe(2);
-      expect(logs).toContain("atlas context build requires state intake_ready; current state is context_ready");
+      expect(code).toBe(0);
+      expect(logs.filter((line) => line.startsWith("Built context art_"))).toHaveLength(2);
       expect(logs).toContain("Next: atlas plan");
     } finally {
       process.chdir(previousCwd);
@@ -855,6 +856,7 @@ describe("cli", () => {
     const root = tempRoot();
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
+    writeFileSync(join(repo, "README.md"), "# Planning fixture\n");
     writeFileSync(
       join(repo, "atlas.config.json"),
       JSON.stringify({
@@ -873,13 +875,6 @@ describe("cli", () => {
         }
       })
     );
-    const manifestPath = join(root, "context.json");
-    writeFileSync(
-      manifestPath,
-      JSON.stringify({
-        sources: [{ uri: "README.md", kind: "file", reason: "Context", byte_length: 1, included: true }]
-      })
-    );
     const previousCwd = process.cwd();
     const previousAtlasHome = process.env.ATLAS_HOME;
     const previousFetch = globalThis.fetch;
@@ -894,7 +889,7 @@ describe("cli", () => {
         })) as typeof fetch;
 
       await main(["start", "--manual", "--title", "Plan", "--objective", "Plan the work", "--task-key", "manual-plan"]);
-      await main(["context", "import", manifestPath]);
+      await main(["context", "build"]);
       const code = await main(["plan", "--ai"]);
 
       expect(code).toBe(0);

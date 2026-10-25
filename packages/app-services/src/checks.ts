@@ -60,11 +60,11 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
   const configuredChecks = readConfiguredChecks(cwd);
   const visualChecks = readVisualCheckDefinitions(cwd);
   const visualByName = new Map(visualChecks.map((check) => [check.name, check]));
-  const checkSet = await runCheckSet({
+  const initialCheckSet = await runCheckSet({
     cwd,
     env: options.env,
     changedFiles: git?.changed_files.map((file) => file.path),
-    checks: [{ name: "basic-session-integrity", required: true }, ...configuredChecks],
+    checks: [{ name: "basic-session-integrity", required: true, alwaysRun: true }, ...configuredChecks],
     builtIns: [
       {
         name: "basic-session-integrity",
@@ -88,6 +88,18 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
       })
     ]
   });
+  const configuredRequiredNames = new Set(configuredChecks.filter((check) => check.required).map((check) => check.name));
+  const configuredRequiredExecuted = initialCheckSet.results.some(
+    (result) => configuredRequiredNames.has(result.name) && result.status !== "skipped"
+  );
+  const allConfiguredRequiredSkipped = configuredRequiredNames.size > 0 && !configuredRequiredExecuted;
+  const checkSet = allConfiguredRequiredSkipped
+    ? {
+        ...initialCheckSet,
+        status: "failed" as const,
+        failedRequired: [...initialCheckSet.failedRequired, "atlas/configured-required-validation-executed"]
+      }
+    : initialCheckSet;
 
   const runtime = await openAtlasRuntime(options);
   try {
@@ -105,6 +117,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
     const failures = checkSet.results
       .filter((result) => result.required && result.status !== "passed" && result.status !== "skipped")
       .map((result) => `${result.name}: ${result.summary}`);
+    const failureSummary = failures.length > 0 ? failures.join("; ") : checkSet.failedRequired.join("; ");
     const now = new Date().toISOString();
     const runLogArtifactId = newId("art");
     const runLog = checkRunLogSchema.parse({
@@ -240,7 +253,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
       check_name: "full-check-set",
       status,
       required: true,
-      summary: status === "passed" ? "All required checks passed" : failures.join("; "),
+      summary: status === "passed" ? "All required checks passed" : failureSummary,
       ...(git === undefined ? {} : { git_fingerprint: git.fingerprint }),
       ...(visualConfigFingerprint === undefined ? {} : { visual_config_fingerprint: visualConfigFingerprint })
     });
@@ -381,6 +394,7 @@ function readConfiguredChecks(cwd: string): CheckDefinition[] {
       const definition: CheckDefinition = {
         name: record.name,
         required: record.required !== false,
+        ...(record.alwaysRun === true ? { alwaysRun: true } : {}),
         ...(record.kind === "command" || record.kind === "design-scan" || record.kind === "visual"
           ? { kind: record.kind }
           : {}),

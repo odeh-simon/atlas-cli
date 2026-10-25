@@ -11,6 +11,28 @@
   "writebacks": {
     "enabled": false
   },
+  "index": {
+    "enabled": false,
+    "maxIndexBytes": 50000000,
+    "analyzers": ["typescript-semantic"]
+  },
+  "context": {
+    "maxFiles": 40,
+    "maxBytes": 200000,
+    "maxScannedFiles": 2000,
+    "maxGraphNodes": 500,
+    "maxGraphEdges": 1500,
+    "maxEvidenceFragments": 200,
+    "maxExcerptBytes": 1200,
+    "instructionMaxBytes": 64000,
+    "graphDepth": 2,
+    "pinnedSources": ["DOCS/architecture.md"],
+    "exclusions": ["generated/**"],
+    "requiredSourceGlobs": [],
+    "requiredCategories": ["test"],
+    "instructionFallbackFilenames": [],
+    "requireResolvedImports": false
+  },
   "visualQa": {
     "browserChannel": "auto",
     "timeoutMs": 30000,

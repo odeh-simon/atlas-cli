@@ -73,9 +73,10 @@ describe("runCheckSet", () => {
       ]
     });
 
-    expect(result.status).toBe("passed");
+    expect(result.status).toBe("failed");
     expect(result.results[0]?.status).toBe("skipped");
     expect(result.results[0]?.skippedReason).toContain("affected patterns");
+    expect(result.failedRequired).toContain("atlas/required-validation-executed");
   });
 
   it("runs design scan as a configured check", async () => {

@@ -1,9 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { type ArtifactFilesystem, sha256Bytes, writeImmutableArtifactContent } from "./index.js";
+import { ArtifactIntegrityError } from "@atlas/domain";
+
+import { type ArtifactFilesystem, readVerifiedBlob, sha256Bytes, writeContentAddressedBlob, writeImmutableArtifactContent } from "./index.js";
 
 const tempRoots: string[] = [];
 
@@ -107,5 +109,75 @@ describe("artifact storage", () => {
       })
     ).toThrow("rename failed");
     expect([...memory.keys()].some((path) => path.endsWith(".tmp"))).toBe(true);
+  });
+});
+
+describe("content-addressed blob storage", () => {
+  it("writes a blob under namespace/sha256 and returns a root-relative storage URI", () => {
+    const root = tempRoot();
+    const bytes = new TextEncoder().encode("evidence payload");
+    const digest = sha256Bytes(bytes);
+
+    const written = writeContentAddressedBlob(root, "evidence-blobs", bytes);
+
+    expect(written.sha256).toBe(digest);
+    expect(written.byteLength).toBe(bytes.byteLength);
+    expect(written.storageUri).toBe(`evidence-blobs/${digest}`);
+    expect(written.absolutePath).toBe(join(root, "evidence-blobs", digest));
+    expect(readFileSync(written.absolutePath).equals(bytes)).toBe(true);
+  });
+
+  it("is idempotent when the same content is promoted twice", () => {
+    const root = tempRoot();
+    const bytes = new TextEncoder().encode("idempotent");
+
+    const first = writeContentAddressedBlob(root, "blobs", bytes);
+    const second = writeContentAddressedBlob(root, "blobs", bytes);
+
+    expect(second.absolutePath).toBe(first.absolutePath);
+    expect(existsSync(first.absolutePath)).toBe(true);
+  });
+
+  it("rejects promotion when an existing path holds different bytes after corruption", () => {
+    const root = tempRoot();
+    const bytes = new TextEncoder().encode("original");
+    const written = writeContentAddressedBlob(root, "blobs", bytes);
+
+    writeFileSync(join(root, "blobs", written.sha256), "corrupted-on-disk");
+
+    expect(() => writeContentAddressedBlob(root, "blobs", bytes)).toThrowError(ArtifactIntegrityError);
+    expect(readFileSync(join(root, "blobs", written.sha256), "utf8")).toBe("corrupted-on-disk");
+  });
+
+  it("re-verifies the hash when reading a blob back", async () => {
+    const root = tempRoot();
+    const written = writeContentAddressedBlob(root, "blobs", new TextEncoder().encode("verified"));
+
+    expect(new TextDecoder().decode(readVerifiedBlob(root, written.storageUri))).toBe("verified");
+
+    writeFileSync(join(root, "blobs", written.sha256), "corrupted");
+    expect(() => readVerifiedBlob(root, written.storageUri)).toThrowError(
+      ArtifactIntegrityError
+    );
+  });
+
+  it("refuses unsafe namespaces and malformed storage URIs", () => {
+    const root = tempRoot();
+
+    expect(() => writeContentAddressedBlob(root, "../escape", new TextEncoder().encode("x"))).toThrow(
+      "namespace must be a safe path segment"
+    );
+    expect(() => readVerifiedBlob(root, "only-namespace")).toThrow("<namespace>/<sha256>");
+    expect(() => readVerifiedBlob(root, "blobs/../secret")).toThrow("<namespace>/<sha256>");
+    expect(() => readVerifiedBlob(root, "blobs/not-a-digest")).toThrow("lowercase SHA-256 hex string");
+    expect(() => readVerifiedBlob(root, `blobs/${"a".repeat(63)}`)).toThrow("lowercase SHA-256 hex string");
+  });
+
+  it("reports a missing blob as an integrity failure", () => {
+    const root = tempRoot();
+
+    expect(() => readVerifiedBlob(root, `blobs/${"a".repeat(64)}`)).toThrowError(
+      ArtifactIntegrityError
+    );
   });
 });

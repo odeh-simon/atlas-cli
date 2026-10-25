@@ -5,10 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   approveContract,
+  buildContextManifest,
   exportManualAgentPackage,
   exportPlanningPackage,
   getStatus,
-  importContextManifest,
   importContract,
   openAtlasRuntime,
   startManualTask
@@ -28,15 +28,9 @@ async function preparePlanning(root: string) {
   const cwd = join(root, "repo");
   const env = { ATLAS_HOME: join(root, "home") };
   mkdirSync(cwd, { recursive: true });
+  writeFileSync(join(cwd, "README.md"), "# Fixture\n");
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
-  const manifestPath = join(root, "context.json");
-  writeFileSync(
-    manifestPath,
-    JSON.stringify({
-      sources: [{ uri: "README.md", kind: "file", reason: "Context", byte_length: 1, included: true }]
-    })
-  );
-  await importContextManifest({ cwd, env, filePath: manifestPath });
+  await buildContextManifest({ cwd, env });
   await exportPlanningPackage({ cwd, env });
   return { cwd, env };
 }

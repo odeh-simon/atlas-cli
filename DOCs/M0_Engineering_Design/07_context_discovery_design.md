@@ -4,6 +4,8 @@
 
 Build a bounded, traceable context manifest without whole-repo ingestion or undefined AI relevance. The output is deterministic for identical task, repository, config, and Git inputs.
 
+Implementation note: the production v3 schema, TypeScript semantic graph, instruction precedence, safety rules, and freshness gates are normative in `16_context_manifest_v3_semantic_discovery.md`. This earlier design remains useful for planned framework-specific discovery that v3 does not yet claim.
+
 ## Source Classes
 
 | Class | Discovery method | Default priority |

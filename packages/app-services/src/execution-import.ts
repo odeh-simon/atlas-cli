@@ -2,12 +2,14 @@ import { readFileSync } from "node:fs";
 
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
 import { StateTransitionError, ValidationError } from "@atlas/domain";
-import { appendEvent, createArtifactRecord, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
+import { addArtifactDependency, appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
 import { executionReportSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { captureImplementationDiff } from "./implementation-diff.js";
+import { assertImplementationGitBase, readAndValidateImplementationPackage } from "./implementation-bindings.js";
 
 export interface ImportExecutionResultInput extends RuntimeOptions {
   readonly filePath: string;
@@ -33,18 +35,47 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
     const now = new Date().toISOString();
     const artifactId = newId("art");
     const git = readWorkflowGitSnapshot(runtime.paths.cwd);
+    if (git === undefined) {
+      throw new StateTransitionError("Execution import requires a Git repository to capture reviewable implementation evidence");
+    }
+    const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
+    const implementationPackage = artifacts.filter((artifact) => artifact.type === "agent_implementation_package" && artifact.status === "valid").at(-1);
+    if (implementationPackage === undefined) {
+      throw new StateTransitionError("Execution import requires the current implementation package");
+    }
+    const parsedPackage = readAndValidateImplementationPackage({ runtime, session, artifacts, implementationPackage });
+    assertImplementationGitBase({ package: parsedPackage, git, requireClean: false });
     const raw = JSON.parse(readFileSync(input.filePath, "utf8")) as Record<string, unknown>;
+    const runId = newId("run");
+    const cleanBase = {
+      ...git,
+      fingerprint: parsedPackage.git_snapshot_fingerprint!,
+      dirty: false,
+      changed_file_count: 0,
+      changed_files: [],
+      diff_summary: undefined
+    };
+    const diffRecord = captureImplementationDiff({
+      runtime,
+      sessionId: session.sessionId,
+      runId,
+      before: cleanBase,
+      after: git,
+      parentArtifactIds: [implementationPackage.artifactId],
+      contentVersion: artifacts.filter((artifact) => artifact.type === "implementation_diff").length + 1,
+      now
+    });
     const report = executionReportSchema.parse({
       ...raw,
       artifact_id: artifactId,
       session_id: session.sessionId,
       type: "execution_report",
-      schema_version: 1,
+      schema_version: 2,
       content_version: 1,
       created_at: now,
       producer: { type: "import" },
       sensitivity: "confidential",
-      parents: [],
+      parents: [implementationPackage.artifactId, diffRecord.artifactId],
       content_sha256: "0".repeat(64),
       metadata: {
         ...(git === undefined
@@ -54,7 +85,17 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
               git_fingerprint: git.fingerprint
             })
       },
-      run_id: raw.run_id ?? newId("run")
+      run_id: runId,
+      implementation_actor_id: "manual-agent",
+      implementation_diff_artifact_id: diffRecord.artifactId,
+      implementation_diff_sha256: diffRecord.sha256,
+      implementation_package_artifact_id: implementationPackage.artifactId,
+      implementation_package_sha256: implementationPackage.sha256,
+      contract_artifact_id: parsedPackage.contract_artifact_id,
+      contract_sha256: parsedPackage.contract_sha256,
+      context_content_pack_artifact_id: parsedPackage.context_content_pack_artifact_id,
+      context_content_pack_sha256: parsedPackage.context_content_pack_sha256,
+      changed_files: git.changed_files.map((entry) => entry.path)
     });
     const next = transition({
       state: session.primaryState,
@@ -74,7 +115,7 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
       artifactId,
       sessionId: session.sessionId,
       type: "execution_report",
-      schemaVersion: 1,
+      schemaVersion: 2,
       contentVersion: 1,
       storageUri: written.storageUri,
       sha256: written.sha256,
@@ -85,6 +126,9 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
       producerType: "import",
       createdAt: now
     });
+    for (const dependsOnArtifactId of report.parents) {
+      addArtifactDependency(runtime.db, { artifactId, dependsOnArtifactId, dependencyKind: "parent" });
+    }
     updateSessionState(runtime.db, { sessionId: session.sessionId, primaryState: next, now });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
@@ -92,7 +136,7 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
       eventType: "execution.imported",
       actorType: "user",
       occurredAt: now,
-      summary: "Simulated execution result imported",
+      summary: "Manual execution result and exact Git diff imported",
       metadata: {
         executionReportArtifactId: artifactId,
         processStatus: report.process_status,

@@ -4,7 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { orchestrateRun } from "./index.js";
+import { openAtlasRuntime, orchestrateRun } from "./index.js";
+import { closeAtlasRuntime } from "./runtime.js";
+import { listFindingsForSession } from "@atlas/persistence";
 import { prepareCheckedImplementation } from "./test-support.js";
 
 const tempRoots: string[] = [];
@@ -31,6 +33,7 @@ describe("orchestrateRun", () => {
       ...prepared,
       until: "completion-ready",
       agentProvider: "codex",
+      reviewerActorId: "reviewer:orchestrator-test",
       agentInvoker: async (input) => ({
         provider: "codex",
         process: {
@@ -53,7 +56,7 @@ describe("orchestrateRun", () => {
           redacted: false
         }
       }),
-      reviewer: () => {
+      reviewer: (input) => {
         reviewCalls += 1;
         if (reviewCalls === 1) {
           return {
@@ -73,7 +76,22 @@ describe("orchestrateRun", () => {
           };
         }
 
-        return { summary: "No blocking findings remain.", findings: [] };
+        const reviewPackage = JSON.parse(input.reviewPackageContent) as {
+          implementation_diff_artifact_id: string;
+        };
+        return {
+          summary: "The prior blocking finding is resolved by the current diff.",
+          findings: [],
+          resolved_findings: [
+            {
+              finding_id: "REV-001",
+              resolution_evidence: [{
+                artifact_id: reviewPackage.implementation_diff_artifact_id,
+                claim: "The current diff contains the permission guard repair."
+              }]
+            }
+          ]
+        };
       }
     });
 
@@ -81,13 +99,64 @@ describe("orchestrateRun", () => {
     expect(result.state).toBe("completion_ready");
     expect(result.steps.map((step) => step.command)).toContain("atlas fix prepare");
     expect(result.steps.map((step) => step.command)).toContain("atlas implement --agent");
-    expect(result.steps.map((step) => step.command)).toContain("atlas findings disposition");
+    expect(result.steps.map((step) => step.command)).not.toContain("atlas findings disposition");
     expect(reviewCalls).toBe(2);
 
     const orchestration = readLatestJsonArtifact(root, result.sessionId, "orchestration_run");
     expect(orchestration.artifact_id).toBe(result.orchestrationRunArtifactId);
     expect(orchestration.status).toBe("succeeded");
     expect(orchestration.until).toBe("completion_ready");
+  });
+
+  it("does not blanket-resolve an earlier blocker after a generic clean review", async () => {
+    const root = tempRoot();
+    const prepared = await prepareCheckedImplementation(root);
+    let reviewCalls = 0;
+    const result = await orchestrateRun({
+      ...prepared,
+      until: "completion-ready",
+      maxIterations: 8,
+      agentProvider: "codex",
+      reviewerActorId: "reviewer:orchestrator-test",
+      agentInvoker: async (input) => ({
+        provider: "codex",
+        process: {
+          runId: `run_fix_${reviewCalls}`,
+          command: input.command ?? "codex",
+          args: ["--prompt", "redacted"],
+          cwd: input.package.cwd,
+          status: "succeeded",
+          exitCode: 0,
+          signal: undefined,
+          stdout: 'ATLAS_EXECUTION_REPORT_JSON: {"agent_claims_complete":true,"changed_files":[],"limitations":[]}',
+          stderr: "",
+          timedOut: false,
+          startedAt: "2026-07-12T12:00:00.000Z",
+          endedAt: "2026-07-12T12:00:01.000Z",
+          durationMs: 1_000,
+          stdoutTruncated: false,
+          stderrTruncated: false,
+          redacted: false
+        }
+      }),
+      reviewer: () => {
+        reviewCalls += 1;
+        return reviewCalls === 1
+          ? {
+              summary: "Blocker",
+              findings: [{ finding_id: "REV-001", severity: "blocking", title: "Guard", description: "Missing guard", evidence: ["contract"], affected_files: [], requirement_ids: [] }]
+            }
+          : { summary: "No new findings", findings: [] };
+      }
+    });
+
+    expect(result.status).toBe("blocked");
+    const runtime = await openAtlasRuntime(prepared);
+    try {
+      expect(listFindingsForSession(runtime.db, result.sessionId).find((finding) => finding.findingId === "REV-001")?.status).toBe("open");
+    } finally {
+      closeAtlasRuntime(runtime, false);
+    }
   });
 });
 

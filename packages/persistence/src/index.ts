@@ -2,6 +2,7 @@ export * from "./approvals.js";
 export * from "./artifact-records.js";
 export * from "./core-schema.js";
 export * from "./decision-records.js";
+export * from "./evidence-index.js";
 export * from "./findings.js";
 export * from "./migrations.js";
 export * from "./repositories.js";

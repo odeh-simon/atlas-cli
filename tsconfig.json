@@ -1,29 +1,80 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/adapter-contracts" },
-    { "path": "./packages/adapters-claude-code" },
-    { "path": "./packages/adapters-codex" },
-    { "path": "./packages/adapters-figma" },
-    { "path": "./packages/adapters-github" },
-    { "path": "./packages/adapters-linear" },
-    { "path": "./packages/adapters-os" },
-    { "path": "./packages/app-services" },
-    { "path": "./packages/artifacts" },
-    { "path": "./packages/checks" },
-    { "path": "./packages/cli" },
-    { "path": "./packages/config" },
-    { "path": "./packages/context-discovery" },
-    { "path": "./packages/diagnostics" },
-    { "path": "./packages/domain" },
-    { "path": "./packages/git" },
-    { "path": "./packages/llm" },
-    { "path": "./packages/persistence" },
-    { "path": "./packages/process-runner" },
-    { "path": "./packages/schemas" },
-    { "path": "./packages/security" },
-    { "path": "./packages/test-utils" },
-    { "path": "./packages/visual-qa" },
-    { "path": "./packages/workflow-engine" }
+    {
+      "path": "./packages/adapter-contracts"
+    },
+    {
+      "path": "./packages/adapters-claude-code"
+    },
+    {
+      "path": "./packages/adapters-codex"
+    },
+    {
+      "path": "./packages/adapters-figma"
+    },
+    {
+      "path": "./packages/adapters-github"
+    },
+    {
+      "path": "./packages/adapters-linear"
+    },
+    {
+      "path": "./packages/adapters-os"
+    },
+    {
+      "path": "./packages/app-services"
+    },
+    {
+      "path": "./packages/artifacts"
+    },
+    {
+      "path": "./packages/checks"
+    },
+    {
+      "path": "./packages/cli"
+    },
+    {
+      "path": "./packages/config"
+    },
+    {
+      "path": "./packages/context-discovery"
+    },
+    {
+      "path": "./packages/diagnostics"
+    },
+    {
+      "path": "./packages/domain"
+    },
+    {
+      "path": "./packages/evidence-index"
+    },
+    {
+      "path": "./packages/git"
+    },
+    {
+      "path": "./packages/llm"
+    },
+    {
+      "path": "./packages/persistence"
+    },
+    {
+      "path": "./packages/process-runner"
+    },
+    {
+      "path": "./packages/schemas"
+    },
+    {
+      "path": "./packages/security"
+    },
+    {
+      "path": "./packages/test-utils"
+    },
+    {
+      "path": "./packages/visual-qa"
+    },
+    {
+      "path": "./packages/workflow-engine"
+    }
   ]
 }

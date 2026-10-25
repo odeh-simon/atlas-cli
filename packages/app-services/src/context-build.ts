@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError } from "@atlas/domain";
-import { discoverContextSources } from "@atlas/context-discovery";
+import { GateFailedError, StateTransitionError } from "@atlas/domain";
+import { ContextConfigurationError, discoverContextSources, readContextDiscoveryConfig } from "@atlas/context-discovery";
 import {
   addArtifactDependency,
   appendEvent,
@@ -13,10 +14,11 @@ import {
   listSessionsForRepository,
   updateSessionContextArtifact
 } from "@atlas/persistence";
-import { aiContextRecommendationSchema, contextManifestSchema, contextQualityReportSchema } from "@atlas/schemas";
+import { aiContextRecommendationSchema, contextManifestSchema, contextQualityReportSchema, taskBriefSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
+import { createContextContentPack } from "./context-pack.js";
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface BuildContextInput extends RuntimeOptions {
@@ -29,6 +31,7 @@ export interface BuildContextResult {
   readonly sessionId: string;
   readonly contextArtifactId: string;
   readonly contextQualityReportArtifactId: string;
+  readonly contextContentPackArtifactId: string;
   readonly contextReadiness: "ready" | "weak" | "blocked";
   readonly state: string;
   readonly sourceCount: number;
@@ -54,27 +57,61 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
     const git = readWorkflowGitSnapshot(runtime.paths.cwd);
     const aiRecommendation = loadAiRecommendation(runtime.paths.artifactRoot, artifacts, input.aiRecommendationArtifactId);
     const taskBrief = artifacts.find((artifact) => artifact.type === "task_brief");
-    const taskBriefText =
-      taskBrief === undefined ? undefined : readFileSync(join(runtime.paths.artifactRoot, taskBrief.storageUri), "utf8");
+    const taskBriefContent = taskBrief === undefined ? undefined : readFileSync(join(runtime.paths.artifactRoot, taskBrief.storageUri), "utf8");
+    const parsedTaskBrief = taskBriefContent === undefined ? undefined : taskBriefSchema.parse(JSON.parse(taskBriefContent) as unknown);
+    const taskText = parsedTaskBrief === undefined
+      ? undefined
+      : [parsedTaskBrief.title, parsedTaskBrief.objective, ...parsedTaskBrief.acceptance_criteria].join("\n");
+    let configured;
+    try {
+      configured = readContextDiscoveryConfig(runtime.paths.cwd);
+    } catch (error) {
+      if (error instanceof ContextConfigurationError) {
+        throw new GateFailedError("Context configuration is invalid; fix atlas.config.json before discovery", { error: error.message }, error);
+      }
+      throw error;
+    }
     const discovery = discoverContextSources({
       rootPath: runtime.paths.cwd,
+      config: configured.config,
       budget: {
         ...(input.maxFiles === undefined ? {} : { maxFiles: input.maxFiles }),
         ...(input.maxBytes === undefined ? {} : { maxBytes: input.maxBytes })
       },
       recommendations: aiRecommendation?.recommendations,
-      taskText: taskBriefText
+      taskText,
+      snapshot: {
+        rootPathHash: git?.root_path_hash,
+        gitBaseFingerprint: git?.base_fingerprint,
+        gitHeadSha: git?.head_sha,
+        taskBriefSha256: taskBrief?.sha256
+      }
     });
+    const gaps = [
+      ...discovery.gaps.map((gap) => ({ id: gap.id, severity: gap.severity, description: gap.description })),
+      ...gapsFromAiRecommendation(aiRecommendation)
+    ];
+    const relevantInputsSha256 = createHash("sha256").update(JSON.stringify({
+      taskBriefSha256: taskBrief?.sha256,
+      discoveryConfigSha256: configured.sha256,
+      effectiveContextConfigSha256: discovery.configSha256,
+      gitBaseFingerprint: git?.base_fingerprint,
+      sources: discovery.includedSources.map((source) => [source.uri, source.sha256]),
+      instructions: discovery.instructionChain.map((instruction) => [instruction.uri, instruction.sha256])
+    })).digest("hex");
     const manifest = contextManifestSchema.parse({
       artifact_id: artifactId,
       session_id: session.sessionId,
       type: "context_manifest",
-      schema_version: 2,
+      schema_version: 3,
       content_version: nextContextVersion(runtime.db, session.sessionId),
       created_at: now,
       producer: { type: "atlas" },
       sensitivity: "confidential",
-      parents: [],
+      parents: [
+        ...(taskBrief === undefined ? [] : [taskBrief.artifactId]),
+        ...(aiRecommendation === undefined ? [] : [aiRecommendation.artifact_id])
+      ],
       content_sha256: "0".repeat(64),
       metadata: {
         discovery: aiRecommendation === undefined ? "deterministic" : "hybrid",
@@ -102,8 +139,48 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       included_sources: discovery.includedSources,
       excluded_candidates: discovery.excludedCandidates,
       budgets: discovery.budgets,
-      gaps: [],
-      freshness: discovery.freshness
+      gaps,
+      freshness: discovery.freshness,
+      semantic_complete: true,
+      repository_snapshot: {
+        ...(git === undefined ? {} : {
+          root_path_hash: git.root_path_hash,
+          git_base_fingerprint: git.base_fingerprint,
+          ...(git.head_sha === undefined ? {} : { git_head_sha: git.head_sha })
+        }),
+        task_brief_sha256: taskBrief?.sha256 ?? "0".repeat(64),
+        discovery_config_sha256: configured.sha256
+      },
+      discovery_algorithm: discovery.algorithm,
+      effective_context_config: discovery.effectiveConfig,
+      effective_context_config_sha256: discovery.configSha256,
+      task_terms: discovery.taskTerms,
+      seeds: discovery.seeds,
+      instruction_chain: discovery.instructionChain,
+      symbols: discovery.symbols,
+      relations: discovery.relations,
+      evidence_fragments: discovery.evidenceFragments,
+      pins_exclusions: {
+        pinned_sources: discovery.effectiveConfig.pinnedSources,
+        exclusions: discovery.effectiveConfig.exclusions,
+        required_source_globs: discovery.effectiveConfig.requiredSourceGlobs,
+        required_categories: discovery.effectiveConfig.requiredCategories
+      },
+      semantic_budgets: {
+        max_graph_nodes: discovery.budgets.max_graph_nodes,
+        used_graph_nodes: discovery.budgets.used_graph_nodes,
+        max_graph_edges: discovery.budgets.max_graph_edges,
+        used_graph_edges: discovery.budgets.used_graph_edges,
+        max_evidence_fragments: discovery.budgets.max_evidence_fragments,
+        used_evidence_fragments: discovery.budgets.used_evidence_fragments,
+        instruction_max_bytes: discovery.budgets.instruction_max_bytes,
+        instruction_used_bytes: discovery.budgets.instruction_used_bytes
+      },
+      invalidation: {
+        source_hashes: Object.fromEntries(discovery.includedSources.map((source) => [source.uri, source.sha256])),
+        instruction_hashes: Object.fromEntries(discovery.instructionChain.map((instruction) => [instruction.uri, instruction.sha256])),
+        relevant_inputs_sha256: relevantInputsSha256
+      }
     });
     const next = transition({
       state: session.primaryState,
@@ -121,11 +198,11 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       content: `${JSON.stringify(manifest, null, 2)}\n`
     });
 
-    createArtifactRecord(runtime.db, {
+    const contextRecord = createArtifactRecord(runtime.db, {
       artifactId,
       sessionId: session.sessionId,
       type: "context_manifest",
-      schemaVersion: 2,
+      schemaVersion: 3,
       contentVersion,
       storageUri: written.storageUri,
       sha256: written.sha256,
@@ -207,6 +284,36 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       });
     }
 
+    if (taskBrief === undefined || taskBrief.status !== "valid") {
+      throw new GateFailedError("Context content pack requires a valid task brief; restart or repair the session");
+    }
+    const contextPackRecord = createContextContentPack({
+      runtime,
+      sessionId: session.sessionId,
+      taskBrief,
+      contextManifest: contextRecord,
+      manifest,
+      git,
+      now,
+      contentVersion: artifacts.filter((artifact) => artifact.type === "context_content_pack").length + 1
+    });
+
+    if (qualityReport.readiness === "blocked") {
+      appendEvent(runtime.db, {
+        eventId: newId("evt"),
+        sessionId: session.sessionId,
+        eventType: "context.blocked",
+        actorType: "atlas",
+        occurredAt: now,
+        summary: "Context evidence is incomplete; session remains at intake",
+        metadata: { contextArtifactId: artifactId, contextContentPackArtifactId: contextPackRecord.artifactId, gaps }
+      });
+      throw new GateFailedError("Context readiness gate failed; resolve missing context/questions and rebuild", {
+        gaps: gaps.map((gap) => gap.description),
+        repair: "Rerun atlas context scout/build after resolving the listed gaps"
+      });
+    }
+
     updateSessionContextArtifact(runtime.db, { sessionId: session.sessionId, artifactId, primaryState: next, now });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
@@ -218,6 +325,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       metadata: {
         contextArtifactId: artifactId,
         contextQualityReportArtifactId: qualityArtifactId,
+        contextContentPackArtifactId: contextPackRecord.artifactId,
         contextReadiness: qualityReport.readiness,
         gitFingerprint: git?.base_fingerprint,
         scannedFileCount: discovery.scannedFileCount,
@@ -231,6 +339,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       sessionId: session.sessionId,
       contextArtifactId: artifactId,
       contextQualityReportArtifactId: qualityArtifactId,
+      contextContentPackArtifactId: contextPackRecord.artifactId,
       contextReadiness: qualityReport.readiness,
       state: next,
       sourceCount: discovery.sources.length,
@@ -267,6 +376,12 @@ function evaluateContextQuality(input: {
   if (input.aiRecommendation !== undefined && input.aiRecommendation.recommendations.length === 0) {
     issues.push({ code: "ai-no-recommendations", severity: "warning", summary: "AI scout returned no file recommendations." });
   }
+  for (const gap of input.discovery.gaps) {
+    issues.push({ code: gap.code, severity: gap.severity, summary: gap.description });
+  }
+  for (const gap of gapsFromAiRecommendation(input.aiRecommendation)) {
+    issues.push({ code: gap.id, severity: gap.severity, summary: gap.description });
+  }
   const averageConfidence =
     input.aiRecommendation === undefined || input.aiRecommendation.recommendations.length === 0
       ? undefined
@@ -286,6 +401,24 @@ function evaluateContextQuality(input: {
       ? ["Proceed to atlas plan."]
       : issues.map((issue) => `Review ${issue.code}: ${issue.summary}`);
   return { readiness, issues, recommended_next_actions };
+}
+
+function gapsFromAiRecommendation(
+  recommendation: ReturnType<typeof aiContextRecommendationSchema.parse> | undefined
+): Array<{ id: string; severity: "blocking"; description: string }> {
+  if (recommendation === undefined) return [];
+  return [
+    ...recommendation.missing_context.map((description, index) => ({
+      id: `scout-missing-${String(index + 1).padStart(3, "0")}`,
+      severity: "blocking" as const,
+      description: `Missing required context: ${description}`
+    })),
+    ...recommendation.questions.map((description, index) => ({
+      id: `scout-question-${String(index + 1).padStart(3, "0")}`,
+      severity: "blocking" as const,
+      description: `Unresolved context question: ${description}`
+    }))
+  ];
 }
 
 function loadAiRecommendation(

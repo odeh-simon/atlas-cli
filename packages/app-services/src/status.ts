@@ -13,12 +13,26 @@ import {
   type SessionRecord
 } from "@atlas/persistence";
 import { allowedCommands } from "@atlas/workflow-engine";
+import { contextContentPackSchema, contextManifestSchema } from "@atlas/schemas";
+import { readVerifiedArtifactText } from "./evidence.js";
+import { assertContextManifestFresh } from "./context-pack.js";
+import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 
 export interface SessionStatus {
   readonly session: SessionRecord | undefined;
   readonly artifactCount: number;
   readonly eventCount: number;
   readonly nextCommands: readonly string[];
+  readonly context?: {
+    readonly schemaVersion: number;
+    readonly semanticComplete: boolean;
+    readonly fresh: boolean;
+    readonly discoveryAlgorithm?: string | undefined;
+    readonly effectiveConfigSha256?: string | undefined;
+    readonly blockingGapCount: number;
+    readonly warningGapCount: number;
+    readonly budgetPressure: boolean;
+  } | undefined;
 }
 
 export async function getStatus(options: RuntimeOptions = {}): Promise<SessionStatus> {
@@ -35,11 +49,14 @@ export async function getStatus(options: RuntimeOptions = {}): Promise<SessionSt
       };
     }
 
+    const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
+    const context = contextStatus(runtime.paths.cwd, runtime.paths.artifactRoot, session, artifacts);
     return {
       session,
-      artifactCount: listArtifactsForSession(runtime.db, session.sessionId).length,
+      artifactCount: artifacts.length,
       eventCount: listEvents(runtime.db, session.sessionId).length,
-      nextCommands: nextCommandsForSession(session, listFindingsForSession(runtime.db, session.sessionId))
+      nextCommands: nextCommandsForSession(session, listFindingsForSession(runtime.db, session.sessionId), artifacts, context?.semanticComplete === true && context.fresh),
+      ...(context === undefined ? {} : { context })
     };
   } finally {
     closeAtlasRuntime(runtime, false);
@@ -48,7 +65,12 @@ export async function getStatus(options: RuntimeOptions = {}): Promise<SessionSt
 
 export const resumeSession = getStatus;
 
-function nextCommandsForSession(session: SessionRecord, findings: readonly FindingRecord[]): readonly string[] {
+function nextCommandsForSession(
+  session: SessionRecord,
+  findings: readonly FindingRecord[],
+  artifacts: readonly { readonly type: string; readonly status: string }[],
+  hasSemanticContext: boolean
+): readonly string[] {
   if (session.disposition !== "active") {
     return [];
   }
@@ -61,14 +83,64 @@ function nextCommandsForSession(session: SessionRecord, findings: readonly Findi
     return ["atlas resume"];
   }
 
+  if (["context_ready", "planning_ready", "contract_draft", "contract_approved"].includes(session.primaryState) && !hasSemanticContext) {
+    return ["atlas context build"];
+  }
+
   const hasOpenFindings = findings.some((finding) => finding.status === "open" || finding.status === "reopened");
   return [...allowedCommands(session.primaryState)]
+    .filter((command) => session.primaryState === "intake_ready" || command !== "import_context")
     .sort(
       (left, right) =>
         commandPriority(session.primaryState, left, hasOpenFindings) -
         commandPriority(session.primaryState, right, hasOpenFindings)
     )
     .map(commandToCli);
+}
+
+function contextStatus(
+  cwd: string,
+  artifactRoot: string,
+  session: SessionRecord,
+  artifacts: readonly ReturnType<typeof listArtifactsForSession>[number][]
+): SessionStatus["context"] {
+  const manifestRecord = artifacts.find((artifact) => artifact.artifactId === session.currentContextArtifactId);
+  if (manifestRecord === undefined || manifestRecord.type !== "context_manifest") return undefined;
+  try {
+    const manifest = contextManifestSchema.parse(JSON.parse(readVerifiedArtifactText(artifactRoot, manifestRecord)) as unknown);
+    const packRecord = artifacts.filter((artifact) => artifact.type === "context_content_pack" && artifact.status === "valid").at(-1);
+    const pack = packRecord === undefined
+      ? undefined
+      : contextContentPackSchema.parse(JSON.parse(readVerifiedArtifactText(artifactRoot, packRecord)) as unknown);
+    const semanticComplete = manifest.schema_version >= 3 && manifest.semantic_complete === true && pack !== undefined &&
+      pack.schema_version >= 3 && pack.semantic_complete === true && pack.manifest_schema_version === 3 &&
+      pack.context_manifest_artifact_id === manifestRecord.artifactId && pack.context_manifest_sha256 === manifestRecord.sha256 &&
+      pack.blocking_gaps.length === 0;
+    let fresh = false;
+    if (semanticComplete && pack !== undefined) {
+      const taskBrief = artifacts.find((artifact) => artifact.artifactId === pack.task_artifact_id && artifact.type === "task_brief" && artifact.status === "valid");
+      if (taskBrief !== undefined && taskBrief.sha256 === pack.task_artifact_sha256) {
+        try {
+          assertContextManifestFresh({ rootPath: cwd, manifest, taskBriefSha256: taskBrief.sha256, git: readWorkflowGitSnapshot(cwd) });
+          fresh = true;
+        } catch {
+          fresh = false;
+        }
+      }
+    }
+    return {
+      schemaVersion: manifest.schema_version,
+      semanticComplete,
+      fresh,
+      ...(manifest.discovery_algorithm === undefined ? {} : { discoveryAlgorithm: `${manifest.discovery_algorithm.name} ${manifest.discovery_algorithm.version}` }),
+      ...(manifest.effective_context_config_sha256 === undefined ? {} : { effectiveConfigSha256: manifest.effective_context_config_sha256 }),
+      blockingGapCount: manifest.gaps.filter((gap) => gap.severity === "blocking").length,
+      warningGapCount: manifest.gaps.filter((gap) => gap.severity === "warning").length,
+      budgetPressure: manifest.freshness === "partial" || manifest.gaps.some((gap) => gap.id.includes("budget"))
+    };
+  } catch {
+    return { schemaVersion: manifestRecord.schemaVersion, semanticComplete: false, fresh: false, blockingGapCount: 1, warningGapCount: 0, budgetPressure: false };
+  }
 }
 
 function commandPriority(state: string, command: string, hasOpenFindings: boolean): number {
@@ -123,7 +195,7 @@ function commandToCli(command: string): string {
     case "prepare_review":
       return "atlas review prepare";
     case "import_review":
-      return "atlas review import <file>";
+      return "atlas review import <file> --actor <trusted-reviewer-id>";
     case "dispose_findings":
       return "atlas findings disposition <id>";
     case "prepare_fix_batch":

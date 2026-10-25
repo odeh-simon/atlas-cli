@@ -6,11 +6,11 @@
 | --- | --- |
 | Product | Atlas |
 | Document | V1 Product Requirements Document |
-| Version | 1.0 |
-| Status | Draft for product and technical review |
-| Date | 12 July 2026 |
-| Product owner | TBD |
-| Technical owner | TBD |
+| Version | 2.0 |
+| Status | Approved product baseline aligned to the production-orchestration plan |
+| Date | 23 August 2026 |
+| Product owner | Human product owner; approves intent, material product decisions, and final release |
+| Technical owner | Atlas orchestrator/reviewer; approves and checkpoints implementation batches |
 | Reviewers | Product, Staff Engineering, Developer Experience, Security, Design Systems |
 | Intended audience | Product managers, engineers, security reviewers, developer-experience engineers, and implementation agents |
 
@@ -19,14 +19,29 @@
 | Version | Date | Author | Change |
 | --- | --- | --- | --- |
 | 1.0 | 12 July 2026 | Product/Engineering | Initial implementation-ready V1 PRD |
+| 2.0 | 23 August 2026 | Product/Engineering | Align product scope, delivery authority, integrations, release criteria, and milestones with the governing production-orchestration plan |
+
+### Authority and delivery relationship
+
+- This PRD is authoritative for product behavior, safety boundaries, user outcomes, and release requirements.
+- The Linear document [Atlas Implementation Context and Production-Orchestration Plan](https://linear.app/poundz/document/atlas-implementation-context-and-production-orchestration-plan-fe5c5c15918e), mirrored locally at `DOCs/Atlas_Implementation_Context.md`, is authoritative for delivery order, batch boundaries, implementation invariants, promotion gates, and current approved progress.
+- `DOCs/M0_Engineering_Design/` is authoritative for approved subsystem designs and implemented technical contracts.
+- ATL Linear issues are executable views of the governing plan. A Done state is valid progress evidence only when the required implementation, tests, review packet, independent approval, and checkpoint are traceable.
+- If these sources conflict, implementation stops and the conflict is resolved through an approved document update; an agent must not silently choose one.
 
 ## 2. Executive summary
 
 Atlas is a local-first command-line workflow orchestrator for AI-assisted software development. It coordinates context, decisions, artifacts, state, and handoffs across Linear, a local Git repository, GitHub, Figma, ChatGPT, Claude Code, and Codex. Atlas is not a coding agent, issue tracker, design tool, or autonomous project manager.
 
-The V1 product replaces a fragile copy-and-paste workflow with a durable, task-centric session. Given a Linear issue or a manually created task, Atlas collects bounded context, generates a planning package, captures and versions an approved implementation contract, hands that contract to an installed coding-agent CLI, tracks local implementation activity, runs deterministic checks, assembles a review package, records review findings, and manages fix iterations until completion gates pass.
+The product replaces a fragile copy-and-paste workflow with a durable, task-centric session. Given an approved architecture/work source, Linear issue, or manually created task, Atlas builds versioned repository evidence, resolves authority and conflicts, synthesizes bounded context, validates a draft plan through a second discovery pass, captures an approved implementation contract, decomposes approved work into dependency-correct packages, coordinates isolated coding-agent execution, runs deterministic and independent validation, and reconciles approved work with Linear, GitHub, CI, review, merge, and closure state.
 
-V1 is deliberately human-in-the-loop. ChatGPT planning and review are human-mediated unless the user separately configures an officially supported API. Atlas may open an application or URL and copy prepared Markdown, but it does not control a consumer ChatGPT browser session. Product decisions, material architecture choices, contract approval, accepted deviations, destructive Git actions, and final completion remain under explicit developer control.
+Atlas is deliberately human-in-the-loop. Planning, context interpretation, and visual review may use manual handoffs or explicitly configured provider-neutral local/cloud model APIs, but deterministic evidence and gates remain authoritative. Atlas does not control a consumer ChatGPT browser session. Product decisions, material architecture choices, contract approval, accepted deviations, destructive Git actions, final completion, and merge remain explicit human decisions.
+
+Production-hardening amendment: artifact identifiers alone are never sufficient handoff evidence. Atlas creates a bounded, hash-verified context content pack for planning and implementation, captures an immutable reviewable Git diff for each execution, supplies substantive contract/diff/check evidence to an independently identified reviewer, and requires that fresh review plus the current contract, diff, checks, and Git state before completion. A later generic clean review never resolves an earlier finding; resolution requires explicit human evidence or finding-specific evidence from a fresh independent review. See `DOCs/M0_Engineering_Design/15_evidence_and_independent_review_gates.md`.
+
+Context-semantic amendment: production planning and implementation require a fresh manifest/content-pack v3 generated from deterministic repository evidence. Atlas records TypeScript symbols and local-module relationships, applicable root-to-scope repository instructions, test associations, verified line-range fragments, explainable selection scores, explicit gaps, effective budgets/configuration, and input hashes. AI may rerank real candidates but cannot create repository facts. Legacy manifests remain inspectable and require refresh. See `DOCs/M0_Engineering_Design/16_context_manifest_v3_semantic_discovery.md`.
+
+Production-orchestration amendment: the production target is delivered through twelve dependency-ordered batches. It adds a persistent evidence index and semantic graph v2; typed authority, conflicts, patterns, and invariants; provenance-preserving synthesis and plan-aware rediscovery; architecture-to-Linear work decomposition; isolated worktrees and bounded agent execution; specialized independent review and evidence-use attribution; secure Linear/GitHub reconciliation; a privacy-bounded context-quality learning loop; production hardening; and released-binary adversarial certification. Trail Safe may depend on Atlas only after Batch 12 certification and explicit product-owner approval.
 
 The V1 outcome is successful when an engineer can stop and resume a complex task without reconstructing context, can see exactly which contract and code state are under review, and spends materially less time moving information between tools without weakening quality or control.
 
@@ -75,9 +90,9 @@ The result is:
 
 ## 6. Product opportunity
 
-Atlas can create a reliable coordination layer without requiring a new model, IDE, cloud service, or paid model API. A deterministic local state machine, structured artifacts, supported CLIs, official SaaS APIs, and explicit human gates can remove repeated work while preserving developer control.
+Atlas can create a reliable coordination layer without requiring a new model, IDE, cloud service, or paid model API for its core workflow. A deterministic local state machine, structured artifacts, supported CLIs, official SaaS APIs, and explicit human gates remove repeated work while preserving developer control. Optional local or cloud models may improve context discovery, planning, and visual review only within deterministic evidence, privacy, consent, cost, and capability boundaries.
 
-The initial wedge is a single experienced engineer working in one large SaaS repository. The product can later support richer integrations, automated model APIs, team collaboration, and visual interfaces without invalidating the V1 task and artifact model.
+The initial wedge is a single experienced engineer working in one large SaaS repository. The production program includes richer Linear/GitHub orchestration, optional model APIs, deterministic and AI-assisted visual evidence, and outcome-based context evaluation while remaining local-first and single-user. Team collaboration, an Atlas cloud service, and a rich graphical interface remain future opportunities.
 
 ## 7. Personas and primary user profile
 
@@ -141,6 +156,14 @@ A senior reviewer may inspect an Atlas session, approved contract, diff summary,
 - Support human-mediated ChatGPT planning and review without requiring model API spend.
 - Preserve an auditable history of decisions, approvals, implementation, reviews, and fixes.
 - Improve adherence to project conventions and design-system constraints.
+- Build and reuse a persistent, content-addressed repository evidence index with explicit semantic capability gaps.
+- Resolve requirement authority and conflicts before planning, preserving human decisions and source provenance.
+- Produce compact cited context and require draft plans to survive a bounded second discovery pass.
+- Decompose approved architecture/work into dependency-correct, PR-sized Linear work packages.
+- Execute implementation in isolated policy-compliant branches/worktrees with bounded retries and recoverable interruption.
+- Reconcile approved local evidence with GitHub PR/CI/review/merge state and Linear lifecycle state idempotently.
+- Improve context selection through privacy-bounded, versioned, human-promoted learning profiles.
+- Certify released binaries through golden, adversarial, offline, corruption, remote-failure, and Trail Safe rehearsal scenarios.
 
 ### Outcome targets
 
@@ -149,6 +172,9 @@ A senior reviewer may inspect an Atlas session, approved contract, diff summary,
 - 100% of implementation runs reference an approved contract version.
 - 100% of review-ready states include the diff base, current HEAD, required check results, and contract hash.
 - No destructive Git or merge action occurs without explicit confirmation in V1.
+- 100% of synthesized assertions, plan steps, review findings, and completion claims resolve to current evidence or an explicit labeled gap.
+- 100% of remote writes are previewable, explicitly authorized, idempotent, attributable, and reconcilable.
+- No implementation batch promotes without focused and full validation, an independently reviewed handoff, and an approved checkpoint.
 
 ## 12. Non-goals
 
@@ -162,7 +188,7 @@ V1 does not include:
 - billing, account management, model training, or fine-tuning;
 - general browser automation or control of consumer ChatGPT sessions;
 - a complex graphical interface;
-- pixel-perfect visual comparison without defined evidence and tooling;
+- unqualified pixel-perfect claims without defined reference evidence, deterministic comparison, and review policy;
 - support for every coding agent; or
 - required use of separately billed AI APIs.
 
@@ -173,7 +199,7 @@ V1 does not include:
 - The user can authenticate to enabled SaaS integrations with credentials permitted by their organization.
 - Linear is the initial task source, but manual task creation remains available.
 - Git is the source of truth for code changes; Atlas metadata does not replace Git history.
-- ChatGPT planning and review are manual handoffs in V1 unless an official API adapter is explicitly configured.
+- Planning and review support manual handoffs and explicitly configured provider-neutral model APIs; neither path may bypass deterministic gates or approval authority.
 - Project commands and conventions differ and must be configured or discovered with user confirmation.
 - Figma metadata availability depends on credentials, permissions, API support, and referenced node accessibility.
 - V1 targets macOS, Linux, and Windows, with Windows support including PowerShell and Git-based repositories; shell-specific behavior requires validation.
@@ -183,11 +209,14 @@ V1 does not include:
 - Core V1 must function without paid model API calls.
 - Atlas cannot assume consumer subscriptions grant API access.
 - Atlas must not claim or attempt hidden browser/session access.
+- Cloud code context and image transfer require separate explicit consent and provider capability declaration.
+- Model output is advisory evidence interpretation, never repository fact, approval, check success, or completion proof.
 - Local secrets must not be stored in session artifacts or committed project files.
 - Large repositories require bounded, incremental context collection.
 - CLI adapters must tolerate tool version differences and unavailable capabilities.
 - V1 is single-user and single-machine; moving sessions between machines is a manual export/import concern, not transparent sync.
 - Product requirements constrain behavior but do not prescribe a complete internal architecture.
+- External mutations require preview, authorization policy, idempotency, audit evidence, and reconciliation; automatic merge remains prohibited.
 
 ## 15. Definitions and terminology
 
@@ -206,6 +235,11 @@ V1 does not include:
 | Finding | Review observation classified as blocking, important, suggestion, question, or accepted deviation |
 | Override | Explicit, attributed decision to proceed despite a failed or waived gate |
 | Adapter | Replaceable integration implementing a normalized capability interface |
+| Evidence index | Versioned, content-addressed repository evidence snapshots with deterministic identity, invalidation, history, and analyzer capabilities |
+| Authority claim | Provenance-bound assertion classified by authority, scope, version, confidence, and supersession state |
+| Work package | Dependency-aware, PR-sized executable unit derived only from approved source requirements and evidence |
+| Evidence-use ledger | Mapping from discovered evidence to plans, changes, tests, findings, deviations, omissions, and outcomes |
+| Orchestration run | Bounded sequence of Atlas workflow actions with explicit steps, budgets, blockers, and resulting artifacts |
 
 ## 16. Existing workflow versus target workflow
 
@@ -251,6 +285,8 @@ flowchart TD
 11. The developer accepts, rejects, or reclassifies findings. `atlas fix` sends only approved actionable findings and relevant contract context to the agent.
 12. Checks and review repeat against a new iteration.
 13. `atlas complete` evaluates gates and presents evidence, overrides, and unresolved items. The developer approves completion or chooses another action.
+
+For a production-orchestrated run, the journey additionally begins from an approved architecture/work source, creates dependency-correct Linear work packages, resolves each task against the persistent evidence index and authority model, performs plan-aware rediscovery before approval, executes in an isolated owned worktree, invokes independent review lanes, and reconciles the exact approved head with GitHub PR/CI/review/merge and Linear closure state. Remote failure pauses or degrades to an explicitly supported local/manual path; it never weakens approval or evidence gates.
 
 ## 18. Workflow stages and human approval gates
 
@@ -398,6 +434,23 @@ The following requirements are the V1 product baseline. “V1 status” indicate
 | AT-FIX-001 | **Versioned fix loop.** Send only approved findings and retain iteration history. | P0 | Findings disposition approved. | Create fix batch tied to review/contract/HEAD, invoke selected agent, rerun affected/required checks, and generate next review iteration. | If Git or contract changes, invalidate stale batch and require regeneration. | Resolved findings retain evidence; reopened findings preserve history; no finding silently vanishes. | Committed |
 | AT-CMP-001 | **Completion gates.** Prevent unsupported claims of done. | P0 | `complete`. | Verify approved current contract, required checks, no unresolved blocking findings, valid Git state, required evidence, and no paused/rejected status; show overrides. | Failed gates block completion; overrideable gates require explicit reason; non-overrideable corruption/security failures remain blocked. | Completion record includes exact contract, HEAD/worktree, check set, findings state, evidence, overrides, and approval. | Committed |
 
+### 19.9 Production-orchestration requirements
+
+These requirements extend the local V1 foundation into the production target. Delivery state is governed by the corresponding batch and ATL issues, not by the word "Committed" in the scope column.
+
+| ID | Requirement and user value | Delivery batch | Main behavior and outputs | Failure behavior | Acceptance criteria | Scope status |
+| --- | --- | --- | --- | --- | --- | --- |
+| AT-ORC-003 | **Persistent evidence index and semantic graph v2.** Reuse trustworthy repository evidence across tasks and history. | Batch 3 | Content-addressed snapshots, incremental invalidation, analyzer capabilities, bounded graph queries, inspection, repair, metrics, and manifest integration. | Stale, corrupt, unsupported, or truncated required evidence fails closed or rebuilds transactionally. | Unchanged repositories reuse exact evidence; scoped changes do not leave ghost evidence; large-repo and cancellation tests pass. | Committed |
+| AT-ORC-004 | **Authority, conflicts, patterns, and invariants.** Distinguish normative requirements from descriptive evidence before planning. | Batch 4 | Typed claims, deterministic precedence, conflict sets, human resolution records, pattern/invariant artifacts, and citation audits. | Unresolved material conflicts, stale authority, and uncited mandatory claims block planning. | Precedence is deterministic; human decisions are immutable and scoped; adversarial conflicts fail safely. | Committed |
+| AT-ORC-005 | **Synthesis and plan-aware rediscovery.** Keep context compact without losing provenance and challenge the draft plan with new evidence. | Batch 5 | Context cards, extractive-first compression, fidelity gates, evidence-declared plan schema, second-pass queries, context deltas, and plan reconciliation. | Compression loss, contradictory new evidence, or revision-budget exhaustion blocks or escalates. | Every assertion remains cited; hidden relevant evidence is found; no-op second passes are deterministic. | Committed |
+| AT-ORC-006 | **Work packages and Linear decomposition.** Convert approved architecture/work sources into dependency-correct executable work. | Batch 6 | PR-sized work-package schema, dependency/sizing validation, previewed Linear project/issue hierarchy and relation writes, task briefs, idempotency, and reconciliation. | Cycles, future dependencies, invented acceptance criteria, oversized work, and partial writes block or recover safely. | Equivalent sources produce stable work packages and no duplicate Linear structures. | Committed |
+| AT-ORC-007 | **Isolated implementation and scope enforcement.** Keep each implementation run contained and recoverable. | Batch 7 | Safe branch/worktree lifecycle, workspace ownership, content-resolved packages, scope policies, immutable Git evidence, execution budgets, retries, cancellation, and recovery. | Dirty/base drift, collision, path escape, unsupported mutation, and out-of-scope changes fail closed. | Parallel sessions cannot collide; crashes preserve evidence; agent claims never override Git/check facts. | Committed |
+| AT-ORC-008 | **Independent review and evidence-use attribution.** Prove coverage through specialized reviewers independent from implementation. | Batch 8 | Review lanes/quorum, reviewer identity and capability, evidence-use ledger, requirement-to-diff-to-test coverage, finding sufficiency, bounded repair, and affected-lane re-review. | Actor collision, stale evidence, uncited blockers, blanket finding closure, and retry exhaustion block or escalate. | Every blocker cites current evidence; affected changes invalidate review lanes; coverage gaps remain visible. | Committed |
+| AT-ORC-009 | **Secure Linear/GitHub orchestration and reconciliation.** Make local and remote workflow state converge safely. | Batch 9 | Protected credential storage, capability checks, durable inbox/outbox, signed webhooks, branch/push/PR/CI/review orchestration, Linear lifecycle reconciliation, drift handling, and dead letters. | Duplicate, delayed, reordered, missing, stale, unauthorized, or offline remote events cannot fabricate success. | Writes are idempotent; stale CI cannot pass a new head; merge/closure requires exact approved evidence. | Committed |
+| AT-ORC-010 | **Privacy-bounded context-quality learning.** Improve evidence selection from audited outcomes under human governance. | Batch 10 | Outcome dataset, quality metrics, versioned ranking profiles, replay, benchmark corpora, shadow evaluation, promotion/rollback, drift detection, retention, and deletion. | Shadow candidates cannot mutate workflow; privacy violations or regressions block promotion. | Active profiles are explainable, reproducible, approved, rollbackable, and privacy-compliant. | Committed |
+| AT-ORC-011 | **Production hardening and release readiness.** Make Atlas durable, observable, secure, supportable, and cross-platform. | Batch 11 | Backup/restore, migration and corruption repair, multiprocess locks/leases, resource limits, diagnostics, performance budgets, packaging provenance, runbooks, and security review. | Unsupported upgrade, corruption, concurrency, resource exhaustion, or diagnostic privacy failure stops safely. | Recovery and platform matrices pass with no release-blocking data-loss, secret-exposure, false-approval, or destructive-action defect. | Committed |
+| AT-ORC-012 | **Released-binary production certification.** Prove the complete system before downstream products depend on it. | Batch 12 | Golden and adversarial scenario harness, two representative repositories, remote/offline/failure scenarios, evidence matrix, Trail Safe rehearsal, rollback criteria, and human sign-off. | Failed required scenario or unresolved release blocker prevents certification. | Every required journey passes from released binaries and the product owner explicitly authorizes Trail Safe proving. | Committed |
+
 ## 20. CLI product specification
 
 Command names are provisional but the capability groups and behavioral contracts are V1 requirements.
@@ -521,31 +574,39 @@ flowchart TD
 ### Linear
 
 - Use official APIs and least-privilege credentials.
-- V1 reads issues, comments, labels, status, links, and available relationships required for intake.
+- Read issues, comments, attachments, labels, status, links, priority, assignee, and available relationships required for intake.
 - Normalize provider data while preserving original IDs, URLs, source times, and raw-field availability.
 - Retry safe reads with bounded exponential backoff and respect provider rate limits.
-- Writing status updates or comments is deferred; any later write must require a preview and explicit authorization.
+- Batch 6 adds previewed, approved, idempotent project/parent/sub-issue/relation/metadata delivery from evidence-grounded work packages.
+- Batch 9 adds secure webhook/poll intake, state/comment/link reconciliation, dependencies, and close-after-merge policy.
+- Every write requires capability verification, explicit policy/authorization, audit evidence, idempotency, and partial-failure recovery.
 
 ### Git and GitHub
 
 - Local Git is authoritative for working-tree, branch, commit, and diff facts.
 - GitHub supplements remote repository and pull-request metadata when configured.
-- V1 supports work before a PR exists. PR preparation may be exported as a completion artifact; direct creation is P2 unless implemented through an official supported interface with confirmation.
+- The local foundation supports work before a PR exists and exports PR-ready evidence.
+- Batch 7 adds isolated branch/worktree ownership and scope enforcement.
+- Batch 9 adds authorized branch push, PR create/update, CI/check aggregation, review/thread reconciliation, merge detection, and exact head/base binding.
 - Atlas never assumes `origin`, default branch, or branch protection without verification.
 - Remote fetch is explicit/configurable and must not silently alter the worktree.
+- Atlas does not merge autonomously. Merge remains an explicit human or separately authorized external action and must reconcile to the exact approved evidence.
 
 ### Figma
 
 - Store canonical file and node references and fetched metadata with timestamps.
 - Use official credentials/APIs only when configured.
 - Accept exported screenshots, annotations, or other user-supplied visual evidence and link them to the relevant frame and contract version.
+- Support deterministic browser capture and PNG comparison when a project declares routes, viewports, references, thresholds, and browser capabilities.
+- Allow optional vision-capable model review only with explicit cloud-image consent and immutable reference/actual/diff evidence.
 - Report access limitations and avoid inferring unobserved interaction, responsiveness, or component behavior.
 
 ### ChatGPT
 
-- V1's default integration is artifact export, clipboard assistance, optional app/URL opening, and artifact import.
+- The default integration remains artifact export, clipboard assistance, optional app/URL opening, and artifact import.
 - The developer is responsible for submitting the package and selecting/importing the final response.
-- An optional future official API adapter must be separately configured, disclose cost and data transfer, and not replace approval gates.
+- Provider-neutral local or cloud model APIs may perform bounded context reranking, planning drafts, and visual review when separately configured with explicit code/image consent, cost/time/token limits, redaction, and capability checks.
+- Model responses are advisory and must cite deterministic evidence; they cannot approve contracts, checks, findings, completion, or merge.
 - Atlas must not automate login, scrape chats, inject browser scripts, or imply access to consumer chat history.
 
 ### Claude Code and Codex
@@ -565,7 +626,8 @@ flowchart TD
 6. Atlas records base commit at contract approval/implementation start. A later base update is a new explicit action and may invalidate checks or review packages.
 7. Diff review can include committed-only or committed-plus-worktree state, but the package must state which.
 8. Atlas tracks commits but does not require agents to commit unless project policy says so. It never authors a commit without an explicit user command/policy and a visible message.
-9. Pull-request creation/update is not required for core V1 completion. Atlas produces the information needed for a PR and may add a supported, confirmed P2 adapter.
+9. The local/manual core remains usable before a PR exists. Production completion modes that claim remote delivery require the current approved PR/CI/review/merge evidence defined by Batch 9 policy.
+10. Push, PR creation/update, and remote reconciliation are previewed, capability-checked, idempotent, and explicitly authorized. Atlas never force-pushes or merges autonomously.
 
 ## 25. Planning and implementation-contract requirements
 
@@ -668,7 +730,7 @@ flowchart TD
 1. Store credentials in OS-protected storage where available; support environment references for CI-like use; never store raw secrets in task artifacts.
 2. Redact configured tokens, authorization headers, signed URLs, and high-confidence secret patterns in console, logs, packages, and crash output.
 3. Default local files to user-only permissions where supported.
-4. Make every remote transfer visible by integration and purpose. Context sent manually to ChatGPT remains a developer-controlled action.
+4. Make every remote transfer visible by integration, purpose, destination, data class, and consent. Cloud code context and cloud image transfer are separately controlled; manual handoffs remain developer-controlled actions.
 5. Support exclude patterns for sensitive paths and reject common secret files by default, including `.env*`, key material, and credential stores.
 6. Treat repository and imported content as untrusted data. It cannot silently redefine Atlas security policy, approve actions, or execute commands.
 7. Use argument arrays and direct process execution rather than shell interpolation by default.
@@ -677,6 +739,8 @@ flowchart TD
 10. Provide local data inventory and deletion/archive controls. Deletion, if later supported, must distinguish Atlas metadata from repository code.
 11. Optional telemetry is off by default and contains no source code, task content, prompts, diffs, filenames, repository URLs, or credentials.
 12. Dependency and release processes should include lockfiles, provenance where available, vulnerability scanning, and signed/checksummed distribution artifacts.
+13. External events must be authenticated where supported, deduplicated, ordered/replayed safely, and retained in inspectable inbox/outbox/dead-letter records without secrets.
+14. Learning and diagnostics must be privacy-bounded: no raw private repository content is collected by default, and preview, retention, deletion, shadow-mode, and human-promotion controls are required.
 
 ## 31. Non-functional requirements
 
@@ -774,18 +838,21 @@ Diagnostic export is a user-initiated action that previews included files/fields
 
 ## 37. Release criteria
 
-V1 may be released when:
+Atlas may be certified for production use when:
 
 - all P0 functional requirements have passing acceptance tests or documented product-approved exclusions;
-- end-to-end intake → plan → contract approval → Codex/Claude adapter → checks → review → fix → completion passes on at least two representative pilot repositories;
+- Batches 1 through 12 are independently approved and checkpointed with traceable migrations and acceptance evidence;
+- end-to-end architecture/work source -> work packages -> Linear -> context and planning -> contract approval -> isolated Codex/Claude implementation -> checks -> independent review -> fixes -> PR/CI -> human approval -> merge reconciliation -> closure passes from released binaries on at least two representative repositories;
 - core workflow works without a model API key;
-- forced-termination recovery tests pass at each state-changing stage;
+- forced-termination, cancellation, retry exhaustion, stale input, supersession, conflict, corruption, malicious content, duplicate/reordered remote event, offline, and partial-failure scenarios stop or recover as designed;
 - the supported OS matrix and supported agent versions are published and validated;
-- secret-handling, shell-injection, unsafe Git, artifact redaction, and dependency security reviews pass;
+- OS-protected credential storage or an approved external-reference mode replaces reversible credential storage;
+- secret-handling, shell-injection, unsafe Git, webhook security, artifact redaction, dependency/license, supply-chain, and diagnostic privacy reviews pass;
 - session migration from the previous release candidate succeeds with rollback backup;
-- documentation covers installation, initialization, credentials, recovery, limitations, and data locations;
+- backup/restore, migration, corruption repair, multiprocess consistency, retention, and release-provenance matrices pass;
+- documentation covers installation, initialization, credentials, privacy, remote writes, recovery, limitations, data locations, support, and rollback;
 - no open P0/P1 data-loss, secret-exposure, false-approval, or destructive-action defect remains; and
-- pilot users can complete and resume tasks with no maintainer intervention in the agreed success threshold.
+- the Batch 12 evidence matrix and Trail Safe rehearsal pass with no unresolved release-blocking finding and explicit product-owner sign-off.
 
 ## 38. V1 scope
 
@@ -793,15 +860,18 @@ V1 may be released when:
 
 - Local TypeScript/Node CLI and local persistent store.
 - Single-user, single-machine, task-centric sessions.
-- Linear read intake and manual task intake.
-- Local Git repository discovery, safe branch preparation, status, commits, and diffs.
-- Optional GitHub read metadata.
-- Figma URL/node parsing, supported metadata, and supplied visual evidence.
-- Bounded context manifests and project memory.
-- Planning/review packages with clipboard/file/manual ChatGPT handoffs.
+- Architecture/work-source normalization, manual intake, Linear issue intake, and evidence-grounded Linear work-package decomposition.
+- Local Git repository discovery, isolated branch/worktree lifecycle, scope enforcement, status, commits, diffs, and immutable before/after evidence.
+- Secure, authorized GitHub branch/PR/CI/review/merge reconciliation and Linear lifecycle reconciliation.
+- Figma URL/node parsing, supported metadata, supplied reference evidence, deterministic browser capture/comparison, and optional consented AI visual review.
+- Persistent incremental evidence indexing, semantic analyzer capabilities, bounded graph queries, context manifests, context cards, project memory, and historical comparison.
+- Typed authority, conflict resolution, patterns, invariants, citation validation, provenance-preserving compression, and plan-aware second discovery.
+- Planning/review packages with clipboard/file/manual handoffs and optional provider-neutral local/cloud AI assistance.
 - Contract and review-report import, validation, versioning, and approvals.
-- Claude Code and Codex local CLI adapters, plus manual export fallback.
-- Configured checks, policy scans, findings, fix loops, recovery, and completion gates.
+- Claude Code and Codex local CLI adapters, manual export fallback, bounded execution, cancellation, retries, and crash recovery.
+- Configured checks, policy scans, independent review lanes, evidence-use attribution, findings, fix loops, recovery, and completion gates.
+- Privacy-bounded outcome evaluation, versioned ranking profiles, shadow tests, human promotion, rollback, drift detection, retention, and deletion.
+- Production persistence, backup/restore, corruption repair, multiprocess coordination, observability, performance budgets, cross-platform packaging, runbooks, and released-binary certification.
 - Human-readable Markdown and machine-readable JSON outputs.
 
 ### P1/P2 scope rule
@@ -810,28 +880,26 @@ P1 items ship when they do not jeopardize P0 safety and workflow completeness. P
 
 ## 39. Deferred scope
 
-- Direct Linear writes and automated status synchronization.
-- Full GitHub pull-request creation/update and check-status orchestration.
-- Direct paid model API integrations.
 - Automated browser interaction with any chat product.
 - Cloud sync, team collaboration, shared approvals, and organization administration.
 - Rich GUI, IDE extension, or persistent background daemon.
-- Automated screenshot capture and visual-regression comparison unless a project supplies existing tools.
 - More coding-agent adapters beyond Claude Code and Codex.
 - Cross-machine transparent session synchronization.
-- Policy-managed autonomous commits, pushes, PRs, or merges.
+- Autonomous product/architecture decisions, contract approval, deviation approval, final completion, merge, or issue closure without explicit approved human/external authority.
+- Destructive Git operations including force push, reset, unapproved rebase, discard, or branch/worktree deletion without explicit recoverable policy.
+- Organization-wide cloud repository indexing or training/fine-tuning on private repository content.
+- Atlas-hosted multi-tenant orchestration or distributed worker infrastructure.
+- Starting Trail Safe feature implementation before Batch 12 certification and product-owner approval.
 
 ## 40. V2 and V3 opportunities
 
 ### V2 candidates
 
-- Optional official model API adapters for planning and review with explicit cost/privacy controls.
-- Supported GitHub PR creation/update and Linear status/comment writes with previews and idempotency.
 - IDE companion showing status, artifacts, and approval gates.
-- Project-memory recommendations and richer component/design-token registries.
-- Integration with existing visual-regression tools and screenshot evidence capture.
 - Additional agent adapters and richer resumable provider sessions.
+- Additional language/framework analyzers and richer component/design-token registries.
 - Encrypted session export/import between machines.
+- Human-approved reusable organization policy packs without shared live sessions.
 
 ### V3 candidates
 
@@ -839,7 +907,7 @@ P1 items ship when they do not jeopardize P0 safety and workflow completeness. P
 - Secure cloud synchronization and web dashboard.
 - Portfolio visibility across tasks and repositories.
 - Policy-bounded background execution.
-- Cross-task learning using explicitly curated, privacy-safe project knowledge.
+- Cross-repository learning using explicitly curated, privacy-safe organization knowledge.
 
 Later automation must preserve the same artifacts, state transitions, auditability, and human-gate semantics rather than bypassing them.
 
@@ -853,9 +921,12 @@ Later automation must preserve the same artifacts, state transitions, auditabili
 - OS keychain library with documented fallback behavior.
 - Clipboard and application-opening libraries with cross-platform support.
 - Official Linear, GitHub, and Figma APIs/SDKs where used.
+- Provider-neutral Ollama/OpenAI-compatible model APIs where explicitly configured.
+- Installed Edge/Chrome browser channels and deterministic PNG comparison tooling for configured visual checks.
 - Installed supported Claude Code and/or Codex CLI.
 - Project-provided build, lint, typecheck, test, and optional design-policy commands.
-- Packaging, signing/checksum, dependency scanning, and cross-platform CI infrastructure.
+- Webhook verification, durable event inbox/outbox, retry/dead-letter, and provider sandbox infrastructure for remote certification.
+- Packaging, signing/checksum, software-bill-of-materials/provenance, dependency scanning, and cross-platform CI infrastructure.
 
 Licenses, maintenance health, security posture, and platform support of dependencies must be reviewed before technical commitment.
 
@@ -879,14 +950,14 @@ Licenses, maintenance health, security posture, and platform support of dependen
 
 ## 43. Trade-offs
 
-1. **Manual ChatGPT handoff over browser automation:** Less seamless, but supportable, secure, honest, and compatible with existing subscriptions.
-2. **Deterministic state machine over autonomous orchestration:** Requires explicit transitions, but improves predictability, auditability, and recovery.
+1. **Manual/API handoffs over consumer-browser automation:** Provider APIs may be configured explicitly, but Atlas does not scrape or control consumer chat sessions.
+2. **Deterministic authority and gates around orchestration:** Agents may automate bounded work, while state, evidence, approvals, and stop conditions remain deterministic.
 3. **Local SQLite plus files over a cloud service:** Limits collaboration and sync, but reduces cost, privacy risk, and infrastructure requirements.
 4. **Bounded context over maximal ingestion:** Risks omission, but prevents cost/noise explosions and makes sources auditable.
 5. **Strict approval/versioning over editable plans:** Adds a deliberate step, but prevents intent drift and makes review meaningful.
-6. **Safe Git subset over full automation:** Leaves some manual Git work, but protects user code and trust.
+6. **Policy-bounded Git/remote orchestration over autonomous mutation:** Atlas may prepare branches, worktrees, pushes, and PRs, but destructive actions and merge remain explicitly controlled.
 7. **Provider-neutral adapters over deep single-agent coupling:** May limit provider-specific features initially, but protects workflow portability.
-8. **Deterministic UI policy scans over subjective fidelity claims:** Cannot prove complete design correctness, but catches enforceable violations without false assurance.
+8. **Layered visual evidence over subjective fidelity claims:** Deterministic capture/comparison establishes observable change; optional vision review interprets evidence but cannot prove unobserved behavior.
 
 ## 44. Open questions
 
@@ -898,49 +969,33 @@ Licenses, maintenance health, security posture, and platform support of dependen
 | OQ-004 | How are Markdown contracts structured for robust import? | Required headings plus YAML/JSON metadata generated from a published template | Import tolerance and human editability |
 | OQ-005 | Which Claude Code and Codex versions/modes are supportable? | Publish a tested version matrix and manual-export fallback | Adapter reliability |
 | OQ-006 | Can coding agents be allowed to commit by project policy? | Default no; permit only an explicit project policy and run-level visibility | Audit trail and Git ergonomics |
-| OQ-007 | Is direct GitHub PR creation required for V1 launch? | No; export PR-ready completion report first | Scope and external-write safety |
+| OQ-007 | Is direct GitHub PR creation required for production certification? | Yes for configured remote-delivery scenarios in Batch 9/12; local/manual mode remains valid before a PR exists | Remote orchestration and release certification |
 | OQ-008 | Which deterministic design-token rules exist in the pilot repo? | Configure repo-specific regex/AST rules and reuse existing lint tooling | UI-check quality and effort |
-| OQ-009 | How should visual evidence be captured in V1? | User-supplied files and links, optionally project-provided screenshot commands | Fidelity confidence |
+| OQ-009 | How should visual evidence be captured? | Immutable supplied/Figma references plus configured deterministic browser capture and PNG comparison; optional consented vision review is advisory | Fidelity confidence and privacy |
 | OQ-010 | Should session artifacts live inside the repository? | Keep canonical state outside Git; allow a configurable, gitignored project artifact directory | Privacy, portability, discoverability |
 | OQ-011 | What constitutes a material contract change? | Scope, architecture, data/security, design constraints, acceptance, or required tests are material by default | Approval frequency |
-| OQ-012 | Is opt-in anonymous telemetry desired for pilot? | Start with local diagnostics only; add opt-in after privacy review | Product insight versus trust |
+| OQ-012 | Is product telemetry allowed? | Yes, only under explicit enablement and strict content-free privacy controls with preview/disable/delete behavior | Product insight versus trust |
 
-## 45. Delivery milestones
+## 45. Delivery milestones and current progress
 
-### M0 — Product and safety foundation
+M0-M6 delivered the local walking skeleton and remain historical implementation milestones. Production promotion now follows the governing twelve-batch plan below. Status is current as of 23 August 2026 and must be reconciled from approved commits and ATL issue evidence.
 
-- Confirm state model, artifact schemas, data layout, supported OS/runtime matrix, Git safety boundary, threat model, and pilot repository.
-- Exit: approved technical design and test strategy mapped to P0 requirements.
+| Batch | Scope | Current status/evidence | Promotion exit |
+| --- | --- | --- | --- |
+| 1 | Evidence and independent-review gates | Completed and approved at `b8547d2` (`ATL-1`) | Current contract/diff/check/review evidence gates independently approved |
+| 2 | Semantic discovery and context manifest v3 | Completed and approved at `c6df706` (`ATL-2`) | Fresh semantic-complete v3 planning/implementation path approved |
+| 3 | Persistent evidence index and semantic graph v2 | In delivery: B3.1 completed at `166563b` (`ATL-13`); B3.2 (`ATL-14`) has unapproved worktree implementation; B3.3-B3.5 remain planned | Integrated index/analyzer/query/manifest path certified and independently approved |
+| 4 | Authority, conflicts, patterns, and invariants | Planned; blocked by Batch 3 | Authority and invariant gates certified |
+| 5 | Synthesis, compression, and plan-aware rediscovery | Planned; blocked by Batch 4 | Cited compact context and reconciled two-pass plan certified |
+| 6 | Work packages and Linear decomposition | Planned; blocked by Batch 5 | Stable dependency-correct Linear delivery certified |
+| 7 | Isolated implementation and scope enforcement | Planned; blocked by Batch 6 | Isolated bounded implementation certified |
+| 8 | Independent review and evidence-use attribution | Planned; blocked by Batch 7 | Review lanes, coverage, attribution, and bounded repair certified |
+| 9 | Secure Linear/GitHub orchestration and reconciliation | Planned; blocked by Batch 8 | Credentials, remote events, PR/CI/review/merge/closure reconciliation certified |
+| 10 | Context-quality learning loop | Planned; blocked by Batch 9 | Privacy-bounded replay/shadow/promotion/rollback loop certified |
+| 11 | Production hardening and release readiness | Planned; blocked by Batch 10 | Persistence, concurrency, observability, performance, packaging, and operations approved |
+| 12 | End-to-end and adversarial production certification | Planned; blocked by Batch 11 | Released-binary evidence matrix and Trail Safe rehearsal receive product-owner sign-off |
 
-### M1 — Local session core
-
-- CLI install/init/config, SQLite migrations, session lifecycle, events, artifacts, status/resume/pause/archive, doctor, structured output.
-- Exit: forced-termination and migration fixtures pass for local/manual tasks.
-
-### M2 — Intake and context
-
-- Linear read adapter, manual intake, repository verification, reference detection, Figma metadata/reference support, bounded manifest, project memory and freshness.
-- Exit: representative issue creates a complete traceable planning package without whole-repo ingestion.
-
-### M3 — Planning and contract gates
-
-- Planning export/clipboard/open, contract template/import/validation/versioning/diff, decision log, explicit approval.
-- Exit: implementation cannot start without a valid approved immutable contract.
-
-### M4 — Agent execution and Git tracking
-
-- Claude Code and Codex adapters, manual export fallback, safe branch workflow, command runner, execution reports, Git reconciliation.
-- Exit: both supported adapters complete a fixture task and interrupted runs recover safely.
-
-### M5 — Checks, review, and fixes
-
-- Quality gates, UI policy scans, diff/package generation, review import, findings disposition, fix batches and iterations.
-- Exit: end-to-end fix loop retains contract, commit, finding, and check provenance.
-
-### M6 — Completion and release hardening
-
-- Completion gates/report, security review, redaction, cross-platform tests, performance validation, docs, pilot metrics, release packaging.
-- Exit: all release criteria in Section 37 pass.
+The program is complete only when Batch 12 is approved, all preceding checkpoints and migrations are traceable, no release-blocking finding remains, operational/recovery documentation is current, and the product owner explicitly authorizes the Trail Safe proving phase.
 
 ## 46. Acceptance test scenarios
 
@@ -968,6 +1023,18 @@ Licenses, maintenance health, security posture, and platform support of dependen
 | AT-E2E-020 | Complete with all gates passing | Atlas shows exact contract, base/head, checks, findings, evidence, and records explicit final approval |
 | AT-E2E-021 | Run `--json` in non-interactive mode with missing approval | Stable JSON error and exit code are returned immediately; no prompt or state mutation occurs |
 | AT-E2E-022 | Upgrade a session from the previous supported schema | Backup/migration succeeds without changing approved artifact hashes; failed migration restores prior usable state |
+| AT-E2E-023 | Rebuild context on an unchanged indexed repository, then change one file | Exact snapshot is reused first; only provably affected evidence invalidates after the change; no ghost evidence remains |
+| AT-E2E-024 | Architecture, repository instructions, issue text, and tests contain material conflicting claims | Typed conflict set identifies authority and scope; unresolved conflict blocks planning until a human resolution is recorded |
+| AT-E2E-025 | A draft plan names a boundary whose relevant evidence was absent from pass one | Bounded second-pass discovery finds or explicitly gaps the evidence; material context delta reopens plan approval |
+| AT-E2E-026 | Deliver the same approved architecture source to Linear twice | Stable PR-sized work packages and dependencies are produced; preview/reconciliation creates no duplicate projects, issues, relations, or comments |
+| AT-E2E-027 | Two sessions attempt to own the same branch/worktree or an agent changes a forbidden path | Ownership/scope gate blocks safely, preserves both workspaces, and records exact immutable Git evidence |
+| AT-E2E-028 | Implementer identity is reused as the only reviewer or a clean review attempts blanket closure | Independent-review/quorum gate blocks and every prior finding retains finding-specific status and evidence requirements |
+| AT-E2E-029 | GitHub/Linear events are duplicated, delayed, reordered, omitted, or replayed after offline work | Inbox/outbox reconciliation converges idempotently or emits an inspectable conflict/dead letter without fabricating success |
+| AT-E2E-030 | CI passed for an older PR head while local/remote head has advanced | Stale CI/review evidence cannot satisfy completion or merge readiness for the new head |
+| AT-E2E-031 | A candidate context-ranking profile appears better in shadow replay | Shadow run cannot alter active selection; promotion requires reproducible metrics, privacy checks, and explicit human approval; rollback remains available |
+| AT-E2E-032 | Upgrade from reversible credential storage to OS-protected/external references | Secret migrates or requires safe re-entry without appearing in logs, artifacts, diagnostics, backups, or error output |
+| AT-E2E-033 | Kill concurrent index/orchestration/persistence operations and corrupt recoverable local state | Locks/leases and transactional recovery preserve the last valid state; doctor previews repair/restore without inventing approvals |
+| AT-E2E-034 | Run the released-binary golden/adversarial matrix on two repositories and a Trail Safe rehearsal | Required scenarios pass with reproducible evidence, no release blocker remains, and product-owner sign-off is recorded before Trail Safe proving |
 
 ## 47. Appendix
 

@@ -66,7 +66,13 @@ try {
   mkdirSync(outputDirectory, { recursive: true });
   rmSync(archivePath, { force: true });
   rmSync(checksumPath, { force: true });
-  run("tar", ["-czf", archivePath, "-C", stageDirectory, "."], workspaceRoot);
+  // --force-local is GNU-tar specific and unsupported by Windows bsdtar.
+  // Only pass it on platforms whose tar implements it.
+  const tarArgs =
+    process.platform === "win32"
+      ? ["-czf", archivePath.replace(/\\/g, "/"), "-C", stageDirectory.replace(/\\/g, "/"), "."]
+      : ["--force-local", "-czf", archivePath.replace(/\\/g, "/"), "-C", stageDirectory.replace(/\\/g, "/"), "."];
+  run("tar", tarArgs, workspaceRoot);
   const checksum = createHash("sha256").update(readFileSync(archivePath)).digest("hex");
   writeFileSync(checksumPath, `${checksum}  ${basename(archivePath)}\n`);
 

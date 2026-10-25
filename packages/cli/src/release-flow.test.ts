@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -21,16 +22,14 @@ describe("release workflow smoke", () => {
     const atlasHome = join(root, "home");
     mkdirSync(repository, { recursive: true });
     writeFileSync(join(repository, "README.md"), "# Release flow fixture\n");
-    const contextPath = join(root, "context.json");
+    execFileSync("git", ["init", "-b", "main"], { cwd: repository, stdio: "ignore" });
+    execFileSync("git", ["config", "user.email", "atlas-tests@example.invalid"], { cwd: repository, stdio: "ignore" });
+    execFileSync("git", ["config", "user.name", "Atlas Tests"], { cwd: repository, stdio: "ignore" });
+    execFileSync("git", ["add", "README.md"], { cwd: repository, stdio: "ignore" });
+    execFileSync("git", ["commit", "-m", "fixture"], { cwd: repository, stdio: "ignore" });
     const contractPath = join(root, "contract.json");
     const executionPath = join(root, "execution.json");
     const reviewPath = join(root, "review.json");
-    writeFileSync(
-      contextPath,
-      JSON.stringify({
-        sources: [{ uri: "README.md", kind: "file", reason: "Release fixture", byte_length: 23, included: true }]
-      })
-    );
     writeFileSync(contractPath, JSON.stringify(validContract()));
     writeFileSync(
       executionPath,
@@ -54,7 +53,7 @@ describe("release workflow smoke", () => {
       process.env.ATLAS_HOME = atlasHome;
       const commands: readonly string[][] = [
         ["start", "--manual", "--title", "Release smoke", "--objective", "Prove the complete CLI flow"],
-        ["context", "import", contextPath],
+        ["context", "build"],
         ["plan"],
         ["contract", "import", contractPath],
         ["approve", "contract", "--yes"],
@@ -62,7 +61,7 @@ describe("release workflow smoke", () => {
         ["execution", "import", executionPath],
         ["checks", "run"],
         ["review", "prepare"],
-        ["review", "import", reviewPath],
+        ["review", "import", reviewPath, "--actor", "human:release-reviewer"],
         ["complete", "--check"],
         ["approve", "completion", "--yes"],
         ["writebacks", "run", "--provider", "linear", "--target", "REL-1", "--summary", "Completed", "--dry-run"],

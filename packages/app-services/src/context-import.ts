@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError, ValidationError } from "@atlas/domain";
+import { GateFailedError, StateTransitionError, ValidationError } from "@atlas/domain";
 import {
   addArtifactDependency,
   appendEvent,
@@ -15,6 +15,9 @@ import { contextManifestSchema } from "@atlas/schemas";
 import { transition } from "@atlas/workflow-engine";
 
 import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { createContextContentPack } from "./context-pack.js";
+import { readSafeRepositorySource } from "./evidence.js";
+import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 
 export interface ImportContextInput extends RuntimeOptions {
   readonly filePath: string;
@@ -23,6 +26,7 @@ export interface ImportContextInput extends RuntimeOptions {
 export interface ImportContextResult {
   readonly sessionId: string;
   readonly contextArtifactId: string;
+  readonly contextContentPackArtifactId: string;
   readonly state: string;
   readonly nextCommand: string;
 }
@@ -36,15 +40,15 @@ export async function importContextManifest(input: ImportContextInput): Promise<
       throw new StateTransitionError("No active session found for context import");
     }
 
-    const now = new Date().toISOString();
-    const artifactId = newId("art");
-    const raw = JSON.parse(readFileSync(input.filePath, "utf8")) as unknown;
-    const manifest = contextManifestSchema.parse(normalizeManifest(raw, session.sessionId, artifactId, now));
     const next = transition({
       state: session.primaryState,
       command: "import_context",
       overlay: { paused: session.paused, archived: session.archived, disposition: session.disposition }
     }).to;
+    const now = new Date().toISOString();
+    const artifactId = newId("art");
+    const raw = JSON.parse(readFileSync(input.filePath, "utf8")) as unknown;
+    const manifest = contextManifestSchema.parse(enrichSourceHashes(normalizeManifest(raw, session.sessionId, artifactId, now), runtime.paths.cwd));
     const written = writeImmutableArtifactContent({
       rootDir: runtime.paths.artifactRoot,
       sessionId: session.sessionId,
@@ -55,7 +59,7 @@ export async function importContextManifest(input: ImportContextInput): Promise<
       content: `${JSON.stringify(manifest, null, 2)}\n`
     });
 
-    createArtifactRecord(runtime.db, {
+    const contextRecord = createArtifactRecord(runtime.db, {
       artifactId,
       sessionId: session.sessionId,
       type: "context_manifest",
@@ -71,13 +75,28 @@ export async function importContextManifest(input: ImportContextInput): Promise<
       createdAt: now
     });
 
-    const taskBrief = listArtifactsForSession(runtime.db, session.sessionId).find((artifact) => artifact.type === "task_brief");
+    const existingArtifacts = listArtifactsForSession(runtime.db, session.sessionId);
+    const taskBrief = existingArtifacts.find((artifact) => artifact.type === "task_brief" && artifact.status === "valid");
     if (taskBrief !== undefined && getArtifactRecord(runtime.db, taskBrief.artifactId) !== undefined) {
       addArtifactDependency(runtime.db, {
         artifactId,
         dependsOnArtifactId: taskBrief.artifactId,
         dependencyKind: "input"
       });
+    }
+    if (taskBrief === undefined) throw new GateFailedError("Imported context requires a valid task brief");
+    const contextPackRecord = createContextContentPack({
+      runtime,
+      sessionId: session.sessionId,
+      taskBrief,
+      contextManifest: contextRecord,
+      manifest,
+      git: readWorkflowGitSnapshot(runtime.paths.cwd),
+      now,
+      contentVersion: existingArtifacts.filter((artifact) => artifact.type === "context_content_pack").length + 1
+    });
+    if (manifest.gaps.some((gap) => gap.severity === "blocking")) {
+      throw new GateFailedError("Imported context contains blocking gaps; resolve them and re-import");
     }
 
     updateSessionContextArtifact(runtime.db, {
@@ -93,14 +112,15 @@ export async function importContextManifest(input: ImportContextInput): Promise<
       actorType: "user",
       occurredAt: now,
       summary: "Context manifest imported",
-      metadata: { contextArtifactId: artifactId, sourcePath: input.filePath }
+      metadata: { contextArtifactId: artifactId, contextContentPackArtifactId: contextPackRecord.artifactId, sourcePath: input.filePath }
     });
 
     return {
       sessionId: session.sessionId,
       contextArtifactId: artifactId,
+      contextContentPackArtifactId: contextPackRecord.artifactId,
       state: next,
-      nextCommand: "atlas plan"
+      nextCommand: "atlas context build"
     };
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -112,12 +132,32 @@ export async function importContextManifest(input: ImportContextInput): Promise<
   }
 }
 
-function normalizeManifest(raw: unknown, sessionId: string, artifactId: string, now: string): unknown {
-  if (typeof raw === "object" && raw !== null && "type" in raw) {
-    return raw;
-  }
+function enrichSourceHashes(raw: unknown, cwd: string): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const record = raw as Record<string, unknown>;
+  const enrich = (sources: unknown): unknown =>
+    Array.isArray(sources)
+      ? sources.map((source) => {
+          if (typeof source !== "object" || source === null || typeof (source as Record<string, unknown>).uri !== "string") return source;
+          const value = source as Record<string, unknown>;
+          if (value.included !== true) return source;
+          const sourceContent = readSafeRepositorySource({ rootPath: cwd, uri: value.uri as string });
+          return {
+            ...value,
+            sha256: value.sha256 ?? sourceContent.sha256,
+            byte_length: sourceContent.bytes.byteLength
+          };
+        })
+      : sources;
+  return {
+    ...record,
+    ...(record.sources === undefined ? {} : { sources: enrich(record.sources) }),
+    ...(record.included_sources === undefined ? {} : { included_sources: enrich(record.included_sources) })
+  };
+}
 
-  const value = raw as {
+function normalizeManifest(raw: unknown, sessionId: string, artifactId: string, now: string): unknown {
+  const value = (typeof raw === "object" && raw !== null ? raw : {}) as {
     sources?: unknown[];
     included_sources?: unknown[];
     excluded_candidates?: unknown[];
@@ -131,6 +171,8 @@ function normalizeManifest(raw: unknown, sessionId: string, artifactId: string, 
   const excludedCandidates = Array.isArray(value.excluded_candidates) ? value.excluded_candidates : undefined;
   const usedSources = includedSources ?? sources.filter((source) => isIncludedSource(source));
   return {
+    // Envelope identity is always established by this trusted import boundary.
+    // Imported envelope fields are untrusted and must never cross sessions.
     artifact_id: artifactId,
     session_id: sessionId,
     type: "context_manifest",

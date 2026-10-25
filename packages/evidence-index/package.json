@@ -1,0 +1,22 @@
+{
+  "name": "@atlas/evidence-index",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "check": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@atlas/domain": "workspace:*",
+    "@atlas/git": "workspace:*",
+    "@atlas/persistence": "workspace:*",
+    "@atlas/schemas": "workspace:*",
+    "typescript": "^5.7.0"
+  },
+  "devDependencies": {
+    "@atlas/test-utils": "workspace:*"
+  }
+}

@@ -9,6 +9,7 @@ export const artifactTypeSchema = z.enum([
   "manual_task_input",
   "ai_context_recommendation",
   "context_manifest",
+  "context_content_pack",
   "context_quality_report",
   "ai_planning_draft",
   "ai_vision_result",
@@ -25,6 +26,7 @@ export const artifactTypeSchema = z.enum([
   "agent_implementation_package",
   "agent_run_log",
   "execution_report",
+  "implementation_diff",
   "check_run_log",
   "check_result",
   "review_package",
@@ -98,7 +100,71 @@ export const contextSourceRecordSchema = z.object({
   exclusion_reason: z.string().min(1).optional(),
   rank: z.number().int().positive().optional(),
   deterministic_score: z.number().nonnegative().optional(),
-  ai_confidence: z.number().min(0).max(1).optional()
+  ai_confidence: z.number().min(0).max(1).optional(),
+  category: z.enum(["source", "test", "architecture", "contract", "schema", "migration", "operation", "config", "instruction"]).optional(),
+  selection_reasons: z.array(z.string().min(1)).optional(),
+  score_features: z.array(z.object({
+    feature: z.string().min(1),
+    score: z.number(),
+    evidence: z.string().min(1)
+  })).optional(),
+  relation_to_seeds: z.array(z.string().min(1)).optional(),
+  required: z.boolean().optional(),
+  pinned: z.boolean().optional(),
+  package_boundary: z.string().min(1).optional()
+});
+
+const semanticSymbolSchema = z.object({
+  id: idSchema,
+  source_uri: z.string().min(1),
+  name: z.string().min(1),
+  kind: z.string().min(1),
+  exported: z.boolean(),
+  line_start: z.number().int().positive(),
+  line_end: z.number().int().positive()
+}).refine((value) => value.line_end >= value.line_start, { message: "symbol line_end must be >= line_start" });
+
+const contextRelationSchema = z.object({
+  id: idSchema,
+  kind: z.enum(["import", "re-export", "test-association", "instruction-scope"]),
+  from_uri: z.string().min(1),
+  to_uri: z.string().min(1),
+  rule: z.string().min(1),
+  evidence_fragment_id: idSchema.optional()
+});
+
+const evidenceFragmentSchema = z.object({
+  id: idSchema,
+  source_uri: z.string().min(1),
+  source_sha256: sha256Schema,
+  line_start: z.number().int().positive(),
+  line_end: z.number().int().positive(),
+  symbol_name: z.string().min(1).optional(),
+  symbol_kind: z.string().min(1).optional(),
+  excerpt: z.string(),
+  excerpt_truncated: z.boolean().optional(),
+  reason: z.string().min(1),
+  classification: z.enum(["fact", "inference"])
+}).refine((value) => value.line_end >= value.line_start, { message: "fragment line_end must be >= line_start" });
+
+const instructionEvidenceSchema = z.object({
+  uri: z.string().min(1),
+  sha256: sha256Schema,
+  scope_directory: z.string().min(1),
+  precedence: z.number().int().nonnegative(),
+  filename: z.string().min(1),
+  applies_to: z.array(z.string().min(1)),
+  byte_length: z.number().int().nonnegative(),
+  included_bytes: z.number().int().nonnegative(),
+  truncated: z.boolean()
+});
+
+const contextRepositorySnapshotSchema = z.object({
+  root_path_hash: sha256Schema.optional(),
+  git_base_fingerprint: sha256Schema.optional(),
+  git_head_sha: z.string().min(1).optional(),
+  task_brief_sha256: sha256Schema,
+  discovery_config_sha256: sha256Schema
 });
 
 export const contextManifestSchema = artifactEnvelopeSchema.extend({
@@ -128,7 +194,76 @@ export const contextManifestSchema = artifactEnvelopeSchema.extend({
       description: z.string().min(1)
     })
   ).default([]),
-  freshness: z.enum(["fresh", "stale", "partial"])
+  freshness: z.enum(["fresh", "stale", "partial"]),
+  semantic_complete: z.boolean().optional(),
+  repository_snapshot: contextRepositorySnapshotSchema.optional(),
+  discovery_algorithm: z.object({ name: z.string().min(1), version: z.string().min(1) }).optional(),
+  effective_context_config: z.record(z.string(), z.unknown()).optional(),
+  effective_context_config_sha256: sha256Schema.optional(),
+  task_terms: z.array(z.string().min(1)).optional(),
+  seeds: z.array(z.object({ uri: z.string().min(1), score: z.number().nonnegative(), reasons: z.array(z.string().min(1)) })).optional(),
+  instruction_chain: z.array(instructionEvidenceSchema).optional(),
+  symbols: z.array(semanticSymbolSchema).optional(),
+  relations: z.array(contextRelationSchema).optional(),
+  evidence_fragments: z.array(evidenceFragmentSchema).optional(),
+  pins_exclusions: z.object({
+    pinned_sources: z.array(z.string().min(1)),
+    exclusions: z.array(z.string().min(1)),
+    required_source_globs: z.array(z.string().min(1)),
+    required_categories: z.array(z.string().min(1))
+  }).optional(),
+  semantic_budgets: z.object({
+    max_graph_nodes: z.number().int().positive(),
+    used_graph_nodes: z.number().int().nonnegative(),
+    max_graph_edges: z.number().int().positive(),
+    used_graph_edges: z.number().int().nonnegative(),
+    max_evidence_fragments: z.number().int().positive(),
+    used_evidence_fragments: z.number().int().nonnegative(),
+    instruction_max_bytes: z.number().int().positive(),
+    instruction_used_bytes: z.number().int().nonnegative()
+  }).optional(),
+  invalidation: z.object({
+    source_hashes: z.record(z.string(), sha256Schema),
+    instruction_hashes: z.record(z.string(), sha256Schema),
+    relevant_inputs_sha256: sha256Schema
+  }).optional()
+});
+
+export const contextContentPackSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("context_content_pack"),
+  task_artifact_id: idSchema,
+  task_artifact_sha256: sha256Schema,
+  context_manifest_artifact_id: idSchema,
+  context_manifest_sha256: sha256Schema,
+  git_base_fingerprint: sha256Schema.optional(),
+  git_head_sha: z.string().min(1).optional(),
+  max_bytes: z.number().int().positive(),
+  used_bytes: z.number().int().nonnegative(),
+  truncated: z.boolean(),
+  blocking_gaps: z.array(idSchema).default([]),
+  manifest_schema_version: z.number().int().positive().optional(),
+  semantic_complete: z.boolean().optional(),
+  repository_snapshot: contextRepositorySnapshotSchema.optional(),
+  discovery_config_sha256: sha256Schema.optional(),
+  instruction_chain: z.array(instructionEvidenceSchema).optional(),
+  symbols: z.array(semanticSymbolSchema).optional(),
+  relations: z.array(contextRelationSchema).optional(),
+  evidence_fragments: z.array(evidenceFragmentSchema).optional(),
+  sources: z.array(z.object({
+    uri: z.string().min(1),
+    kind: contextSourceRecordSchema.shape.kind,
+    reason: z.string().min(1),
+    sha256: sha256Schema,
+    byte_length: z.number().int().nonnegative(),
+    included_bytes: z.number().int().nonnegative(),
+    truncated: z.boolean(),
+    redacted: z.boolean(),
+    content: z.string(),
+    category: z.string().min(1).optional(),
+    required: z.boolean().optional(),
+    pinned: z.boolean().optional(),
+    selection_reasons: z.array(z.string().min(1)).optional()
+  }))
 });
 
 export const aiContextRecommendationSchema = artifactEnvelopeSchema.extend({
@@ -169,6 +304,8 @@ export const aiPlanningDraftSchema = artifactEnvelopeSchema.extend({
   task_artifact_sha256: sha256Schema,
   context_manifest_artifact_id: idSchema,
   context_manifest_sha256: sha256Schema,
+  context_content_pack_artifact_id: idSchema.optional(),
+  context_content_pack_sha256: sha256Schema.optional(),
   draft_markdown: z.string().min(1),
   ready_label: z.enum(["draft", "blocked"])
 });
@@ -338,6 +475,13 @@ export const agentImplementationPackageSchema = artifactEnvelopeSchema.extend({
   type: z.literal("agent_implementation_package"),
   contract_artifact_id: idSchema,
   contract_sha256: sha256Schema,
+  context_content_pack_artifact_id: idSchema.optional(),
+  context_content_pack_sha256: sha256Schema.optional(),
+  git_snapshot_fingerprint: sha256Schema.optional(),
+  git_base_fingerprint: sha256Schema.optional(),
+  git_root_path_hash: sha256Schema.optional(),
+  git_branch: z.string().min(1).optional(),
+  git_head_sha: z.string().min(1).optional(),
   mode: z.enum(["implement", "fix"]),
   instructions_markdown: z.string().min(1),
   report_schema_version: z.number().int().positive()
@@ -407,10 +551,37 @@ export const agentRunLogSchema = artifactEnvelopeSchema.extend({
 export const executionReportSchema = artifactEnvelopeSchema.extend({
   type: z.literal("execution_report"),
   run_id: idSchema,
+  implementation_actor_id: z.string().min(1).optional(),
+  implementation_diff_artifact_id: idSchema.optional(),
+  implementation_diff_sha256: sha256Schema.optional(),
+  implementation_package_artifact_id: idSchema.optional(),
+  implementation_package_sha256: sha256Schema.optional(),
+  contract_artifact_id: idSchema.optional(),
+  contract_sha256: sha256Schema.optional(),
+  context_content_pack_artifact_id: idSchema.optional(),
+  context_content_pack_sha256: sha256Schema.optional(),
   process_status: z.enum(["succeeded", "failed", "cancelled", "timeout", "interrupted", "unknown"]),
   agent_claims_complete: z.boolean().optional(),
   changed_files: z.array(z.string()).default([]),
   limitations: z.array(z.string()).default([])
+});
+
+export const implementationDiffSchema = artifactEnvelopeSchema.extend({
+  type: z.literal("implementation_diff"),
+  run_id: idSchema,
+  base_fingerprint: sha256Schema,
+  result_fingerprint: sha256Schema,
+  base_head_sha: z.string().min(1).optional(),
+  result_head_sha: z.string().min(1).optional(),
+  patch_sha256: sha256Schema,
+  patch: z.string(),
+  byte_length: z.number().int().nonnegative(),
+  truncated: z.boolean(),
+  has_binary: z.boolean(),
+  has_secret_risk: z.boolean(),
+  reviewable: z.boolean(),
+  omitted_paths: z.array(z.string()).default([]),
+  changed_files: z.array(z.string()).default([])
 });
 
 export const checkRunLogSchema = artifactEnvelopeSchema.extend({
@@ -458,11 +629,27 @@ export const checkResultSchema = artifactEnvelopeSchema.extend({
 export const reviewPackageSchema = artifactEnvelopeSchema.extend({
   type: z.literal("review_package"),
   contract_artifact_id: idSchema,
+  contract_sha256: sha256Schema.optional(),
   execution_report_artifact_id: idSchema,
+  implementation_run_id: idSchema.optional(),
+  implementation_actor_id: z.string().min(1).optional(),
+  implementation_diff_artifact_id: idSchema.optional(),
+  implementation_diff_sha256: sha256Schema.optional(),
+  git_fingerprint: sha256Schema.optional(),
   check_result_artifact_ids: z.array(idSchema),
   visual_evidence_artifact_ids: z.array(idSchema).default([]),
   review_ready_label: z.enum(["ready", "draft", "blocked"]),
-  rubric_markdown: z.string().min(1)
+  rubric_markdown: z.string().min(1),
+  contract_content: z.string().min(1).optional(),
+  diff_content: z.string().optional(),
+  check_evidence: z.array(z.object({ artifact_id: idSchema, sha256: sha256Schema, content: z.string().min(1) })).optional(),
+  context_evidence_artifact_ids: z.array(idSchema).default([]),
+  prior_open_findings: z.array(z.object({
+    finding_id: idSchema,
+    severity: z.enum(["blocking", "important", "suggestion", "question", "accepted_deviation"]),
+    title: z.string().min(1),
+    evidence: z.array(z.string())
+  })).default([])
 });
 
 export const findingSeveritySchema = z.enum(["blocking", "important", "suggestion", "question", "accepted_deviation"]);
@@ -495,8 +682,24 @@ export const reviewReportSchema = artifactEnvelopeSchema.extend({
   type: z.literal("review_report"),
   review_package_artifact_id: idSchema,
   review_package_sha256: sha256Schema,
+  reviewer_actor_id: z.string().min(1).optional(),
+  reviewer_run_id: idSchema.optional(),
+  reviewed_contract_sha256: sha256Schema.optional(),
+  reviewed_diff_sha256: sha256Schema.optional(),
+  reviewed_git_fingerprint: sha256Schema.optional(),
   summary: z.string().min(1),
-  findings: z.array(findingSchema)
+  findings: z.array(findingSchema),
+  resolved_findings: z.array(z.object({
+    finding_id: idSchema,
+    resolution_evidence: z.array(z.union([
+      z.string().min(1),
+      z.object({
+        artifact_id: idSchema,
+        claim: z.string().min(1).optional(),
+        location: z.string().min(1).optional()
+      })
+    ])).min(1)
+  })).default([])
 });
 
 export const findingDispositionSchema = artifactEnvelopeSchema.extend({
@@ -552,6 +755,8 @@ export const completionReportSchema = artifactEnvelopeSchema.extend({
   contract_artifact_id: idSchema,
   contract_sha256: sha256Schema,
   check_result_artifact_ids: z.array(idSchema),
+  review_report_artifact_id: idSchema.optional(),
+  implementation_diff_artifact_id: idSchema.optional(),
   unresolved_blocking_findings: z.array(idSchema),
   approved_by: z.string().min(1),
   approved_at: isoDateTimeSchema,
@@ -575,6 +780,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   aiContextRecommendationSchema,
   taskBriefSchema,
   contextManifestSchema,
+  contextContentPackSchema,
   contextQualityReportSchema,
   aiPlanningDraftSchema,
   aiVisionResultSchema,
@@ -588,6 +794,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
   agentImplementationPackageSchema,
   agentRunLogSchema,
   executionReportSchema,
+  implementationDiffSchema,
   checkRunLogSchema,
   checkResultSchema,
   reviewPackageSchema,
@@ -604,6 +811,7 @@ export const walkingSkeletonArtifactSchema = z.discriminatedUnion("type", [
 export type ArtifactEnvelope = z.infer<typeof artifactEnvelopeSchema>;
 export type ContextSourceRecord = z.infer<typeof contextSourceRecordSchema>;
 export type ContextManifest = z.infer<typeof contextManifestSchema>;
+export type ContextContentPack = z.infer<typeof contextContentPackSchema>;
 export type AiContextRecommendation = z.infer<typeof aiContextRecommendationSchema>;
 export type ContextQualityReport = z.infer<typeof contextQualityReportSchema>;
 export type AiPlanningDraft = z.infer<typeof aiPlanningDraftSchema>;
@@ -614,6 +822,7 @@ export type FigmaVisualEvidence = z.infer<typeof figmaVisualEvidenceSchema>;
 export type AiVisualReview = z.infer<typeof aiVisualReviewSchema>;
 export type ImplementationContract = z.infer<typeof implementationContractSchema>;
 export type AgentRunLog = z.infer<typeof agentRunLogSchema>;
+export type ImplementationDiff = z.infer<typeof implementationDiffSchema>;
 export type CheckRunLog = z.infer<typeof checkRunLogSchema>;
 export type OrchestrationRun = z.infer<typeof orchestrationRunSchema>;
 export type AdapterWriteback = z.infer<typeof adapterWritebackSchema>;
