@@ -188,6 +188,12 @@ importers:
       '@atlas/schemas':
         specifier: workspace:*
         version: link:../schemas
+      '@atlas/security':
+        specifier: workspace:*
+        version: link:../security
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
     devDependencies:
       '@atlas/test-utils':
         specifier: workspace:*

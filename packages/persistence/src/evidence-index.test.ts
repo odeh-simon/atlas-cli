@@ -202,7 +202,7 @@ describe("fail-closed schema policy", () => {
       now: () => new Date(FIXTURE_NOW_ISO),
       migrations: coreMigrations
     });
-    expect(upgrade.applied.map((migration) => migration.version)).toEqual([7, 8]);
+    expect(upgrade.applied.map((migration) => migration.version)).toEqual([7, 8, 9]);
 
     const reopened = await openDatabase(dbPath);
     expect(getRepository(reopened, "repo_legacy")).toEqual(repository);

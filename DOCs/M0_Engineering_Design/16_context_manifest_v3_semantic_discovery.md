@@ -72,3 +72,23 @@ Unknown fields, malformed values, missing required pins/categories/globs, and un
 ## Current limits
 
 The v3 graph focuses on TypeScript/JavaScript compiler relationships plus deterministic path/content classification. It does not yet build language-server graphs for other languages, framework-specific runtime call graphs, GraphQL AST graphs, or a persistent cross-session index. Project references are surfaced and imports are followed where TypeScript can resolve explicit paths/package sources; unresolved referenced-package imports remain visible gaps rather than invented edges.
+
+## Analyzer v2 (B3.3) – Evidence-Index Integration
+
+B3.3 persists the v3 semantic graph through the evidence-index analyzer contract:
+
+- **Contract:** `EvidenceAnalyzer` declares `name`, `version`, `fingerprint`, `languages`, `extensions`, `capabilities`, `unsupported`; accepts `repositoryId`, `rootPath`, `files` (safe, current, with `uri`, `absolutePath`, `contentSha256`), `analyzerVersions`, `configSha256`, `limits`, `signal`; emits `symbols`, `edges` (import/re-export/caller/callee), `testAssociations`, `apiEvidence`, `configEvidence`, `gaps`, `diagnostics`, `status` (`completed` | `partial` | `unsupported` | `cancelled` | `failed`), `metrics` (filesAnalyzed, symbolsEmitted, etc.) with deterministic ordering and IDs (`deriveId`).
+
+- **Registry:** Trusted built-ins only (`typescript-analyzer-v2`); `registerAnalyzer` rejects duplicate identities, invalid names, undeclared capabilities, path-like capabilities; `selectAnalyzersForFile` by extension; `ensureDefaultAnalyzersRegistered` registers TS v2; no dynamic code loading from repository content.
+
+- **TypeScript v2:** Uses TypeScript compiler API with per-file `tsconfig` discovery (inheritance, `baseUrl`, `paths`, `projectReferences`), `allowJs`, `NodeNext` fallback; handles TS/TSX/JS/JSX/MJS/CJS; extracts declarations (function, class, interface, type, enum, variable, alias, default, re-export, overload, declaration merging) with exact `line_start`/`col_start`/`line_end`/`col_end`, `source_sha256`, `proof: exact`, `analyzer_name/version`; resolves imports/re-exports via `ts.resolveModuleName` with `baseUrl`/`paths` and `realpath` containment; builds reverse dependents, cycles, package boundaries; test associations via import and `co-located-test-name` (stem match) with `ambiguous` gap; caller/callee only when `CallExpression` with `Identifier`/`PropertyAccess` resolves to local or imported symbol (static), otherwise gaps (`dynamic-call`, `polymorphic-call`, `reflective-call`, `unresolved-callee`); API evidence only for `exported-function` with exact declaration; gaps for `unsupported-language`, `unresolved-module`, `dynamic-import`, `tsconfig-malformed`, `unsupported-project-reference`, `graph-resource-limit`, `analyzer-failure`, `ambiguous-test-association`.
+
+- **Proof model:** Every symbol/edge/testAssociation/api/config record carries `uri`, `source_sha256`, exact `line`/`col` span, `kind`, `rule`, `resolution`/`proof` (`exact` for static, `heuristic` only for instruction-scope), `analyzer_name/version`; no `heuristic` for caller/callee/API; `heuristic` retained only for legacy instruction relations.
+
+- **Security:** Analyzer receives only `safeFilesForAnalyzer` (`!binary && !secret && !excluded`); `walkRepositoryCandidates` already enforces symlink/realpath/containment; `hashAndClassifyFile` redacts secrets; no parsing of excluded secret content; `redactSecretText` on diagnostics; no absolute paths in portable payload (only `uri` and `root_path_hash`).
+
+- **Limits & Determinism:** Bounded by `maxFiles`, `maxBytes`, `maxGraphNodes` (500), `maxGraphEdges` (1500), `maxDiagnostics` (100), `wallClockMs` (30s), `signal`; `symbols`/`edges`/`testAssociations` sorted by `uri`/`name`/`line`/`id`; IDs via `deriveId` with `repositoryId` and content hash; `canonicalJson` sorting ensures byte-stable payloads.
+
+- **Promotion:** Analyzer status `cancelled` throws `CancellationError` (no promotion), `failed` with `blocking` gaps throws `PersistenceError` (no promotion), `partial`/`completed` promote with `gaps` persisted and `analyzer_capabilities.gaps` populated; previous `current` remains authoritative on failure.
+
+This v2 graph is persisted evidence for later bounded queries (B3.4) and planning (B3.5) but does not yet expose query/inspection CLI.

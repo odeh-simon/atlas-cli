@@ -14,12 +14,14 @@ import type initSqlJs from "sql.js";
 import {
   EVIDENCE_INDEX_SCHEMA_VERSION,
   analyzerCapabilitySchema,
+  analyzerGapSchema,
   evidenceCategorySchema,
   evidenceEntityTypeSchema,
   evidenceInvalidationReasonSchema,
   indexPayloadSchema,
   indexSnapshotSchema,
   type AnalyzerCapability,
+  type AnalyzerGap,
   type EvidenceEntryCounts,
   type EvidenceIndexPayload,
   type EvidenceIndexSnapshot
@@ -116,6 +118,11 @@ export interface EvidenceSymbolRow {
   readonly exported: boolean;
   readonly lineStart: number;
   readonly lineEnd: number;
+  readonly colStart?: number | undefined;
+  readonly colEnd?: number | undefined;
+  readonly proof?: string | undefined;
+  readonly analyzerName?: string | undefined;
+  readonly analyzerVersion?: string | undefined;
 }
 
 export interface EvidenceEdgeRow {
@@ -128,6 +135,19 @@ export interface EvidenceEdgeRow {
   readonly toUri: string;
   readonly rule: string;
   readonly resolution: "static" | "heuristic";
+  readonly proof?: string | undefined;
+  readonly analyzerName?: string | undefined;
+  readonly analyzerVersion?: string | undefined;
+  readonly fromSourceSha256?: string | undefined;
+  readonly toSourceSha256?: string | undefined;
+  readonly fromLineStart?: number | undefined;
+  readonly fromLineEnd?: number | undefined;
+  readonly fromColStart?: number | undefined;
+  readonly fromColEnd?: number | undefined;
+  readonly toLineStart?: number | undefined;
+  readonly toLineEnd?: number | undefined;
+  readonly toColStart?: number | undefined;
+  readonly toColEnd?: number | undefined;
 }
 
 export interface EvidenceTestAssociationRow {
@@ -138,6 +158,15 @@ export interface EvidenceTestAssociationRow {
   readonly testUri: string;
   readonly sourceUri: string;
   readonly rule: string;
+  readonly proof?: string | undefined;
+  readonly analyzerName?: string | undefined;
+  readonly analyzerVersion?: string | undefined;
+  readonly sourceSha256?: string | undefined;
+  readonly testSha256?: string | undefined;
+  readonly lineStart?: number | undefined;
+  readonly lineEnd?: number | undefined;
+  readonly colStart?: number | undefined;
+  readonly colEnd?: number | undefined;
 }
 
 export interface EvidenceConfigEvidenceRow {
@@ -148,6 +177,9 @@ export interface EvidenceConfigEvidenceRow {
   readonly byteLength: number;
   readonly format: string;
   readonly secretRedacted: boolean;
+  readonly analyzerName?: string | undefined;
+  readonly analyzerVersion?: string | undefined;
+  readonly proof?: string | undefined;
 }
 
 export interface EvidenceApiEvidenceRow {
@@ -160,6 +192,26 @@ export interface EvidenceApiEvidenceRow {
   readonly surface: string;
   readonly lineStart: number;
   readonly lineEnd: number;
+  readonly colStart?: number | undefined;
+  readonly colEnd?: number | undefined;
+  readonly proof?: string | undefined;
+  readonly analyzerName?: string | undefined;
+  readonly analyzerVersion?: string | undefined;
+}
+
+export interface EvidenceAnalyzerGapRow {
+  readonly gapId: string;
+  readonly repositoryId: string;
+  readonly snapshotId?: string | undefined;
+  readonly analyzerName: string;
+  readonly analyzerVersion: string;
+  readonly code: string;
+  readonly severity: string;
+  readonly scopeUri?: string | undefined;
+  readonly message: string;
+  readonly blocking: boolean;
+  readonly capability?: string | undefined;
+  readonly createdAt: string;
 }
 
 export interface EvidenceAnalyzerCapabilityRow {
@@ -195,6 +247,7 @@ export interface CommitIndexSnapshotInput {
   readonly testAssociations?: readonly EvidenceTestAssociationRow[] | undefined;
   readonly configEvidence?: readonly EvidenceConfigEvidenceRow[] | undefined;
   readonly apiEvidence?: readonly EvidenceApiEvidenceRow[] | undefined;
+  readonly gaps?: readonly EvidenceAnalyzerGapRow[] | undefined;
   readonly invalidations?: readonly EvidenceInvalidationRow[] | undefined;
   readonly supersedesSnapshotId?: string | undefined;
   readonly createdAt: string;
@@ -258,6 +311,7 @@ function commitIndexSnapshotInsideTransaction(
   const testAssociations = input.testAssociations ?? [];
   const configEvidence = input.configEvidence ?? [];
   const apiEvidence = input.apiEvidence ?? [];
+  const gaps = input.gaps ?? [];
   const invalidations = input.invalidations ?? [];
 
   for (const content of contents) {
@@ -284,6 +338,9 @@ function commitIndexSnapshotInsideTransaction(
   for (const api of apiEvidence) {
     upsertEvidenceApiEvidence(db, api);
   }
+  for (const gap of gaps) {
+    upsertEvidenceAnalyzerGap(db, gap);
+  }
   for (const analyzer of input.analyzers ?? []) {
     upsertEvidenceAnalyzerCapability(db, identity.repositoryId, analyzer);
   }
@@ -299,7 +356,8 @@ function commitIndexSnapshotInsideTransaction(
     edges: edges.length,
     test_associations: testAssociations.length,
     config_evidence: configEvidence.length,
-    api_evidence: apiEvidence.length
+    api_evidence: apiEvidence.length,
+    gaps: gaps.length
   };
 
   const payloadCandidate = {
@@ -351,7 +409,12 @@ function commitIndexSnapshotInsideTransaction(
       kind: symbol.kind,
       exported: symbol.exported,
       line_start: symbol.lineStart,
-      line_end: symbol.lineEnd
+      line_end: symbol.lineEnd,
+      ...(symbol.colStart === undefined ? {} : { col_start: symbol.colStart }),
+      ...(symbol.colEnd === undefined ? {} : { col_end: symbol.colEnd }),
+      ...(symbol.proof === undefined ? {} : { proof: symbol.proof }),
+      ...(symbol.analyzerName === undefined ? {} : { analyzer_name: symbol.analyzerName }),
+      ...(symbol.analyzerVersion === undefined ? {} : { analyzer_version: symbol.analyzerVersion })
     })),
     edges: edges.map((edge) => ({
       edge_id: edge.edgeId,
@@ -361,7 +424,20 @@ function commitIndexSnapshotInsideTransaction(
       from_uri: edge.fromUri,
       to_uri: edge.toUri,
       rule: edge.rule,
-      resolution: edge.resolution
+      resolution: edge.resolution,
+      ...(edge.proof === undefined ? {} : { proof: edge.proof }),
+      ...(edge.analyzerName === undefined ? {} : { analyzer_name: edge.analyzerName }),
+      ...(edge.analyzerVersion === undefined ? {} : { analyzer_version: edge.analyzerVersion }),
+      ...(edge.fromSourceSha256 === undefined ? {} : { from_source_sha256: edge.fromSourceSha256 }),
+      ...(edge.toSourceSha256 === undefined ? {} : { to_source_sha256: edge.toSourceSha256 }),
+      ...(edge.fromLineStart === undefined ? {} : { from_line_start: edge.fromLineStart }),
+      ...(edge.fromLineEnd === undefined ? {} : { from_line_end: edge.fromLineEnd }),
+      ...(edge.fromColStart === undefined ? {} : { from_col_start: edge.fromColStart }),
+      ...(edge.fromColEnd === undefined ? {} : { from_col_end: edge.fromColEnd }),
+      ...(edge.toLineStart === undefined ? {} : { to_line_start: edge.toLineStart }),
+      ...(edge.toLineEnd === undefined ? {} : { to_line_end: edge.toLineEnd }),
+      ...(edge.toColStart === undefined ? {} : { to_col_start: edge.toColStart }),
+      ...(edge.toColEnd === undefined ? {} : { to_col_end: edge.toColEnd })
     })),
     test_associations: testAssociations.map((association) => ({
       association_id: association.associationId,
@@ -369,7 +445,16 @@ function commitIndexSnapshotInsideTransaction(
       source_file_id: association.sourceFileId,
       test_uri: association.testUri,
       source_uri: association.sourceUri,
-      rule: association.rule
+      rule: association.rule,
+      ...(association.proof === undefined ? {} : { proof: association.proof }),
+      ...(association.analyzerName === undefined ? {} : { analyzer_name: association.analyzerName }),
+      ...(association.analyzerVersion === undefined ? {} : { analyzer_version: association.analyzerVersion }),
+      ...(association.sourceSha256 === undefined ? {} : { source_sha256: association.sourceSha256 }),
+      ...(association.testSha256 === undefined ? {} : { test_sha256: association.testSha256 }),
+      ...(association.lineStart === undefined ? {} : { line_start: association.lineStart }),
+      ...(association.lineEnd === undefined ? {} : { line_end: association.lineEnd }),
+      ...(association.colStart === undefined ? {} : { col_start: association.colStart }),
+      ...(association.colEnd === undefined ? {} : { col_end: association.colEnd })
     })),
     config_evidence: configEvidence.map((config) => ({
       config_evidence_id: config.configEvidenceId,
@@ -377,7 +462,10 @@ function commitIndexSnapshotInsideTransaction(
       source_sha256: config.sourceSha256,
       byte_length: config.byteLength,
       format: config.format,
-      secret_redacted: config.secretRedacted
+      secret_redacted: config.secretRedacted,
+      ...(config.analyzerName === undefined ? {} : { analyzer_name: config.analyzerName }),
+      ...(config.analyzerVersion === undefined ? {} : { analyzer_version: config.analyzerVersion }),
+      ...(config.proof === undefined ? {} : { proof: config.proof })
     })),
     api_evidence: apiEvidence.map((api) => ({
       api_evidence_id: api.apiEvidenceId,
@@ -387,7 +475,24 @@ function commitIndexSnapshotInsideTransaction(
       name: api.name,
       surface: api.surface,
       line_start: api.lineStart,
-      line_end: api.lineEnd
+      line_end: api.lineEnd,
+      ...(api.colStart === undefined ? {} : { col_start: api.colStart }),
+      ...(api.colEnd === undefined ? {} : { col_end: api.colEnd }),
+      ...(api.proof === undefined ? {} : { proof: api.proof }),
+      ...(api.analyzerName === undefined ? {} : { analyzer_name: api.analyzerName }),
+      ...(api.analyzerVersion === undefined ? {} : { analyzer_version: api.analyzerVersion })
+    })),
+    gaps: gaps.map((gap) => ({
+      gap_id: gap.gapId,
+      analyzer_name: gap.analyzerName,
+      analyzer_version: gap.analyzerVersion,
+      code: gap.code,
+      severity: gap.severity,
+      ...(gap.scopeUri === undefined ? {} : { scope_uri: gap.scopeUri }),
+      message: gap.message,
+      blocking: gap.blocking,
+      ...(gap.capability === undefined ? {} : { capability: gap.capability }),
+      ...(gap.createdAt === undefined ? {} : { created_at: gap.createdAt })
     })),
     invalidations: invalidations.map((invalidation) => ({
       invalidation_id: invalidation.invalidationId,
@@ -539,6 +644,9 @@ function rejectForeignRepositoryRows(
   }
   for (const api of input.apiEvidence ?? []) {
     check(api.repositoryId, "api_evidence", api.uri);
+  }
+  for (const gap of input.gaps ?? []) {
+    check(gap.repositoryId, "gap", gap.gapId);
   }
   for (const invalidation of input.invalidations ?? []) {
     check(invalidation.repositoryId, "invalidation", invalidation.invalidationId);
@@ -1184,17 +1292,22 @@ export function listEvidenceSymbols(db: SqlDatabase, repositoryId: string): Evid
 function upsertEvidenceSymbol(db: SqlDatabase, input: EvidenceSymbolRow): EvidenceSymbolRow {
   db.run(
     `INSERT INTO evidence_symbols
-      (symbol_id, repository_id, file_id, uri, source_sha256, name, kind, exported, line_start, line_end)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (symbol_id, repository_id, file_id, uri, source_sha256, name, kind, exported, line_start, line_end, col_start, col_end, proof, analyzer_name, analyzer_version)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(symbol_id) DO UPDATE SET
-       file_id = excluded.file_id,
-       uri = excluded.uri,
-       source_sha256 = excluded.source_sha256,
-       name = excluded.name,
-       kind = excluded.kind,
-       exported = excluded.exported,
-       line_start = excluded.line_start,
-       line_end = excluded.line_end`,
+        file_id = excluded.file_id,
+        uri = excluded.uri,
+        source_sha256 = excluded.source_sha256,
+        name = excluded.name,
+        kind = excluded.kind,
+        exported = excluded.exported,
+        line_start = excluded.line_start,
+        line_end = excluded.line_end,
+        col_start = excluded.col_start,
+        col_end = excluded.col_end,
+        proof = excluded.proof,
+        analyzer_name = excluded.analyzer_name,
+        analyzer_version = excluded.analyzer_version`,
     [
       input.symbolId,
       input.repositoryId,
@@ -1205,7 +1318,12 @@ function upsertEvidenceSymbol(db: SqlDatabase, input: EvidenceSymbolRow): Eviden
       input.kind,
       input.exported ? 1 : 0,
       input.lineStart,
-      input.lineEnd
+      input.lineEnd,
+      input.colStart ?? null,
+      input.colEnd ?? null,
+      input.proof ?? "exact",
+      input.analyzerName ?? null,
+      input.analyzerVersion ?? null
     ]
   );
 
@@ -1232,16 +1350,29 @@ export function listEvidenceEdges(db: SqlDatabase, repositoryId: string): Eviden
 function upsertEvidenceEdge(db: SqlDatabase, input: EvidenceEdgeRow): EvidenceEdgeRow {
   db.run(
     `INSERT INTO evidence_edges
-      (edge_id, repository_id, kind, from_file_id, to_file_id, from_uri, to_uri, rule, resolution)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (edge_id, repository_id, kind, from_file_id, to_file_id, from_uri, to_uri, rule, resolution, proof, analyzer_name, analyzer_version, from_source_sha256, to_source_sha256, from_line_start, from_line_end, from_col_start, from_col_end, to_line_start, to_line_end, to_col_start, to_col_end)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(edge_id) DO UPDATE SET
-       kind = excluded.kind,
-       from_file_id = excluded.from_file_id,
-       to_file_id = excluded.to_file_id,
-       from_uri = excluded.from_uri,
-       to_uri = excluded.to_uri,
-       rule = excluded.rule,
-       resolution = excluded.resolution`,
+        kind = excluded.kind,
+        from_file_id = excluded.from_file_id,
+        to_file_id = excluded.to_file_id,
+        from_uri = excluded.from_uri,
+        to_uri = excluded.to_uri,
+        rule = excluded.rule,
+        resolution = excluded.resolution,
+        proof = excluded.proof,
+        analyzer_name = excluded.analyzer_name,
+        analyzer_version = excluded.analyzer_version,
+        from_source_sha256 = excluded.from_source_sha256,
+        to_source_sha256 = excluded.to_source_sha256,
+        from_line_start = excluded.from_line_start,
+        from_line_end = excluded.from_line_end,
+        from_col_start = excluded.from_col_start,
+        from_col_end = excluded.from_col_end,
+        to_line_start = excluded.to_line_start,
+        to_line_end = excluded.to_line_end,
+        to_col_start = excluded.to_col_start,
+        to_col_end = excluded.to_col_end`,
     [
       input.edgeId,
       input.repositoryId,
@@ -1251,7 +1382,20 @@ function upsertEvidenceEdge(db: SqlDatabase, input: EvidenceEdgeRow): EvidenceEd
       input.fromUri,
       input.toUri,
       input.rule,
-      input.resolution
+      input.resolution,
+      input.proof ?? "exact",
+      input.analyzerName ?? null,
+      input.analyzerVersion ?? null,
+      input.fromSourceSha256 ?? null,
+      input.toSourceSha256 ?? null,
+      input.fromLineStart ?? null,
+      input.fromLineEnd ?? null,
+      input.fromColStart ?? null,
+      input.fromColEnd ?? null,
+      input.toLineStart ?? null,
+      input.toLineEnd ?? null,
+      input.toColStart ?? null,
+      input.toColEnd ?? null
     ]
   );
 
@@ -1284,14 +1428,23 @@ export function listEvidenceTestAssociations(
 function upsertEvidenceTestAssociation(db: SqlDatabase, input: EvidenceTestAssociationRow): EvidenceTestAssociationRow {
   db.run(
     `INSERT INTO evidence_test_associations
-      (association_id, repository_id, test_file_id, source_file_id, test_uri, source_uri, rule)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+      (association_id, repository_id, test_file_id, source_file_id, test_uri, source_uri, rule, proof, analyzer_name, analyzer_version, source_sha256, test_sha256, line_start, line_end, col_start, col_end)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(association_id) DO UPDATE SET
-       test_file_id = excluded.test_file_id,
-       source_file_id = excluded.source_file_id,
-       test_uri = excluded.test_uri,
-       source_uri = excluded.source_uri,
-       rule = excluded.rule`,
+        test_file_id = excluded.test_file_id,
+        source_file_id = excluded.source_file_id,
+        test_uri = excluded.test_uri,
+        source_uri = excluded.source_uri,
+        rule = excluded.rule,
+        proof = excluded.proof,
+        analyzer_name = excluded.analyzer_name,
+        analyzer_version = excluded.analyzer_version,
+        source_sha256 = excluded.source_sha256,
+        test_sha256 = excluded.test_sha256,
+        line_start = excluded.line_start,
+        line_end = excluded.line_end,
+        col_start = excluded.col_start,
+        col_end = excluded.col_end`,
     [
       input.associationId,
       input.repositoryId,
@@ -1299,7 +1452,16 @@ function upsertEvidenceTestAssociation(db: SqlDatabase, input: EvidenceTestAssoc
       input.sourceFileId,
       input.testUri,
       input.sourceUri,
-      input.rule
+      input.rule,
+      input.proof ?? "exact",
+      input.analyzerName ?? null,
+      input.analyzerVersion ?? null,
+      input.sourceSha256 ?? null,
+      input.testSha256 ?? null,
+      input.lineStart ?? null,
+      input.lineEnd ?? null,
+      input.colStart ?? null,
+      input.colEnd ?? null
     ]
   );
 
@@ -1331,14 +1493,17 @@ export function listEvidenceConfigEvidence(db: SqlDatabase, repositoryId: string
 function upsertEvidenceConfigEvidence(db: SqlDatabase, input: EvidenceConfigEvidenceRow): EvidenceConfigEvidenceRow {
   db.run(
     `INSERT INTO evidence_config_evidence
-      (config_evidence_id, repository_id, uri, source_sha256, byte_length, format, secret_redacted)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+      (config_evidence_id, repository_id, uri, source_sha256, byte_length, format, secret_redacted, analyzer_name, analyzer_version, proof)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(config_evidence_id) DO UPDATE SET
-       uri = excluded.uri,
-       source_sha256 = excluded.source_sha256,
-       byte_length = excluded.byte_length,
-       format = excluded.format,
-       secret_redacted = excluded.secret_redacted`,
+        uri = excluded.uri,
+        source_sha256 = excluded.source_sha256,
+        byte_length = excluded.byte_length,
+        format = excluded.format,
+        secret_redacted = excluded.secret_redacted,
+        analyzer_name = excluded.analyzer_name,
+        analyzer_version = excluded.analyzer_version,
+        proof = excluded.proof`,
     [
       input.configEvidenceId,
       input.repositoryId,
@@ -1346,7 +1511,10 @@ function upsertEvidenceConfigEvidence(db: SqlDatabase, input: EvidenceConfigEvid
       input.sourceSha256,
       input.byteLength,
       input.format,
-      input.secretRedacted ? 1 : 0
+      input.secretRedacted ? 1 : 0,
+      input.analyzerName ?? null,
+      input.analyzerVersion ?? null,
+      input.proof ?? "exact"
     ]
   );
 
@@ -1378,16 +1546,21 @@ export function listEvidenceApiEvidence(db: SqlDatabase, repositoryId: string): 
 function upsertEvidenceApiEvidence(db: SqlDatabase, input: EvidenceApiEvidenceRow): EvidenceApiEvidenceRow {
   db.run(
     `INSERT INTO evidence_api_evidence
-      (api_evidence_id, repository_id, file_id, uri, source_sha256, name, surface, line_start, line_end)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (api_evidence_id, repository_id, file_id, uri, source_sha256, name, surface, line_start, line_end, col_start, col_end, proof, analyzer_name, analyzer_version)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(api_evidence_id) DO UPDATE SET
-       file_id = excluded.file_id,
-       uri = excluded.uri,
-       source_sha256 = excluded.source_sha256,
-       name = excluded.name,
-       surface = excluded.surface,
-       line_start = excluded.line_start,
-       line_end = excluded.line_end`,
+        file_id = excluded.file_id,
+        uri = excluded.uri,
+        source_sha256 = excluded.source_sha256,
+        name = excluded.name,
+        surface = excluded.surface,
+        line_start = excluded.line_start,
+        line_end = excluded.line_end,
+        col_start = excluded.col_start,
+        col_end = excluded.col_end,
+        proof = excluded.proof,
+        analyzer_name = excluded.analyzer_name,
+        analyzer_version = excluded.analyzer_version`,
     [
       input.apiEvidenceId,
       input.repositoryId,
@@ -1397,7 +1570,12 @@ function upsertEvidenceApiEvidence(db: SqlDatabase, input: EvidenceApiEvidenceRo
       input.name,
       input.surface,
       input.lineStart,
-      input.lineEnd
+      input.lineEnd,
+      input.colStart ?? null,
+      input.colEnd ?? null,
+      input.proof ?? "exact",
+      input.analyzerName ?? null,
+      input.analyzerVersion ?? null
     ]
   );
 
@@ -1405,6 +1583,54 @@ function upsertEvidenceApiEvidence(db: SqlDatabase, input: EvidenceApiEvidenceRo
   if (stored === undefined) {
     throw new PersistenceError("Evidence API record was not created", { apiEvidenceId: input.apiEvidenceId });
   }
+  return stored;
+}
+
+export function getEvidenceAnalyzerGap(db: SqlDatabase, gapId: string): EvidenceAnalyzerGapRow | undefined {
+  const row = queryOne(db, "SELECT * FROM evidence_analyzer_gaps WHERE gap_id = ?", [gapId]);
+  return row === undefined ? undefined : mapEvidenceAnalyzerGap(row);
+}
+
+export function listEvidenceAnalyzerGaps(db: SqlDatabase, repositoryId: string): EvidenceAnalyzerGapRow[] {
+  return queryAll(db, "SELECT * FROM evidence_analyzer_gaps WHERE repository_id = ? ORDER BY code, scope_uri, gap_id", [repositoryId]).map(mapEvidenceAnalyzerGap);
+}
+
+export function listEvidenceAnalyzerGapsForSnapshot(db: SqlDatabase, repositoryId: string, snapshotId: string): EvidenceAnalyzerGapRow[] {
+  return queryAll(db, "SELECT * FROM evidence_analyzer_gaps WHERE repository_id = ? AND snapshot_id = ? ORDER BY code, gap_id", [repositoryId, snapshotId]).map(mapEvidenceAnalyzerGap);
+}
+
+function upsertEvidenceAnalyzerGap(db: SqlDatabase, input: EvidenceAnalyzerGapRow): EvidenceAnalyzerGapRow {
+  db.run(
+    `INSERT INTO evidence_analyzer_gaps (gap_id, repository_id, snapshot_id, analyzer_name, analyzer_version, code, severity, scope_uri, message, blocking, capability, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(gap_id) DO UPDATE SET
+        snapshot_id = excluded.snapshot_id,
+        analyzer_name = excluded.analyzer_name,
+        analyzer_version = excluded.analyzer_version,
+        code = excluded.code,
+        severity = excluded.severity,
+        scope_uri = excluded.scope_uri,
+        message = excluded.message,
+        blocking = excluded.blocking,
+        capability = excluded.capability,
+        created_at = excluded.created_at`,
+    [
+      input.gapId,
+      input.repositoryId,
+      input.snapshotId ?? null,
+      input.analyzerName,
+      input.analyzerVersion,
+      input.code,
+      input.severity,
+      input.scopeUri ?? null,
+      input.message,
+      input.blocking ? 1 : 0,
+      input.capability ?? null,
+      input.createdAt
+    ]
+  );
+  const stored = getEvidenceAnalyzerGap(db, input.gapId);
+  if (stored === undefined) throw new PersistenceError("Evidence gap was not created", { gapId: input.gapId });
   return stored;
 }
 
@@ -1586,7 +1812,12 @@ function mapEvidenceSymbol(row: Record<string, initSqlJs.SqlValue>): EvidenceSym
     kind: requiredString(row, "kind"),
     exported: requiredNumber(row, "exported") === 1,
     lineStart: requiredNumber(row, "line_start"),
-    lineEnd: requiredNumber(row, "line_end")
+    lineEnd: requiredNumber(row, "line_end"),
+    colStart: row.col_start === null || row.col_start === undefined ? undefined : Number(row.col_start),
+    colEnd: row.col_end === null || row.col_end === undefined ? undefined : Number(row.col_end),
+    proof: optionalString(row, "proof"),
+    analyzerName: optionalString(row, "analyzer_name"),
+    analyzerVersion: optionalString(row, "analyzer_version")
   };
 }
 
@@ -1609,7 +1840,20 @@ function mapEvidenceEdge(row: Record<string, initSqlJs.SqlValue>): EvidenceEdgeR
     fromUri: requiredString(row, "from_uri"),
     toUri: requiredString(row, "to_uri"),
     rule: requiredString(row, "rule"),
-    resolution
+    resolution,
+    proof: optionalString(row, "proof"),
+    analyzerName: optionalString(row, "analyzer_name"),
+    analyzerVersion: optionalString(row, "analyzer_version"),
+    fromSourceSha256: optionalString(row, "from_source_sha256"),
+    toSourceSha256: optionalString(row, "to_source_sha256"),
+    fromLineStart: row.from_line_start === null || row.from_line_start === undefined ? undefined : Number(row.from_line_start),
+    fromLineEnd: row.from_line_end === null || row.from_line_end === undefined ? undefined : Number(row.from_line_end),
+    fromColStart: row.from_col_start === null || row.from_col_start === undefined ? undefined : Number(row.from_col_start),
+    fromColEnd: row.from_col_end === null || row.from_col_end === undefined ? undefined : Number(row.from_col_end),
+    toLineStart: row.to_line_start === null || row.to_line_start === undefined ? undefined : Number(row.to_line_start),
+    toLineEnd: row.to_line_end === null || row.to_line_end === undefined ? undefined : Number(row.to_line_end),
+    toColStart: row.to_col_start === null || row.to_col_start === undefined ? undefined : Number(row.to_col_start),
+    toColEnd: row.to_col_end === null || row.to_col_end === undefined ? undefined : Number(row.to_col_end)
   };
 }
 
@@ -1621,7 +1865,16 @@ function mapEvidenceTestAssociation(row: Record<string, initSqlJs.SqlValue>): Ev
     sourceFileId: requiredString(row, "source_file_id"),
     testUri: requiredString(row, "test_uri"),
     sourceUri: requiredString(row, "source_uri"),
-    rule: requiredString(row, "rule")
+    rule: requiredString(row, "rule"),
+    proof: optionalString(row, "proof"),
+    analyzerName: optionalString(row, "analyzer_name"),
+    analyzerVersion: optionalString(row, "analyzer_version"),
+    sourceSha256: optionalString(row, "source_sha256"),
+    testSha256: optionalString(row, "test_sha256"),
+    lineStart: row.line_start === null || row.line_start === undefined ? undefined : Number(row.line_start),
+    lineEnd: row.line_end === null || row.line_end === undefined ? undefined : Number(row.line_end),
+    colStart: row.col_start === null || row.col_start === undefined ? undefined : Number(row.col_start),
+    colEnd: row.col_end === null || row.col_end === undefined ? undefined : Number(row.col_end)
   };
 }
 
@@ -1633,7 +1886,10 @@ function mapEvidenceConfigEvidence(row: Record<string, initSqlJs.SqlValue>): Evi
     sourceSha256: requiredString(row, "source_sha256"),
     byteLength: requiredNumber(row, "byte_length"),
     format: requiredString(row, "format"),
-    secretRedacted: requiredNumber(row, "secret_redacted") === 1
+    secretRedacted: requiredNumber(row, "secret_redacted") === 1,
+    analyzerName: optionalString(row, "analyzer_name"),
+    analyzerVersion: optionalString(row, "analyzer_version"),
+    proof: optionalString(row, "proof")
   };
 }
 
@@ -1652,7 +1908,29 @@ function mapEvidenceApiEvidence(row: Record<string, initSqlJs.SqlValue>): Eviden
     name: requiredString(row, "name"),
     surface,
     lineStart: requiredNumber(row, "line_start"),
-    lineEnd: requiredNumber(row, "line_end")
+    lineEnd: requiredNumber(row, "line_end"),
+    colStart: row.col_start === null || row.col_start === undefined ? undefined : Number(row.col_start),
+    colEnd: row.col_end === null || row.col_end === undefined ? undefined : Number(row.col_end),
+    proof: optionalString(row, "proof"),
+    analyzerName: optionalString(row, "analyzer_name"),
+    analyzerVersion: optionalString(row, "analyzer_version")
+  };
+}
+
+function mapEvidenceAnalyzerGap(row: Record<string, initSqlJs.SqlValue>): EvidenceAnalyzerGapRow {
+  return {
+    gapId: requiredString(row, "gap_id"),
+    repositoryId: requiredString(row, "repository_id"),
+    snapshotId: optionalString(row, "snapshot_id"),
+    analyzerName: requiredString(row, "analyzer_name"),
+    analyzerVersion: requiredString(row, "analyzer_version"),
+    code: requiredString(row, "code"),
+    severity: requiredString(row, "severity"),
+    scopeUri: optionalString(row, "scope_uri"),
+    message: requiredString(row, "message"),
+    blocking: requiredNumber(row, "blocking") === 1,
+    capability: optionalString(row, "capability"),
+    createdAt: requiredString(row, "created_at")
   };
 }
 

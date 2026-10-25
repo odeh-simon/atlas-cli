@@ -75,14 +75,22 @@ Both raise `MigrationError` (RecoveryRequired exit code). Legacy sessions and ar
 - No raw absolute user paths, tokens, or secret values are persisted: locations appear only as SHA-256 hashes; secret-bearing sources are flagged via classification (`secret=true`) and redacted content records.
 - URIs are repository-relative forward-slash paths; artifact-store references are root-relative `namespace/sha256` pairs. Fixtures use synthetic roots so deterministic tests never encode developer directories.
 
+## Analyzer v2 (B3.3) – Schema and Storage
+
+- **Version:** `EVIDENCE_INDEX_SCHEMA_VERSION` remains `1` (additive). Migration `9_evidence_index_analyzer_v2` adds `evidence_analyzer_gaps` table and extends `evidence_symbols` (`col_start`, `col_end`, `proof`, `analyzer_name/version`), `evidence_edges` (`proof`, `analyzer_name/version`, `from/to_source_sha256`, `from/to_line/col`), `evidence_test_associations` (`proof`, `analyzer_name/version`, `source/test_sha256`, `line/col`), `evidence_api_evidence` (`col_*`, `proof`, `analyzer_*`), `evidence_config_evidence` (`analyzer_*`, `proof`). All new columns are nullable/defaulted, so v1 payloads remain valid.
+
+- **Gaps:** `evidence_analyzer_gaps` stores `gap_id`, `repository_id`, `snapshot_id` (nullable, for pre-promotion), `analyzer_name/version`, `code`, `severity` (`blocking`|`warning`|`info`), `scope_uri` (nullable, repo-relative), `message` (redacted, ≤500 chars), `blocking` (0/1), `capability`, `created_at`. Gaps are part of `indexPayload.gaps` and `entry_counts.gaps`; `relevant_inputs_sha256` includes `analyzerVersions` and file SHAs, so analyzer version/config changes invalidate deterministically.
+
+- **Entry counts:** `evidenceEntryCounts` now includes optional `gaps`; `indexPayload` includes `gaps: AnalyzerGap[]` (default `[]`).
+
 ## Known limitations
 
 - **Single writer:** SQLite transactions serialize writers, but Atlas's advisory lock system does not yet cover evidence-index commits. Two processes committing concurrently will see one transaction block or fail rather than corrupt data; cross-process coordination lands with Batch 11 orchestration.
-- **No incremental scanner:** the schema supports tombstones (`deleted_at_snapshot_id`) and invalidation reasons, but nothing populates them incrementally yet (Batch 3.2).
-- **No analyzer plugins:** capability rows exist, but analyzers are registered manually by callers until Batch 3.3.
+- **Incremental analyzer:** B3.3 analyzer runs incrementally (only changed files plus dependents) via `changedUris` and `analyzerVersionChanged`; unchanged semantic rows are carried forward from `previous` payload. Full re-analysis occurs on `gitReset` or version change.
 
 ## Extension points
 
 - **B3.2 incremental scanner** — consumes `evidence_files` tombstones and `invalidationMetadataSchema` reasons (`file-changed`, `file-deleted`, `git-reset`) without schema change.
-- **B3.3 analyzer plugins** — register `analyzerCapabilitySchema` rows; declare `unsupported`/`gaps` instead of silently skipping inputs.
+- **B3.3 analyzer plugins** — `EvidenceAnalyzer` contract (`contract.ts`) with `registerAnalyzer` (rejects duplicate/invalid names, path-like capabilities), `selectAnalyzersForFile` by extension, `ensureDefaultAnalyzersRegistered` (trusted `typescript-analyzer-v2`); `typescript-analyzer.ts` implements the contract. No dynamic loading from repository content.
 - **B3.5 discovery integration** — context manifests may cite `snapshot_id` and `file_id`s as evidence once a current snapshot exists; the fail-closed read path gives them a safe lookup primitive.
+- **B3.4 queries** — `listEvidence*` and `getEvidence*` already expose symbols/edges/gaps for bounded queries; CLI/inspection not yet exposed.

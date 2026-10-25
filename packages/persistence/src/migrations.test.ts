@@ -98,7 +98,7 @@ describe("evidence index core migration (v7)", () => {
       migrations: coreMigrations
     });
 
-    expect(result.applied.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(result.applied.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(result.applied.find((migration) => migration.version === 7)?.name).toBe("evidence_index_core");
     expect(result.applied.find((migration) => migration.version === 8)?.name).toBe("evidence_index_build_state");
 
@@ -108,6 +108,7 @@ describe("evidence index core migration (v7)", () => {
     )[0];
     expect(tables?.values.flat()).toEqual([
       "evidence_analyzer_capabilities",
+      "evidence_analyzer_gaps",
       "evidence_api_evidence",
       "evidence_classifications",
       "evidence_config_evidence",
@@ -152,10 +153,10 @@ describe("evidence index core migration (v7)", () => {
       now,
       migrations: coreMigrations
     });
-    expect(upgrade.applied.map((migration) => migration.version)).toEqual([8]);
+    expect(upgrade.applied.map((migration) => migration.version)).toEqual([8, 9]);
 
     const reopened = await openDatabase(dbPath);
-    expect(readAppliedMigrations(reopened).map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(readAppliedMigrations(reopened).map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(
       reopened.exec("SELECT display_name FROM evidence_repositories WHERE repository_id = 'evrepo_v7legacy'")[0]
         ?.values
@@ -195,10 +196,10 @@ describe("evidence index core migration (v7)", () => {
       migrations: coreMigrations
     });
 
-    expect(upgrade.applied.map((migration) => migration.version)).toEqual([7, 8]);
+    expect(upgrade.applied.map((migration) => migration.version)).toEqual([7, 8, 9]);
 
     const reopened = await openDatabase(dbPath);
-    expect(readAppliedMigrations(reopened).map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(readAppliedMigrations(reopened).map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(
       reopened.exec("SELECT repo_id, display_name FROM repositories WHERE repo_id = 'repo_legacy'")[0]?.values
     ).toEqual([["repo_legacy", "Legacy Repo"]]);

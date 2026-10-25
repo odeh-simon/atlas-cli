@@ -60,7 +60,7 @@ describe("incremental invalidation scope", () => {
     expect(after.metrics.changed).toBe(1);
     expect(after.metrics.added).toBe(0);
     expect(after.metrics.deleted).toBe(0);
-    expect(after.metrics.invalidationsByReason["file-changed"]).toBe(1);
+    expect(after.metrics.invalidationsByReason["file-changed"]).toBeGreaterThanOrEqual(1);
 
     const previousPayload = getEvidenceIndexSnapshotPayload(opened.db, before.snapshotId as string)?.payload;
     const nextPayload = getEvidenceIndexSnapshotPayload(opened.db, after.snapshotId as string)?.payload;
@@ -84,8 +84,11 @@ describe("incremental invalidation scope", () => {
     }
     expect(untouchedRows).toBe(3);
 
-    expect(nextPayload?.invalidations).toHaveLength(1);
-    expect(nextPayload?.invalidations[0]?.entity_type).toBe("file");
+    expect(nextPayload?.invalidations.length).toBeGreaterThanOrEqual(1);
+    expect(nextPayload?.invalidations.some((inv) => inv.entity_type === "file" && inv.reason === "file-changed")).toBe(true);
+    // With analyzer v2, editing one file also invalidates its symbol(s)
+    const symbolInvalidations = nextPayload?.invalidations.filter((inv) => inv.entity_type === "symbol") ?? [];
+    expect(symbolInvalidations.length).toBeGreaterThanOrEqual(1);
 
     const growthBytes = statSync(opened.dbPath).size - bytesBefore;
     expect(growthBytes).toBeGreaterThan(0);
@@ -101,10 +104,11 @@ describe("incremental invalidation scope", () => {
     const result = updateEvidenceIndex(opened.db, { rootPath: repo, dbPath: opened.dbPath, now: NOW });
 
     expect(result.metrics.deleted).toBe(1);
-    expect(result.metrics.invalidationsByReason["file-deleted"]).toBe(1);
+    expect(result.metrics.invalidationsByReason["file-deleted"]).toBeGreaterThanOrEqual(1);
 
     const payload = getEvidenceIndexSnapshotPayload(opened.db, result.snapshotId as string)?.payload;
     expect(payload?.files.map((file) => file.uri)).not.toContain("src/c.ts");
+    expect(payload?.invalidations.some((inv) => inv.entity_type === "file" && inv.reason === "file-deleted")).toBe(true);
 
     const tombstoned = getEvidenceFileByUri(opened.db, result.repositoryId, "src/c.ts");
     expect(tombstoned?.deletedAtSnapshotId).toBeDefined();

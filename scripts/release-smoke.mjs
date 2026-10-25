@@ -17,7 +17,11 @@ assertSupportedRuntime();
 verifyChecksum(archivePath, checksumPath);
 
 try {
-  run("tar", ["--force-local", "-xzf", archivePath.replace(/\\/g, "/"), "-C", temporaryRoot.replace(/\\/g, "/")], workspaceRoot);
+  const extractArgs =
+    process.platform === "win32"
+      ? ["-xzf", archivePath.replace(/\\/g, "/"), "-C", temporaryRoot.replace(/\\/g, "/")]
+      : ["--force-local", "-xzf", archivePath.replace(/\\/g, "/"), "-C", temporaryRoot.replace(/\\/g, "/")];
+  run("tar", extractArgs, workspaceRoot);
   const cliPath = join(temporaryRoot, "dist", "index.js");
   if (!existsSync(cliPath)) throw new Error("Release archive does not contain dist/index.js");
   mkdirSync(repositoryRoot, { recursive: true });

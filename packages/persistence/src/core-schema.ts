@@ -407,5 +407,72 @@ CREATE TABLE IF NOT EXISTS evidence_scan_cache (
   PRIMARY KEY (repository_id, uri)
 );
 `
+  },
+  {
+    version: 9,
+    name: "evidence_index_analyzer_v2",
+    sql: `
+CREATE TABLE IF NOT EXISTS evidence_analyzer_gaps (
+  gap_id TEXT PRIMARY KEY,
+  repository_id TEXT NOT NULL REFERENCES evidence_repositories(repository_id),
+  snapshot_id TEXT,
+  analyzer_name TEXT NOT NULL,
+  analyzer_version TEXT NOT NULL,
+  code TEXT NOT NULL,
+  severity TEXT NOT NULL CHECK (severity IN ('blocking', 'warning', 'info')),
+  scope_uri TEXT,
+  message TEXT NOT NULL,
+  blocking INTEGER NOT NULL CHECK (blocking IN (0, 1)),
+  capability TEXT,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidence_gaps_repo ON evidence_analyzer_gaps(repository_id, snapshot_id);
+
+-- Extend symbols with proof and span columns (additive, ignore if exists)
+ALTER TABLE evidence_symbols ADD COLUMN col_start INTEGER;
+ALTER TABLE evidence_symbols ADD COLUMN col_end INTEGER;
+ALTER TABLE evidence_symbols ADD COLUMN proof TEXT DEFAULT 'exact' CHECK (proof IN ('exact', 'bounded', 'partial', 'unsupported'));
+ALTER TABLE evidence_symbols ADD COLUMN analyzer_name TEXT;
+ALTER TABLE evidence_symbols ADD COLUMN analyzer_version TEXT;
+
+-- Extend edges
+ALTER TABLE evidence_edges ADD COLUMN proof TEXT DEFAULT 'exact' CHECK (proof IN ('exact', 'bounded', 'partial', 'unsupported'));
+ALTER TABLE evidence_edges ADD COLUMN analyzer_name TEXT;
+ALTER TABLE evidence_edges ADD COLUMN analyzer_version TEXT;
+ALTER TABLE evidence_edges ADD COLUMN from_source_sha256 TEXT;
+ALTER TABLE evidence_edges ADD COLUMN to_source_sha256 TEXT;
+ALTER TABLE evidence_edges ADD COLUMN from_line_start INTEGER;
+ALTER TABLE evidence_edges ADD COLUMN from_line_end INTEGER;
+ALTER TABLE evidence_edges ADD COLUMN from_col_start INTEGER;
+ALTER TABLE evidence_edges ADD COLUMN from_col_end INTEGER;
+ALTER TABLE evidence_edges ADD COLUMN to_line_start INTEGER;
+ALTER TABLE evidence_edges ADD COLUMN to_line_end INTEGER;
+ALTER TABLE evidence_edges ADD COLUMN to_col_start INTEGER;
+ALTER TABLE evidence_edges ADD COLUMN to_col_end INTEGER;
+
+-- Extend test associations
+ALTER TABLE evidence_test_associations ADD COLUMN proof TEXT DEFAULT 'exact' CHECK (proof IN ('exact', 'bounded', 'partial', 'unsupported'));
+ALTER TABLE evidence_test_associations ADD COLUMN analyzer_name TEXT;
+ALTER TABLE evidence_test_associations ADD COLUMN analyzer_version TEXT;
+ALTER TABLE evidence_test_associations ADD COLUMN source_sha256 TEXT;
+ALTER TABLE evidence_test_associations ADD COLUMN test_sha256 TEXT;
+ALTER TABLE evidence_test_associations ADD COLUMN line_start INTEGER;
+ALTER TABLE evidence_test_associations ADD COLUMN line_end INTEGER;
+ALTER TABLE evidence_test_associations ADD COLUMN col_start INTEGER;
+ALTER TABLE evidence_test_associations ADD COLUMN col_end INTEGER;
+
+-- Extend api evidence
+ALTER TABLE evidence_api_evidence ADD COLUMN col_start INTEGER;
+ALTER TABLE evidence_api_evidence ADD COLUMN col_end INTEGER;
+ALTER TABLE evidence_api_evidence ADD COLUMN proof TEXT DEFAULT 'exact' CHECK (proof IN ('exact', 'bounded', 'partial', 'unsupported'));
+ALTER TABLE evidence_api_evidence ADD COLUMN analyzer_name TEXT;
+ALTER TABLE evidence_api_evidence ADD COLUMN analyzer_version TEXT;
+
+-- Extend config evidence
+ALTER TABLE evidence_config_evidence ADD COLUMN analyzer_name TEXT;
+ALTER TABLE evidence_config_evidence ADD COLUMN analyzer_version TEXT;
+ALTER TABLE evidence_config_evidence ADD COLUMN proof TEXT DEFAULT 'exact' CHECK (proof IN ('exact', 'bounded', 'partial', 'unsupported'));
+`
   }
 ] as const;

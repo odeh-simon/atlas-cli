@@ -122,6 +122,8 @@ export const evidenceSourceClassificationSchema = z.object({
   excluded_reason: z.string().min(1).optional()
 });
 
+export const evidenceSymbolProofSchema = z.enum(["exact", "bounded", "partial", "unsupported"]);
+
 export const evidenceSymbolSchema = z
   .object({
     symbol_id: idSchema,
@@ -132,11 +134,18 @@ export const evidenceSymbolSchema = z
     kind: z.string().min(1),
     exported: z.boolean(),
     line_start: z.number().int().positive(),
-    line_end: z.number().int().positive()
+    line_end: z.number().int().positive(),
+    col_start: z.number().int().nonnegative().optional(),
+    col_end: z.number().int().nonnegative().optional(),
+    proof: evidenceSymbolProofSchema.default("exact"),
+    analyzer_name: z.string().trim().min(1).optional(),
+    analyzer_version: z.string().trim().min(1).optional()
   })
   .refine((value) => value.line_end >= value.line_start, { message: "symbol line_end must be >= line_start" });
 
 export const evidenceEdgeKindSchema = z.enum(["import", "re-export", "test-association", "caller", "callee"]);
+
+export const evidenceProofSchema = z.enum(["exact", "bounded", "partial", "unsupported"]);
 
 export const evidenceEdgeSchema = z
   .object({
@@ -147,7 +156,20 @@ export const evidenceEdgeSchema = z
     from_uri: repoRelativeUriSchema,
     to_uri: repoRelativeUriSchema,
     rule: z.string().min(1),
-    resolution: z.enum(["static", "heuristic"]).default("heuristic")
+    resolution: z.enum(["static", "heuristic"]).default("heuristic"),
+    proof: evidenceProofSchema.default("exact"),
+    analyzer_name: z.string().trim().min(1).optional(),
+    analyzer_version: z.string().trim().min(1).optional(),
+    from_source_sha256: sha256Schema.optional(),
+    to_source_sha256: sha256Schema.optional(),
+    from_line_start: z.number().int().positive().optional(),
+    from_line_end: z.number().int().positive().optional(),
+    from_col_start: z.number().int().nonnegative().optional(),
+    from_col_end: z.number().int().nonnegative().optional(),
+    to_line_start: z.number().int().positive().optional(),
+    to_line_end: z.number().int().positive().optional(),
+    to_col_start: z.number().int().nonnegative().optional(),
+    to_col_end: z.number().int().nonnegative().optional()
   })
   .refine((value) => (value.kind === "caller" || value.kind === "callee") ? value.resolution === "static" : true, {
     message: "caller/callee edges require static resolution"
@@ -159,7 +181,16 @@ export const evidenceTestAssociationSchema = z.object({
   source_file_id: idSchema,
   test_uri: repoRelativeUriSchema,
   source_uri: repoRelativeUriSchema,
-  rule: z.string().min(1)
+  rule: z.string().min(1),
+  proof: evidenceProofSchema.default("exact").optional(),
+  analyzer_name: z.string().trim().min(1).optional(),
+  analyzer_version: z.string().trim().min(1).optional(),
+  source_sha256: sha256Schema.optional(),
+  test_sha256: sha256Schema.optional(),
+  line_start: z.number().int().positive().optional(),
+  line_end: z.number().int().positive().optional(),
+  col_start: z.number().int().nonnegative().optional(),
+  col_end: z.number().int().nonnegative().optional()
 });
 
 export const evidenceConfigEvidenceSchema = z.object({
@@ -168,7 +199,10 @@ export const evidenceConfigEvidenceSchema = z.object({
   source_sha256: sha256Schema,
   byte_length: z.number().int().nonnegative(),
   format: z.string().min(1),
-  secret_redacted: z.boolean()
+  secret_redacted: z.boolean(),
+  analyzer_name: z.string().trim().min(1).optional(),
+  analyzer_version: z.string().trim().min(1).optional(),
+  proof: evidenceProofSchema.default("exact").optional()
 });
 
 export const evidenceApiSurfaceSchema = z.enum(["cli-command", "exported-function", "http-endpoint"]);
@@ -182,7 +216,12 @@ export const evidenceApiEvidenceSchema = z
     name: z.string().min(1),
     surface: evidenceApiSurfaceSchema,
     line_start: z.number().int().positive(),
-    line_end: z.number().int().positive()
+    line_end: z.number().int().positive(),
+    col_start: z.number().int().nonnegative().optional(),
+    col_end: z.number().int().nonnegative().optional(),
+    proof: evidenceProofSchema.default("exact").optional(),
+    analyzer_name: z.string().trim().min(1).optional(),
+    analyzer_version: z.string().trim().min(1).optional()
   })
   .refine((value) => value.line_end >= value.line_start, { message: "api evidence line_end must be >= line_start" });
 
@@ -194,6 +233,21 @@ export const analyzerCapabilitySchema = z.object({
   capabilities: z.array(z.string().min(1)).default([]),
   unsupported: z.array(z.string().min(1)).default([]),
   gaps: z.array(z.string().min(1)).default([])
+});
+
+export const analyzerGapSeveritySchema = z.enum(["blocking", "warning", "info"]);
+
+export const analyzerGapSchema = z.object({
+  gap_id: idSchema,
+  analyzer_name: z.string().trim().min(1),
+  analyzer_version: z.string().trim().min(1),
+  code: z.string().min(1),
+  severity: analyzerGapSeveritySchema,
+  scope_uri: repoRelativeUriSchema.optional(),
+  message: z.string().min(1),
+  blocking: z.boolean().default(false),
+  capability: z.string().min(1).optional(),
+  created_at: isoDateTimeSchema.optional()
 });
 
 export const evidenceIndexStatusSchema = z.enum(["building", "current", "superseded", "invalid"]);
@@ -236,7 +290,8 @@ export const evidenceEntryCountsSchema = z.object({
   edges: z.number().int().nonnegative(),
   test_associations: z.number().int().nonnegative(),
   config_evidence: z.number().int().nonnegative(),
-  api_evidence: z.number().int().nonnegative()
+  api_evidence: z.number().int().nonnegative(),
+  gaps: z.number().int().nonnegative().optional()
 });
 
 export const evidenceEngineStateSchema = z.object({
@@ -257,6 +312,7 @@ export const indexPayloadSchema = z.object({
   test_associations: z.array(evidenceTestAssociationSchema).default([]),
   config_evidence: z.array(evidenceConfigEvidenceSchema).default([]),
   api_evidence: z.array(evidenceApiEvidenceSchema).default([]),
+  gaps: z.array(analyzerGapSchema).default([]),
   invalidations: z.array(invalidationMetadataSchema).default([])
 });
 
@@ -274,6 +330,11 @@ export const indexSnapshotSchema = z.object({
   payload_sha256: sha256Schema
 });
 
+export const TYPESCRIPT_ANALYZER_NAME = "typescript-analyzer-v2" as const;
+export const TYPESCRIPT_ANALYZER_VERSION = "2.0.0" as const;
+
+export const analyzerStatusSchema = z.enum(["completed", "partial", "unsupported", "cancelled", "failed"]);
+
 export type EvidenceRepositoryIdentity = z.infer<typeof evidenceRepositoryIdentitySchema>;
 export type EvidenceGitSnapshot = z.infer<typeof evidenceGitSnapshotSchema>;
 export type EvidenceFileRecord = z.infer<typeof evidenceFileRecordSchema>;
@@ -285,6 +346,11 @@ export type EvidenceTestAssociation = z.infer<typeof evidenceTestAssociationSche
 export type EvidenceConfigEvidence = z.infer<typeof evidenceConfigEvidenceSchema>;
 export type EvidenceApiEvidence = z.infer<typeof evidenceApiEvidenceSchema>;
 export type AnalyzerCapability = z.infer<typeof analyzerCapabilitySchema>;
+export type AnalyzerGap = z.infer<typeof analyzerGapSchema>;
+export type AnalyzerGapSeverity = z.infer<typeof analyzerGapSeveritySchema>;
+export type AnalyzerStatus = z.infer<typeof analyzerStatusSchema>;
+export type EvidenceSymbolProof = z.infer<typeof evidenceSymbolProofSchema>;
+export type EvidenceProof = z.infer<typeof evidenceProofSchema>;
 export type InvalidationMetadata = z.infer<typeof invalidationMetadataSchema>;
 export type EvidenceEntryCounts = z.infer<typeof evidenceEntryCountsSchema>;
 export type EvidenceIndexPayload = z.infer<typeof indexPayloadSchema>;
