@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { CancellationError, PersistenceError, canonicalJson } from "@atlas/domain";
-import { getEvidenceIndexSnapshotPayload, readCurrentIndexSnapshot, saveDatabase } from "@atlas/persistence";
-import { TYPESCRIPT_ANALYZER_NAME, TYPESCRIPT_ANALYZER_VERSION } from "@atlas/schemas";
+import { CancellationError, PersistenceError, canonicalJson } from "@sigil/domain";
+import { getEvidenceIndexSnapshotPayload, readCurrentIndexSnapshot, saveDatabase } from "@sigil/persistence";
+import { TYPESCRIPT_ANALYZER_NAME, TYPESCRIPT_ANALYZER_VERSION } from "@sigil/schemas";
 
 import { createTypeScriptAnalyzer } from "./analyzer/typescript-analyzer.js";
 import { clearAnalyzerRegistry, getAnalyzer, listAnalyzers, registerAnalyzer } from "./analyzer/registry.js";
@@ -16,7 +16,7 @@ import { createCommittedRepo, openEngineDb } from "./test-helpers.js";
 const tempRoots: string[] = [];
 const NOW = () => new Date("2026-08-10T10:00:00.000Z");
 
-function tempRoot(prefix = "atlas-analyzer-matrix-"): string {
+function tempRoot(prefix = "sigil-analyzer-matrix-"): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   tempRoots.push(root);
   return root;

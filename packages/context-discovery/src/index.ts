@@ -1,3 +1,3 @@
-export const contextDiscoveryPackage = "@atlas/context-discovery";
+export const contextDiscoveryPackage = "@sigil/context-discovery";
 
 export * from "./semantic.js";

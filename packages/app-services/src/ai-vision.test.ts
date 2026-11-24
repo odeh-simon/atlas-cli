@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { listArtifactsForSession } from "@atlas/persistence";
+import { listArtifactsForSession } from "@sigil/persistence";
 
-import { openAtlasRuntime, runAiVisionTest, startManualTask } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
+import { openSigilRuntime, runAiVisionTest, startManualTask } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
 
 const tempRoots: string[] = [];
 
@@ -16,10 +16,10 @@ afterEach(() => {
 
 describe("runAiVisionTest", () => {
   it("sends a validated image and stores an auditable result for an active session", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-ai-vision-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-ai-vision-"));
     tempRoots.push(root);
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     const imagePath = join(root, "screen.png");
     mkdirSync(cwd, { recursive: true });
     writeFileSync(imagePath, pngFixture());
@@ -44,11 +44,11 @@ describe("runAiVisionTest", () => {
         return { providerAlias: "hetzner.default", model: "Qwen/Qwen3.6-35B-A3B-FP8", content: "No overlap found." };
       }
     });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const artifact = listArtifactsForSession(runtime.db, session.session.sessionId).find(
       (candidate) => candidate.artifactId === result.artifactId
     );
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result).toMatchObject({ mediaType: "image/png", analysis: "No overlap found." });
     expect(result.artifactId).toMatch(/^art_/);
@@ -56,7 +56,7 @@ describe("runAiVisionTest", () => {
   });
 
   it("rejects unsupported image content before invoking AI", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-ai-vision-invalid-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-ai-vision-invalid-"));
     tempRoots.push(root);
     const imagePath = join(root, "fake.png");
     writeFileSync(imagePath, "not an image");

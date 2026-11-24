@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/adapters-os",
+  "name": "@sigil/adapters-os",
   "version": "0.0.0",
   "type": "module",
   "private": true,

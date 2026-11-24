@@ -1,8 +1,8 @@
 {
-  "$schema": "./atlas.config.schema.json",
+  "$schema": "./sigil.config.schema.json",
   "schemaVersion": 1,
   "project": {
-    "name": "atlas-example",
+    "name": "sigil-example",
     "baseBranch": "main"
   },
   "telemetry": {

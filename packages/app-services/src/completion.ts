@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { GateFailedError, StateTransitionError } from "@atlas/domain";
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
+import { GateFailedError, StateTransitionError } from "@sigil/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
 import {
   appendEvent,
   addArtifactDependency,
@@ -15,13 +15,13 @@ import {
   type ArtifactRecord,
   type FindingRecord,
   type SessionRecord
-} from "@atlas/persistence";
-import { completionReportSchema } from "@atlas/schemas";
-import { implementationDiffSchema, reviewPackageSchema, reviewReportSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { completionReportSchema } from "@sigil/schemas";
+import { implementationDiffSchema, reviewPackageSchema, reviewReportSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
 import { hasStaleGitFingerprint, readWorkflowGitSnapshot, type WorkflowGitSnapshot } from "./git-safeguards.js";
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { visualCheckConfigFingerprint } from "./visual-gates.js";
 import { readVerifiedArtifactText } from "./evidence.js";
 
@@ -44,7 +44,7 @@ export interface ApproveCompletionResult {
 }
 
 export async function evaluateCompletion(options: RuntimeOptions = {}): Promise<EvaluateCompletionResult> {
-  const runtime = await openAtlasRuntime(options);
+  const runtime = await openSigilRuntime(options);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -72,7 +72,7 @@ export async function evaluateCompletion(options: RuntimeOptions = {}): Promise<
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "completion.evaluated",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "Completion gates passed",
       metadata: {
@@ -81,14 +81,14 @@ export async function evaluateCompletion(options: RuntimeOptions = {}): Promise<
       }
     });
 
-    return { sessionId: session.sessionId, state: next, nextCommand: "atlas approve completion --yes" };
+    return { sessionId: session.sessionId, state: next, nextCommand: "sigil approve completion --yes" };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
 export async function approveCompletion(input: ApproveCompletionInput = {}): Promise<ApproveCompletionResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -116,7 +116,7 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
       schema_version: 2,
       content_version: 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [
         gates.contractArtifact.artifactId,
@@ -158,7 +158,7 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
       mediaType: "application/json",
       sensitivity: "confidential",
       status: "approved",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now,
       approvedAt: now
     });
@@ -199,7 +199,7 @@ export async function approveCompletion(input: ApproveCompletionInput = {}): Pro
       state: next
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
@@ -238,7 +238,7 @@ function assertCompletionGates(
   const reviewReportArtifact = artifacts.filter((artifact) => artifact.type === "review_report" && artifact.status === "valid").at(-1);
   let implementationDiffArtifact: ArtifactRecord | undefined;
   if (reviewReportArtifact === undefined) {
-    failures.push("fresh independent review report missing; run atlas review prepare/import");
+    failures.push("fresh independent review report missing; run sigil review prepare/import");
   } else if (contractArtifact !== undefined) {
     try {
       const review = reviewReportSchema.parse(JSON.parse(readVerifiedArtifactText(artifactRoot, reviewReportArtifact)) as unknown);
@@ -313,12 +313,12 @@ function gitFreshnessFailures(input: {
     const context = input.artifacts.find((artifact) => artifact.artifactId === input.session.currentContextArtifactId);
     const contextFingerprint = context === undefined ? undefined : readArtifactGitFingerprint(input.artifactRoot, context);
     if (hasStaleGitFingerprint({ recorded: contextFingerprint, current: input.currentGit.base_fingerprint })) {
-      failures.push("context manifest is stale against current Git HEAD; rerun atlas context build");
+      failures.push("context manifest is stale against current Git HEAD; rerun sigil context build");
     }
 
     const checkFingerprint = latestCheck === undefined ? undefined : readArtifactGitFingerprint(input.artifactRoot, latestCheck);
     if (hasStaleGitFingerprint({ recorded: checkFingerprint, current: input.currentGit.fingerprint })) {
-      failures.push("check result is stale against current Git state; rerun atlas checks run");
+      failures.push("check result is stale against current Git state; rerun sigil checks run");
     }
   }
 
@@ -327,7 +327,7 @@ function gitFreshnessFailures(input: {
   try {
     const currentVisualFingerprint = visualCheckConfigFingerprint(input.cwd);
     if (recordedVisualFingerprint !== currentVisualFingerprint) {
-      failures.push("visual check configuration or local baseline is stale; rerun atlas checks run");
+      failures.push("visual check configuration or local baseline is stale; rerun sigil checks run");
     }
   } catch (error) {
     failures.push(`visual check configuration is invalid: ${error instanceof Error ? error.message : String(error)}`);

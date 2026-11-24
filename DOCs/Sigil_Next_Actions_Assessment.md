@@ -1,6 +1,6 @@
-# Atlas Next-Actions Assessment (reconciliation, validation, backlog estimates)
+# Sigil Next-Actions Assessment (reconciliation, validation, backlog estimates)
 
-Date (UTC): 2026-10-04. Branch: `codex/atlas-production-orchestration`. This report is
+Date (UTC): 2026-10-04. Branch: `codex/sigil-production-orchestration`. This report is
 evidence-backed and review-ready. It approves nothing and marks nothing Done. Linear was
 left untouched (no independent-approval evidence exists for ATL-14, and no Linear write
 authorization was given; this environment also has no Linear integration to refresh issue
@@ -8,7 +8,7 @@ state, so Linear observations below rest on the prompt baseline plus the governi
 
 ## 1. Baseline fingerprints and observed state
 
-- Branch: `codex/atlas-production-orchestration`. HEAD: `6bdc2009f3d6040aadf7cbe594d67a3a8d46937e`
+- Branch: `codex/sigil-production-orchestration`. HEAD: `6bdc2009f3d6040aadf7cbe594d67a3a8d46937e`
   (`Checkpoint B3.2: incremental indexing, invalidation and historical snapshots (ATL-14)`).
   Approved B3.1 base: `166563b`. No commits were added by this agent.
 - Runtime: Node v24.19.0, pnpm 9.15.0, win32 x64, 8 CPUs, ~17 GB RAM (~2 GB free at
@@ -17,7 +17,7 @@ state, so Linear observations below rest on the prompt baseline plus the governi
   evidence-index engine/package, persistence, schemas, lockfile, release scripts,
   `vitest.config.ts`) plus 9 untracked paths (`.freebuff/project-id`, three prompt docs,
   `opencode.json`, `analyzer-matrix.test.ts`, `analyzer/{contract,registry,typescript-analyzer}.ts`).
-  Nothing was reset, stashed, cleaned, committed, or relocated. `atlas.config.json` was
+  Nothing was reset, stashed, cleaned, committed, or relocated. `sigil.config.json` was
   not touched; `.freebuff/` and `opencode.json` were listed but never read for content.
 - Linear (per assessment-prompt baseline, unverifiable from here): ATL-14 and ATL-15 both
   `Backlog`; ATL-13 is the approved B3.1 checkpoint. Governing plan (§8) and the PRD status
@@ -107,7 +107,7 @@ now structurally dependent on the analyzer integration):
   - After fix: `pnpm test` → 347/348 once (single intermittent assertion failure, output
     not captured — see limitation), then 348/348 (202.91 s, exit 0); `pnpm release:check`
     (= check + test + bundle + smoke) → 60 files / 348 passed (210.91 s), bundle
-    `atlas-cli-0.0.0.tgz` SHA-256 `9c3f89e9…7545`, smoke passed, overall exit 0.
+    `sigil-cli-0.0.0.tgz` SHA-256 `9c3f89e9…7545`, smoke passed, overall exit 0.
     `pnpm check`, `release:bundle`, `release:smoke`, `git diff --check` all exit 0.
   - 2,000-file fixture under the fix (stable across runs): full ~15.2–15.3 s (132 files/s),
     incremental ~11.6–12.1 s, exact reuse ~0.9 s; payload ~1.92 MB JSON, DB ~7.1 MB.
@@ -181,7 +181,7 @@ No Linear writes were made (no approval evidence, no explicit write authorizatio
   `packages/persistence/src/evidence-index.test.ts`, `packages/persistence/src/evidence-index.ts`,
   `packages/persistence/src/migrations.test.ts`, `packages/schemas/src/evidence-index.ts`,
   `pnpm-lock.yaml`, `scripts/build-release.mjs`, `scripts/release-smoke.mjs`.
-- Inherited untracked: `.freebuff/`, the three `DOCs/ATL-*/Atlas_Next_Actions*` prompt docs,
+- Inherited untracked: `.freebuff/`, the three `DOCs/ATL-*/Sigil_Next_Actions*` prompt docs,
   `opencode.json`, `analyzer-matrix.test.ts`, `analyzer/{contract,registry,typescript-analyzer}.ts`.
 - Agent-authored: `vitest.config.ts` (forks + min/max workers with rationale comment) and
   this report. No other edits; no commits, stashes, or history changes.

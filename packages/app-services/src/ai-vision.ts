@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import { readFileSync } from "node:fs";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { ValidationError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { ValidationError } from "@sigil/domain";
 import {
   assertAiDataConsent,
   createAiCompletion,
@@ -11,11 +11,11 @@ import {
   supportsAiCapability,
   type AiCompletionResponse,
   type AiProviderConfig
-} from "@atlas/llm";
-import { appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository } from "@atlas/persistence";
-import { aiVisionResultSchema } from "@atlas/schemas";
+} from "@sigil/llm";
+import { appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository } from "@sigil/persistence";
+import { aiVisionResultSchema } from "@sigil/schemas";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface RunAiVisionTestInput extends RuntimeOptions {
   readonly provider: AiProviderConfig;
@@ -96,7 +96,7 @@ async function storeVisionResult(
     readonly analysis: string;
   }
 ): Promise<string | undefined> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
     if (session === undefined) return undefined;
@@ -111,7 +111,7 @@ async function storeVisionResult(
       schema_version: 1,
       content_version: artifacts.filter((artifact) => artifact.type === "ai_vision_result").length + 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [],
       content_sha256: "0".repeat(64),
@@ -149,21 +149,21 @@ async function storeVisionResult(
       mediaType: "application/json",
       sensitivity: "confidential",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "ai.vision_tested",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "AI vision capability tested",
       metadata: { artifactId, providerAlias: input.provider.alias, destination }
     });
     return artifactId;
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

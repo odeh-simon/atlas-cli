@@ -1,4 +1,4 @@
-export const diagnosticsPackage = "@atlas/diagnostics";
+export const diagnosticsPackage = "@sigil/diagnostics";
 
 export type TelemetryCategory = "workflow" | "adapter" | "check" | "error";
 export type TelemetryStatus = "started" | "succeeded" | "failed" | "blocked" | "cancelled";
@@ -8,7 +8,7 @@ export interface TelemetryEventInput {
   readonly category: TelemetryCategory;
   readonly status: TelemetryStatus;
   readonly emittedAt?: string | undefined;
-  readonly atlasVersion?: string | undefined;
+  readonly sigilVersion?: string | undefined;
   readonly adapter?: string | undefined;
   readonly workflowState?: string | undefined;
   readonly durationMs?: number | undefined;
@@ -17,12 +17,12 @@ export interface TelemetryEventInput {
 
 export interface TelemetryEvent {
   readonly schema_version: 1;
-  readonly product: "atlas-cli";
+  readonly product: "sigil-cli";
   readonly event_name: string;
   readonly category: TelemetryCategory;
   readonly status: TelemetryStatus;
   readonly emitted_at: string;
-  readonly atlas_version?: string | undefined;
+  readonly sigil_version?: string | undefined;
   readonly adapter?: string | undefined;
   readonly workflow_state?: string | undefined;
   readonly duration_ms?: number | undefined;
@@ -57,12 +57,12 @@ const forbiddenTelemetryKeyFragments = [
 export function buildTelemetryEvent(input: TelemetryEventInput): TelemetryEvent {
   const event: TelemetryEvent = {
     schema_version: 1,
-    product: "atlas-cli",
+    product: "sigil-cli",
     event_name: input.eventName,
     category: input.category,
     status: input.status,
     emitted_at: input.emittedAt ?? new Date().toISOString(),
-    atlas_version: input.atlasVersion,
+    sigil_version: input.sigilVersion,
     adapter: input.adapter,
     workflow_state: input.workflowState,
     duration_ms: input.durationMs,
@@ -72,12 +72,12 @@ export function buildTelemetryEvent(input: TelemetryEventInput): TelemetryEvent 
   return removeUndefinedTelemetryEvent(event);
 }
 
-export function createTelemetryPreview(atlasVersion = "0.0.0"): TelemetryEvent {
+export function createTelemetryPreview(sigilVersion = "0.0.0"): TelemetryEvent {
   return buildTelemetryEvent({
     eventName: "workflow.command.completed",
     category: "workflow",
     status: "succeeded",
-    atlasVersion,
+    sigilVersion,
     workflowState: "checks_completed",
     durationMs: 123,
     counts: {

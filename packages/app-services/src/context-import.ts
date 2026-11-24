@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { GateFailedError, StateTransitionError, ValidationError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { GateFailedError, StateTransitionError, ValidationError } from "@sigil/domain";
 import {
   addArtifactDependency,
   appendEvent,
@@ -10,11 +10,11 @@ import {
   listArtifactsForSession,
   listSessionsForRepository,
   updateSessionContextArtifact
-} from "@atlas/persistence";
-import { contextManifestSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { contextManifestSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { createContextContentPack } from "./context-pack.js";
 import { readSafeRepositorySource } from "./evidence.js";
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
@@ -32,7 +32,7 @@ export interface ImportContextResult {
 }
 
 export async function importContextManifest(input: ImportContextInput): Promise<ImportContextResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -120,7 +120,7 @@ export async function importContextManifest(input: ImportContextInput): Promise<
       contextArtifactId: artifactId,
       contextContentPackArtifactId: contextPackRecord.artifactId,
       state: next,
-      nextCommand: "atlas context build"
+      nextCommand: "sigil context build"
     };
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -128,7 +128,7 @@ export async function importContextManifest(input: ImportContextInput): Promise<
     }
     throw error;
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

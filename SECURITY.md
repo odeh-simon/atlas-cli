@@ -1,10 +1,10 @@
 # Security Policy
 
-Atlas runs coding agents, executes local processes and handles credentials for services such as Linear, GitHub, Figma and AI providers, so security reports are taken seriously.
+Sigil runs coding agents, executes local processes and handles credentials for services such as Linear, GitHub, Figma and AI providers, so security reports are taken seriously.
 
 ## Supported versions
 
-Atlas is pre-release. Only the latest commit on `main` receives security fixes.
+Sigil is pre-release. Only the latest commit on `main` receives security fixes.
 
 ## Reporting a vulnerability
 
@@ -14,7 +14,7 @@ Report vulnerabilities privately through GitHub: go to the repository's **Securi
 
 - what the issue is and its potential impact
 - steps to reproduce, or a proof of concept
-- the Atlas version or commit, OS and Node.js version
+- the Sigil version or commit, OS and Node.js version
 
 You should receive an acknowledgement within 7 days. Once the issue is confirmed, a fix will be prepared and released as soon as practical, and you will be credited in the release notes unless you prefer otherwise.
 
@@ -25,9 +25,9 @@ Examples of issues in scope:
 - secrets or tokens leaking into logs, artifacts, telemetry or writebacks
 - bypassing an approval, review or completion gate
 - command injection or unsafe process execution through the process runner or agent adapters
-- reading or writing files outside the repository or Atlas's own storage
+- reading or writing files outside the repository or Sigil's own storage
 - sandbox or Git safeguard bypasses
 
 ## Handling credentials
 
-Atlas stores credentials as aliases and redacts known secret formats, but always review command output before sharing it publicly.
+Sigil stores credentials as aliases and redacts known secret formats, but always review command output before sharing it publicly.

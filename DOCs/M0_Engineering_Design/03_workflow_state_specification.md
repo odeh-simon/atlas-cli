@@ -2,7 +2,7 @@
 
 ## Decision: Primary State Plus Lifecycle Overlays
 
-Atlas uses one primary workflow-state dimension and separate lifecycle overlays.
+Sigil uses one primary workflow-state dimension and separate lifecycle overlays.
 
 - Primary workflow state answers: "What work stage is this task in?"
 - Lifecycle overlay answers: "May this session progress or appear in active lists?"
@@ -29,7 +29,7 @@ Recommended model:
 | `contract_draft` | A contract draft was imported but is not approved. | Contract draft artifact. |
 | `contract_approved` | A valid immutable contract version is approved. | Contract approval. |
 | `implementation_ready` | Agent/manual implementation package exists and Git preflight is valid. | Agent package, Git snapshot. |
-| `implementation_running` | Atlas owns or just launched an execution run. | Execution run record. |
+| `implementation_running` | Sigil owns or just launched an execution run. | Execution run record. |
 | `implementation_reconciled` | Run ended or was imported and Git facts were reconciled. | Execution report, Git snapshot. |
 | `checks_ready` | Required checks are configured and can run against current Git facts. | Check plan. |
 | `checks_completed` | Check run set is complete for the current Git fingerprint. | Check results. |
@@ -39,7 +39,7 @@ Recommended model:
 | `fix_ready` | Fix batch exists for approved actionable findings. | Fix batch. |
 | `completion_ready` | Completion gates evaluate pass or permitted overrides. | Gate evaluation. |
 | `completed` | Developer approved completion. | Completion approval/report. |
-| `recovery_required` | Atlas cannot safely continue without reconciliation choice. | Recovery issue event. |
+| `recovery_required` | Sigil cannot safely continue without reconciliation choice. | Recovery issue event. |
 
 ## Normative State Diagram
 
@@ -86,27 +86,27 @@ stateDiagram-v2
 
 | Transition | From | To | Trigger | Preconditions | Guard conditions | Required artifacts/approvals | Side effects | Invalidates | Retry/idempotency | Failure/recovery | Reversible |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `create_manual_session` | none/draft | intake_ready | `atlas start --manual` | Valid title/objective/repo | Repo identity readable | Manual task input | Session, event, task brief | None | Same idempotency key resumes draft | draft/recovery_required | Yes before approval |
-| `create_linear_session` | none/draft | intake_ready | `atlas start ENG-1` | Linear adapter configured | Fetch successful or manual fallback chosen | Linear snapshot | Session, task brief, references | None | Provider reads retryable | no misleading complete session | Yes |
-| `build_context` | intake_ready/context_ready | context_ready | `atlas context build/refresh` | Repo verified | Budgets honored or overflow classified | Context manifest | Source records, gaps | Plan/package descendants if changed | Deterministic for same inputs | partial manifest or recovery_required | Yes by rebuilding |
-| `export_plan` | context_ready/planning_ready | planning_ready | `atlas plan` | Context not stale or override | Required gaps resolved | Planning package | Markdown/JSON artifact, clipboard optional | Prior plan if inputs changed | Idempotent same fingerprints | planning_ready with copy failure | Yes |
-| `import_contract` | planning_ready/contract_draft | contract_draft | `atlas contract import` | Input file/stdin exists | Schema parse attempted | Contract draft | Draft artifact, validation result | Prior draft only | Same content same hash | draft rejected with errors | Yes |
-| `approve_contract` | contract_draft | contract_approved | `atlas approve contract` | Valid required sections | No blocking questions; material diff acknowledged | Explicit approval | Approval record, event | Agent/check/review/completion tied to older contract | Not duplicated if same actor/artifact/idempotency key | blocked with errors | No; supersede only |
-| `prepare_implementation` | contract_approved/fix_ready | implementation_ready | `atlas implement --prepare` or `fix` | Contract approved | Git safe, context fresh | Agent/fix package | Package artifact, Git snapshot | Older package if facts changed | Deterministic | GitSafetyError/recovery_required | Yes |
-| `invoke_agent` | implementation_ready | implementation_running | `atlas implement --agent` | Adapter available | User confirms scope; lock held | Agent package | Execution run queued/running | None | Retry creates new run unless prior queued same key | failed/interrupted | Cancel only |
+| `create_manual_session` | none/draft | intake_ready | `sigil start --manual` | Valid title/objective/repo | Repo identity readable | Manual task input | Session, event, task brief | None | Same idempotency key resumes draft | draft/recovery_required | Yes before approval |
+| `create_linear_session` | none/draft | intake_ready | `sigil start ENG-1` | Linear adapter configured | Fetch successful or manual fallback chosen | Linear snapshot | Session, task brief, references | None | Provider reads retryable | no misleading complete session | Yes |
+| `build_context` | intake_ready/context_ready | context_ready | `sigil context build/refresh` | Repo verified | Budgets honored or overflow classified | Context manifest | Source records, gaps | Plan/package descendants if changed | Deterministic for same inputs | partial manifest or recovery_required | Yes by rebuilding |
+| `export_plan` | context_ready/planning_ready | planning_ready | `sigil plan` | Context not stale or override | Required gaps resolved | Planning package | Markdown/JSON artifact, clipboard optional | Prior plan if inputs changed | Idempotent same fingerprints | planning_ready with copy failure | Yes |
+| `import_contract` | planning_ready/contract_draft | contract_draft | `sigil contract import` | Input file/stdin exists | Schema parse attempted | Contract draft | Draft artifact, validation result | Prior draft only | Same content same hash | draft rejected with errors | Yes |
+| `approve_contract` | contract_draft | contract_approved | `sigil approve contract` | Valid required sections | No blocking questions; material diff acknowledged | Explicit approval | Approval record, event | Agent/check/review/completion tied to older contract | Not duplicated if same actor/artifact/idempotency key | blocked with errors | No; supersede only |
+| `prepare_implementation` | contract_approved/fix_ready | implementation_ready | `sigil implement --prepare` or `fix` | Contract approved | Git safe, context fresh | Agent/fix package | Package artifact, Git snapshot | Older package if facts changed | Deterministic | GitSafetyError/recovery_required | Yes |
+| `invoke_agent` | implementation_ready | implementation_running | `sigil implement --agent` | Adapter available | User confirms scope; lock held | Agent package | Execution run queued/running | None | Retry creates new run unless prior queued same key | failed/interrupted | Cancel only |
 | `import_execution_result` | implementation_running/implementation_ready | implementation_reconciled | run exit/import | Run record or simulated result | Git reconciled | Execution report | Run status, git facts | Checks/review if HEAD changed | Import same report is idempotent | recovery_required if ambiguous | No; supersede |
-| `plan_checks` | implementation_reconciled/checks_ready | checks_ready | `atlas checks --plan` | Work exists | Config valid | Check plan | Plan artifact | Prior check plan if config changed | Idempotent | ConfigError | Yes |
-| `run_checks` | checks_ready/checks_completed | checks_completed | `atlas checks` | Check plan | Required commands safe | Check results | Runs/logs/results | Review/completion if Git/config changed | Rerun creates new set; same facts comparable | failed check state, not workflow failure | Yes by rerun |
-| `prepare_review` | checks_completed/review_ready | review_ready | `atlas review prepare` | Approved contract; diff available | Required checks pass or override | Review package | Package artifact | Prior review if inputs changed | Idempotent same inputs | draft package if blocked | Yes |
-| `import_review` | review_ready/review_imported | review_imported | `atlas review import` | Review package exists | Hash/context matches or stale draft | Review report | Findings records | Prior undispositioned findings superseded only by approval | Same content idempotent | draft/malformed review | Yes |
-| `dispose_findings` | review_imported/findings_dispositioned | findings_dispositioned | `atlas findings disposition` | Findings exist | Blocking dispositions valid | Disposition records | Finding status updates | Fix batches if changed | Idempotent per finding disposition version | blocked if incomplete | Yes by new disposition |
-| `create_fix_batch` | findings_dispositioned | fix_ready | `atlas fix prepare` | Approved actionable findings | Git/contract unchanged | Fix batch | Fix artifact | Older stale fix batch | Idempotent same findings/head | blocked if stale | Yes |
-| `evaluate_completion` | review_imported/findings_dispositioned/checks_completed | completion_ready | `atlas complete --check` | Current contract/checks/findings | Non-overrideable gates pass | Gate evaluation | Completion draft | Older completion if facts changed | Idempotent | blocked with gate list | Yes |
-| `approve_completion` | completion_ready | completed | `atlas approve completion` | Gate eval current | User approval; allowed overrides recorded | Completion report/approval | Terminal completion event | None | Not duplicated | blocked if stale | No |
-| `pause` | any nonterminal | same + paused | `atlas pause` | Session exists | Owned run cancelled/interrupted first | Pause event | Overlay set | None | Idempotent | recovery_required if run unknown | Yes |
-| `resume_pause` | same + paused | same - paused | `atlas resume` | Session exists | Reconciliation complete | Resume event | Overlay cleared | Stale descendants as needed | Idempotent | recovery_required | Yes |
-| `archive` | any | same + archived | `atlas archive` | Session exists | Confirmation | Archive event | Overlay set | None | Idempotent | None | Yes |
-| `cancel` | any nonterminal | disposition cancelled | `atlas cancel` | Session exists | Confirmation + reason | Cancel event | Terminal disposition | Normal progression | Idempotent | None | No normal reversal; can clone |
+| `plan_checks` | implementation_reconciled/checks_ready | checks_ready | `sigil checks --plan` | Work exists | Config valid | Check plan | Plan artifact | Prior check plan if config changed | Idempotent | ConfigError | Yes |
+| `run_checks` | checks_ready/checks_completed | checks_completed | `sigil checks` | Check plan | Required commands safe | Check results | Runs/logs/results | Review/completion if Git/config changed | Rerun creates new set; same facts comparable | failed check state, not workflow failure | Yes by rerun |
+| `prepare_review` | checks_completed/review_ready | review_ready | `sigil review prepare` | Approved contract; diff available | Required checks pass or override | Review package | Package artifact | Prior review if inputs changed | Idempotent same inputs | draft package if blocked | Yes |
+| `import_review` | review_ready/review_imported | review_imported | `sigil review import` | Review package exists | Hash/context matches or stale draft | Review report | Findings records | Prior undispositioned findings superseded only by approval | Same content idempotent | draft/malformed review | Yes |
+| `dispose_findings` | review_imported/findings_dispositioned | findings_dispositioned | `sigil findings disposition` | Findings exist | Blocking dispositions valid | Disposition records | Finding status updates | Fix batches if changed | Idempotent per finding disposition version | blocked if incomplete | Yes by new disposition |
+| `create_fix_batch` | findings_dispositioned | fix_ready | `sigil fix prepare` | Approved actionable findings | Git/contract unchanged | Fix batch | Fix artifact | Older stale fix batch | Idempotent same findings/head | blocked if stale | Yes |
+| `evaluate_completion` | review_imported/findings_dispositioned/checks_completed | completion_ready | `sigil complete --check` | Current contract/checks/findings | Non-overrideable gates pass | Gate evaluation | Completion draft | Older completion if facts changed | Idempotent | blocked with gate list | Yes |
+| `approve_completion` | completion_ready | completed | `sigil approve completion` | Gate eval current | User approval; allowed overrides recorded | Completion report/approval | Terminal completion event | None | Not duplicated | blocked if stale | No |
+| `pause` | any nonterminal | same + paused | `sigil pause` | Session exists | Owned run cancelled/interrupted first | Pause event | Overlay set | None | Idempotent | recovery_required if run unknown | Yes |
+| `resume_pause` | same + paused | same - paused | `sigil resume` | Session exists | Reconciliation complete | Resume event | Overlay cleared | Stale descendants as needed | Idempotent | recovery_required | Yes |
+| `archive` | any | same + archived | `sigil archive` | Session exists | Confirmation | Archive event | Overlay set | None | Idempotent | None | Yes |
+| `cancel` | any nonterminal | disposition cancelled | `sigil cancel` | Session exists | Confirmation + reason | Cancel event | Terminal disposition | Normal progression | Idempotent | None | No normal reversal; can clone |
 
 ## Transition Pseudocode
 
@@ -144,11 +144,11 @@ function executeTransition(command, sessionId, input) {
 
 | Example | Result |
 | --- | --- |
-| `atlas implement` from `planning_ready` | `ApprovalRequiredError`: no approved contract. |
-| `atlas approve contract` with missing required section | `ValidationError`: draft retained, approval blocked. |
-| `atlas review prepare` after HEAD changed since checks | `GateFailedError`: checks stale; rerun or permitted override. |
-| `atlas complete` with unresolved blocking finding | `GateFailedError`: completion blocked. |
-| `atlas fix` with rejected suggestions only | `StateTransitionError`: no approved actionable findings. |
+| `sigil implement` from `planning_ready` | `ApprovalRequiredError`: no approved contract. |
+| `sigil approve contract` with missing required section | `ValidationError`: draft retained, approval blocked. |
+| `sigil review prepare` after HEAD changed since checks | `GateFailedError`: checks stale; rerun or permitted override. |
+| `sigil complete` with unresolved blocking finding | `GateFailedError`: completion blocked. |
+| `sigil fix` with rejected suggestions only | `StateTransitionError`: no approved actionable findings. |
 | Any forward transition while paused | `StateTransitionError`: resume first. |
 | Any normal transition after cancelled | `StateTransitionError`: cancelled sessions are inspect/export only. |
 

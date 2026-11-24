@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/schemas",
+  "name": "@sigil/schemas",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -13,6 +13,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@atlas/domain": "workspace:*"
+    "@sigil/domain": "workspace:*"
   }
 }

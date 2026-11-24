@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getStatus, openAtlasRuntime, runDoctor } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { getStatus, openSigilRuntime, runDoctor } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 import { prepareApprovedContract } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-doctor-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-doctor-"));
   tempRoots.push(root);
   return root;
 }
@@ -38,14 +38,14 @@ describe("runDoctor", () => {
     const root = tempRoot();
     const { cwd, env } = await prepareApprovedContract(root);
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     if (status.session === undefined) throw new Error("Expected session fixture");
     const artifact = listArtifactsForSession(runtime.db, status.session.sessionId)[0];
     if (artifact === undefined) throw new Error("Expected artifact fixture");
     const path = join(runtime.paths.artifactRoot, artifact.storageUri);
     const original = readFileSync(path, "utf8");
     writeFileSync(path, `${original}\ncorrupt\n`);
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
 
@@ -56,7 +56,7 @@ describe("runDoctor", () => {
   it("reports malformed config JSON instead of crashing", async () => {
     const root = tempRoot();
     const { cwd, env } = await prepareApprovedContract(root);
-    writeFileSync(join(cwd, "atlas.config.json"), "{ nope");
+    writeFileSync(join(cwd, "sigil.config.json"), "{ nope");
 
     const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
 
@@ -68,7 +68,7 @@ describe("runDoctor", () => {
     const root = tempRoot();
     const { cwd, env } = await prepareApprovedContract(root);
     writeFileSync(
-      join(cwd, "atlas.config.json"),
+      join(cwd, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -95,9 +95,9 @@ describe("runDoctor", () => {
   it("validates configuration before a session exists", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
-    writeFileSync(join(cwd, "atlas.config.json"), "{ nope");
+    writeFileSync(join(cwd, "sigil.config.json"), "{ nope");
 
     const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
 
@@ -109,7 +109,7 @@ describe("runDoctor", () => {
   it("fails clearly on an unsupported Node.js runtime", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
 
     const result = await runDoctor({ cwd, env, runtimeVersion: "20.19.0" });
@@ -121,7 +121,7 @@ describe("runDoctor", () => {
   it("reports interrupted database sidecars without deleting them", async () => {
     const root = tempRoot();
     const { cwd, env } = await prepareApprovedContract(root);
-    const interruptedPath = join(env.ATLAS_HOME, "atlas.db.tmp");
+    const interruptedPath = join(env.SIGIL_HOME, "sigil.db.tmp");
     writeFileSync(interruptedPath, "preserve me");
 
     const result = await runDoctor({ cwd, env, runtimeVersion: "22.23.1" });
@@ -134,10 +134,10 @@ describe("runDoctor", () => {
   it("reports invalid AI defaults and disabled cloud context separately", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(
-      join(cwd, "atlas.config.json"),
+      join(cwd, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -166,10 +166,10 @@ describe("runDoctor", () => {
   it("reports malformed AI provider collections without crashing", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(
-      join(cwd, "atlas.config.json"),
+      join(cwd, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },

@@ -9,23 +9,23 @@ import {
   exportPlanningPackage,
   getStatus,
   importContract,
-  openAtlasRuntime,
+  openSigilRuntime,
   startManualTask
 } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { getArtifactRecord, listApprovalsForSession } from "@atlas/persistence";
+import { closeSigilRuntime } from "./runtime.js";
+import { getArtifactRecord, listApprovalsForSession } from "@sigil/persistence";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-approve-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-approve-"));
   tempRoots.push(root);
   return root;
 }
 
 async function prepareContract(root: string) {
   const cwd = join(root, "repo");
-  const env = { ATLAS_HOME: join(root, "home") };
+  const env = { SIGIL_HOME: join(root, "home") };
   mkdirSync(cwd, { recursive: true });
   writeFileSync(join(cwd, "README.md"), "# Fixture\n");
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
@@ -70,14 +70,14 @@ describe("approveContract", () => {
 
     const result = await approveContract({ cwd, env, actorId: "tester" });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const approvals = listApprovalsForSession(runtime.db, result.sessionId);
     const artifact = getArtifactRecord(runtime.db, imported.contractArtifactId);
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result.state).toBe("contract_approved");
     expect(status.session?.primaryState).toBe("contract_approved");
-    expect(status.nextCommands[0]).toBe("atlas implement export --manual");
+    expect(status.nextCommands[0]).toBe("sigil implement export --manual");
     expect(approvals[0]).toMatchObject({ approvalType: "contract", actorId: "tester" });
     expect(artifact?.status).toBe("approved");
   });
@@ -85,7 +85,7 @@ describe("approveContract", () => {
   it("rejects approval before a contract is imported", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
 

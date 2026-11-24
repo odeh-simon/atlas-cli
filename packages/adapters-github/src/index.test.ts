@@ -15,7 +15,7 @@ import {
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-github-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-github-"));
   tempRoots.push(root);
   return root;
 }
@@ -28,16 +28,16 @@ afterEach(() => {
 
 describe("GitHub adapter", () => {
   it("parses repository, pull request, and issue URLs", () => {
-    expect(parseGitHubReference("https://github.com/acme/atlas")).toMatchObject({
+    expect(parseGitHubReference("https://github.com/acme/sigil")).toMatchObject({
       kind: "repository",
       owner: "acme",
-      repo: "atlas"
+      repo: "sigil"
     });
-    expect(parseGitHubReference("https://github.com/acme/atlas/pull/12")).toMatchObject({
+    expect(parseGitHubReference("https://github.com/acme/sigil/pull/12")).toMatchObject({
       kind: "pull_request",
       number: 12
     });
-    expect(parseGitHubReference("https://github.com/acme/atlas/issues/7")).toMatchObject({
+    expect(parseGitHubReference("https://github.com/acme/sigil/issues/7")).toMatchObject({
       kind: "issue",
       number: 7
     });
@@ -46,7 +46,7 @@ describe("GitHub adapter", () => {
   it("normalizes repository fixture metadata", () => {
     const snapshot = normalizeGitHubRepository({
       owner: "acme",
-      repo: "atlas",
+      repo: "sigil",
       defaultBranch: "main",
       pullRequests: [
         { number: 2, title: "Second", state: "open", headRef: "feature/b", baseRef: "main" },
@@ -54,21 +54,21 @@ describe("GitHub adapter", () => {
       ]
     });
 
-    expect(snapshot).toMatchObject({ provider: "github", owner: "acme", repo: "atlas", defaultBranch: "main" });
+    expect(snapshot).toMatchObject({ provider: "github", owner: "acme", repo: "sigil", defaultBranch: "main" });
     expect(snapshot.pullRequests.map((pullRequest) => pullRequest.number)).toEqual([1, 2]);
   });
 
   it("reads fixtures and reports health", () => {
     const root = tempRoot();
     const filePath = join(root, "github.json");
-    writeFileSync(filePath, JSON.stringify({ owner: "acme", repo: "atlas" }));
+    writeFileSync(filePath, JSON.stringify({ owner: "acme", repo: "sigil" }));
 
-    expect(readGitHubFixture(filePath)).toMatchObject({ owner: "acme", repo: "atlas" });
+    expect(readGitHubFixture(filePath)).toMatchObject({ owner: "acme", repo: "sigil" });
     expect(getGitHubAdapterHealth()).toMatchObject({ configured: false, mode: "fixture", writable: false });
   });
 
   it("rejects malformed references and fixtures", () => {
-    expect(() => parseGitHubReference("https://example.test/acme/atlas")).toThrow("github.com");
+    expect(() => parseGitHubReference("https://example.test/acme/sigil")).toThrow("github.com");
     expect(() => normalizeGitHubRepository({ owner: "acme" })).toThrow("owner and repo");
   });
 
@@ -76,7 +76,7 @@ describe("GitHub adapter", () => {
     const urls: string[] = [];
     const snapshot = await fetchGitHubRepositorySnapshot({
       token: "ghp_token",
-      reference: parseGitHubReference("https://github.com/acme/atlas/pull/12"),
+      reference: parseGitHubReference("https://github.com/acme/sigil/pull/12"),
       fetchImpl: (async (url, init) => {
         urls.push(String(url));
         expect(init?.headers).toMatchObject({ authorization: "Bearer ghp_token" });
@@ -88,7 +88,7 @@ describe("GitHub adapter", () => {
               state: "open",
               head: { ref: "feature" },
               base: { ref: "main" },
-              html_url: "https://github.com/acme/atlas/pull/12"
+              html_url: "https://github.com/acme/sigil/pull/12"
             }),
             { status: 200 }
           );
@@ -96,8 +96,8 @@ describe("GitHub adapter", () => {
         return new Response(
           JSON.stringify({
             default_branch: "main",
-            html_url: "https://github.com/acme/atlas",
-            description: "Atlas"
+            html_url: "https://github.com/acme/sigil",
+            description: "Sigil"
           }),
           { status: 200 }
         );
@@ -105,20 +105,20 @@ describe("GitHub adapter", () => {
     });
 
     expect(urls).toHaveLength(2);
-    expect(snapshot).toMatchObject({ owner: "acme", repo: "atlas", defaultBranch: "main" });
+    expect(snapshot).toMatchObject({ owner: "acme", repo: "sigil", defaultBranch: "main" });
     expect(snapshot.pullRequests[0]).toMatchObject({ number: 12, headRef: "feature", baseRef: "main" });
   });
 
   it("writes pull request comments through GitHub REST", async () => {
     const result = await commentGitHubPullRequest({
       token: "ghp_token",
-      reference: parseGitHubReference("https://github.com/acme/atlas/pull/12"),
-      body: "Atlas run completed.",
+      reference: parseGitHubReference("https://github.com/acme/sigil/pull/12"),
+      body: "Sigil run completed.",
       fetchImpl: (async (url, init) => {
-        expect(String(url)).toBe("https://api.github.com/repos/acme/atlas/issues/12/comments");
+        expect(String(url)).toBe("https://api.github.com/repos/acme/sigil/issues/12/comments");
         expect(init?.method).toBe("POST");
         expect(init?.headers).toMatchObject({ authorization: "Bearer ghp_token" });
-        return new Response(JSON.stringify({ html_url: "https://github.com/acme/atlas/pull/12#issuecomment-1" }), {
+        return new Response(JSON.stringify({ html_url: "https://github.com/acme/sigil/pull/12#issuecomment-1" }), {
           status: 201
         });
       }) as typeof fetch
@@ -127,7 +127,7 @@ describe("GitHub adapter", () => {
     expect(result).toMatchObject({
       provider: "github",
       status: "written",
-      remoteUrl: "https://github.com/acme/atlas/pull/12#issuecomment-1"
+      remoteUrl: "https://github.com/acme/sigil/pull/12#issuecomment-1"
     });
   });
 });

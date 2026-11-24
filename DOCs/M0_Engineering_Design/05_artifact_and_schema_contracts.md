@@ -45,7 +45,7 @@ export const ArtifactType = z.enum([
 ]);
 
 export const Sensitivity = z.enum(["public", "internal", "confidential", "secret-redacted"]);
-export const ProducerType = z.enum(["atlas", "user", "adapter", "agent", "import"]);
+export const ProducerType = z.enum(["sigil", "user", "adapter", "agent", "import"]);
 
 export const ArtifactEnvelope = z.object({
   artifact_id: Id,
@@ -70,31 +70,31 @@ export const ArtifactEnvelope = z.object({
 
 | Artifact | Purpose | Producer | Consumer | Required fields beyond envelope | Optional fields | Sensitivity | Immutability/invalidation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Task brief | Normalized task baseline | Atlas | Plan/context | title, objective, source, repo_id, references | acceptance_criteria | internal | Superseded when intake changes |
+| Task brief | Normalized task baseline | Sigil | Plan/context | title, objective, source, repo_id, references | acceptance_criteria | internal | Superseded when intake changes |
 | Linear task snapshot | Raw/normalized Linear read | Linear adapter | Task brief | issue_id, url, fetched_at, fields_available | comments, labels | confidential | Stale after TTL/refresh |
 | Manual task input | User-provided intake | User | Task brief | title, objective, repo_path | references | internal | Draft until validated |
 | Context manifest | Traceable selected context | Context service | Plan/agent/review | sources, exclusions, budgets, fingerprints | gaps | confidential | Invalidated by source hash/TTL/git changes |
 | Context source record | Per-source evidence | Context service | Manifest | uri, kind, reason, hash, size | excerpt, symbols | confidential | Immutable per source hash |
-| Planning package metadata | Planning handoff index | Atlas | User/ChatGPT | package_path, input_artifacts, ready_label | clipboard_status | confidential | Invalidated by context/task change |
-| Decision record | Approved/proposed decision | User/Atlas | Review/completion | status, rationale, affected_requirements | alternatives | internal | Superseded, not edited |
+| Planning package metadata | Planning handoff index | Sigil | User/ChatGPT | package_path, input_artifacts, ready_label | clipboard_status | confidential | Invalidated by context/task change |
+| Decision record | Approved/proposed decision | User/Sigil | Review/completion | status, rationale, affected_requirements | alternatives | internal | Superseded, not edited |
 | Implementation contract | Authoritative intent | User import | Agent/review/gates | required sections, unresolved_questions, prohibitions, acceptance, tests | component_mappings | confidential | Approval freezes version |
-| Contract approval | Approval evidence | Atlas | Gates/audit | contract_artifact_id, sha256, actor, approved_at | rationale | internal | Append-only |
-| Contract change record | Semantic diff | Atlas | Approval gate | previous_contract, next_contract, materiality | section_diffs | internal | Immutable |
-| Agent implementation package | Bounded agent input | Atlas | Agent/manual user | contract, git, rules, instructions, report_schema | referenced_artifacts | confidential | Invalidated by contract/git/context |
-| Execution run | Process lifecycle facts | Atlas/adapter | Status/recovery | run_id, agent_kind, status, package | provider_metadata | internal | Status updates in DB; artifact snapshots immutable |
-| Execution report | Run summary | Atlas/agent | Checks/review | contract, git_before_after, changed_files, claims, evidence | deviations | confidential | Invalidated by Git divergence |
+| Contract approval | Approval evidence | Sigil | Gates/audit | contract_artifact_id, sha256, actor, approved_at | rationale | internal | Append-only |
+| Contract change record | Semantic diff | Sigil | Approval gate | previous_contract, next_contract, materiality | section_diffs | internal | Immutable |
+| Agent implementation package | Bounded agent input | Sigil | Agent/manual user | contract, git, rules, instructions, report_schema | referenced_artifacts | confidential | Invalidated by contract/git/context |
+| Execution run | Process lifecycle facts | Sigil/adapter | Status/recovery | run_id, agent_kind, status, package | provider_metadata | internal | Status updates in DB; artifact snapshots immutable |
+| Execution report | Run summary | Sigil/agent | Checks/review | contract, git_before_after, changed_files, claims, evidence | deviations | confidential | Invalidated by Git divergence |
 | Command result | Command execution fact | Runner | Checks/audit | executable, args, cwd, exit, duration, log_refs | signal | internal | Immutable |
 | Check definition | Configured check | Config | Check runner | name, command, args, required, timeout | dependencies | internal | Versioned by config hash |
 | Check result | One check outcome | Check runner | Gates/review | check_definition, git_fingerprint, status, command_result | failure_summary | internal | Stale on git/config change |
-| Review package | Contract-based review input | Atlas | User/ChatGPT | contract, diff, checks, rubric, stale_label | evidence | confidential | Invalidated by contract/git/check change |
+| Review package | Contract-based review input | Sigil | User/ChatGPT | contract, diff, checks, rubric, stale_label | evidence | confidential | Invalidated by contract/git/check change |
 | Review report | Imported review output | User import | Findings | review_package_hash, summary, findings | reviewer_notes | confidential | Draft if stale/malformed |
-| Finding | Unit of review work | Atlas | Disposition/fix | severity, title, evidence, contract_link, action | affected_files | internal | Status via disposition only |
+| Finding | Unit of review work | Sigil | Disposition/fix | severity, title, evidence, contract_link, action | affected_files | internal | Status via disposition only |
 | Finding disposition | Developer decision | User | Fix/completion | finding_id, disposition, reason, actor | resolution_evidence | internal | Append-only |
-| Fix batch | Approved fixes | Atlas | Agent | finding_ids, contract, git_head, instructions | excluded_findings | confidential | Invalidated by finding/git/contract change |
-| Override | Gate exception | User/Atlas | Gates/audit | gate_id, scope, reason, actor | expiry | internal | Append-only; some gates non-overrideable |
-| Completion report | Final evidence package | Atlas/User | Audit/export | contract, git, checks, findings, approvals | overrides | confidential | Append-only terminal artifact |
-| Session export | Portable session bundle | Atlas | User/import | manifest, artifact_hashes, db_extract | include_logs flag | confidential | Immutable bundle |
-| Diagnostic bundle manifest | Preview of diagnostics | Atlas | Support/user | included_records, excluded_sensitive, hashes | notes | secret-redacted | User approves bundle creation |
+| Fix batch | Approved fixes | Sigil | Agent | finding_ids, contract, git_head, instructions | excluded_findings | confidential | Invalidated by finding/git/contract change |
+| Override | Gate exception | User/Sigil | Gates/audit | gate_id, scope, reason, actor | expiry | internal | Append-only; some gates non-overrideable |
+| Completion report | Final evidence package | Sigil/User | Audit/export | contract, git, checks, findings, approvals | overrides | confidential | Append-only terminal artifact |
+| Session export | Portable session bundle | Sigil | User/import | manifest, artifact_hashes, db_extract | include_logs flag | confidential | Immutable bundle |
+| Diagnostic bundle manifest | Preview of diagnostics | Sigil | Support/user | included_records, excluded_sensitive, hashes | notes | secret-redacted | User approves bundle creation |
 
 ## Core Schemas
 
@@ -247,8 +247,8 @@ export const Finding = ArtifactEnvelope.extend({
 
 ## Markdown, JSON, Database, and Hash Relationship
 
-1. Markdown is the human handoff. It begins with a fenced `atlas-metadata` JSON block.
-2. JSON is the machine contract. When Markdown is imported, Atlas extracts or reconstructs JSON and validates it.
+1. Markdown is the human handoff. It begins with a fenced `sigil-metadata` JSON block.
+2. JSON is the machine contract. When Markdown is imported, Sigil extracts or reconstructs JSON and validates it.
 3. Database metadata stores artifact identity, status, hash, dependency graph, and storage URI.
 4. Hashes are calculated over the canonical artifact content file, not over database rows.
 5. If Markdown and JSON are both generated for the same artifact, each has its own artifact row and both depend on a shared logical parent record.
@@ -256,7 +256,7 @@ export const Finding = ArtifactEnvelope.extend({
 ## Example Implementation Contract Markdown
 
 ````markdown
-```atlas-metadata
+```sigil-metadata
 {
   "artifact_id": "art_contract_01",
   "session_id": "ses_123",

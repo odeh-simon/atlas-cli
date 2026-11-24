@@ -1,15 +1,15 @@
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError, type DecisionRecordKind, type MaterialChangeCategory } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { StateTransitionError, type DecisionRecordKind, type MaterialChangeCategory } from "@sigil/domain";
 import {
   appendEvent,
   createArtifactRecord,
   createDecisionRecord,
   listArtifactsForSession,
   listSessionsForRepository
-} from "@atlas/persistence";
-import { decisionRecordSchema } from "@atlas/schemas";
+} from "@sigil/persistence";
+import { decisionRecordSchema } from "@sigil/schemas";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface RecordDecisionInput extends RuntimeOptions {
   readonly kind: DecisionRecordKind;
@@ -28,7 +28,7 @@ export interface RecordDecisionResult {
 }
 
 export async function recordDecision(input: RecordDecisionInput): Promise<RecordDecisionResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -113,6 +113,6 @@ export async function recordDecision(input: RecordDecisionInput): Promise<Record
 
     return { sessionId: session.sessionId, decisionId, artifactId, kind: input.kind };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }

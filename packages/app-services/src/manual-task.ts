@@ -1,6 +1,6 @@
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import type { LinearIssueSnapshot } from "@atlas/adapters-linear";
-import { ValidationError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import type { LinearIssueSnapshot } from "@sigil/adapters-linear";
+import { ValidationError } from "@sigil/domain";
 import {
   appendEvent,
   createArtifactRecord,
@@ -10,14 +10,14 @@ import {
   getRepository,
   getSession,
   type SessionRecord
-} from "@atlas/persistence";
-import { taskBriefSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { taskBriefSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
 import {
-  closeAtlasRuntime,
+  closeSigilRuntime,
   newId,
-  openAtlasRuntime,
+  openSigilRuntime,
   repoDisplayName,
   repoIdForPath,
   type RuntimeOptions
@@ -49,7 +49,7 @@ export async function startManualTask(input: StartManualTaskInput): Promise<Star
     throw new ValidationError("Manual task requires a title and objective");
   }
 
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const now = new Date().toISOString();
     const repoId = repoIdForPath(runtime.paths.cwd);
@@ -60,7 +60,7 @@ export async function startManualTask(input: StartManualTaskInput): Promise<Star
         session: existing,
         taskBriefArtifactId: existing.currentContextArtifactId ?? "",
         resumedExisting: true,
-        nextCommand: "atlas context import <file>"
+        nextCommand: "sigil context import <file>"
       };
     }
 
@@ -90,7 +90,7 @@ export async function startManualTask(input: StartManualTaskInput): Promise<Star
       schema_version: 1,
       content_version: 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "internal",
       parents: [],
       content_sha256: "0".repeat(64),
@@ -128,14 +128,14 @@ export async function startManualTask(input: StartManualTaskInput): Promise<Star
       mediaType: "application/json",
       sensitivity: "internal",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "session.created",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "Manual task session created",
       metadata: { taskKey, taskBriefArtifactId: artifactId }
@@ -145,10 +145,10 @@ export async function startManualTask(input: StartManualTaskInput): Promise<Star
       session,
       taskBriefArtifactId: artifactId,
       resumedExisting: false,
-      nextCommand: "atlas context import <file>"
+      nextCommand: "sigil context import <file>"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
@@ -188,7 +188,7 @@ async function startTaskSession(
     throw new ValidationError("Task requires a title and objective");
   }
 
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const now = new Date().toISOString();
     const repoId = repoIdForPath(runtime.paths.cwd);
@@ -199,7 +199,7 @@ async function startTaskSession(
         session: existing,
         taskBriefArtifactId: existing.currentContextArtifactId ?? "",
         resumedExisting: true,
-        nextCommand: "atlas context import <file>"
+        nextCommand: "sigil context import <file>"
       };
     }
 
@@ -229,7 +229,7 @@ async function startTaskSession(
       schema_version: 1,
       content_version: 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "internal",
       parents: [],
       content_sha256: "0".repeat(64),
@@ -267,14 +267,14 @@ async function startTaskSession(
       mediaType: "application/json",
       sensitivity: "internal",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "session.created",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: `${input.source === "linear" ? "Linear" : "Manual"} task session created`,
       metadata: { taskKey, taskBriefArtifactId: artifactId }
@@ -284,10 +284,10 @@ async function startTaskSession(
       session,
       taskBriefArtifactId: artifactId,
       resumedExisting: false,
-      nextCommand: "atlas context import <file>"
+      nextCommand: "sigil context import <file>"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

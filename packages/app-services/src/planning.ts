@@ -1,12 +1,12 @@
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { GateFailedError, StateTransitionError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { GateFailedError, StateTransitionError } from "@sigil/domain";
 import {
   assertAiDataConsent,
   createAiCompletion,
   isCloudAiProvider,
   type AiCompletionResponse,
   type AiProviderConfig
-} from "@atlas/llm";
+} from "@sigil/llm";
 import {
   addArtifactDependency,
   appendEvent,
@@ -14,11 +14,11 @@ import {
   listArtifactsForSession,
   listSessionsForRepository,
   updateSessionState
-} from "@atlas/persistence";
-import { aiPlanningDraftSchema, contextContentPackSchema, contextManifestSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { aiPlanningDraftSchema, contextContentPackSchema, contextManifestSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { readVerifiedArtifactText } from "./evidence.js";
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { assertContextManifestFresh } from "./context-pack.js";
@@ -44,7 +44,7 @@ export interface ExportPlanningPackageInput extends RuntimeOptions {
 }
 
 export async function exportPlanningPackage(options: ExportPlanningPackageInput = {}): Promise<ExportPlanningPackageResult> {
-  const runtime = await openAtlasRuntime(options);
+  const runtime = await openSigilRuntime(options);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -60,7 +60,7 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
       .at(-1);
     if (taskBrief === undefined || contextManifest === undefined || contextPack === undefined) {
       throw new GateFailedError(
-        "Planning requires a valid current context manifest and content pack; legacy sessions must rerun atlas context build"
+        "Planning requires a valid current context manifest and content pack; legacy sessions must rerun sigil context build"
       );
     }
     const taskBriefText = readVerifiedArtifactText(runtime.paths.artifactRoot, taskBrief);
@@ -77,7 +77,7 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
       parsedPack.manifest_schema_version !== 3 ||
       parsedPack.discovery_config_sha256 !== parsedManifest.repository_snapshot?.discovery_config_sha256
     ) {
-      throw new GateFailedError("Legacy context cannot claim semantic completeness; rerun atlas context build before planning");
+      throw new GateFailedError("Legacy context cannot claim semantic completeness; rerun sigil context build before planning");
     }
     assertContextManifestFresh({
       rootPath: runtime.paths.cwd,
@@ -92,7 +92,7 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
       parsedPack.context_manifest_sha256 !== contextManifest.sha256 ||
       (currentGit !== undefined && parsedPack.git_base_fingerprint !== currentGit.base_fingerprint);
     if (stalePack) {
-      throw new GateFailedError("Context content pack is stale or does not match the current manifest; rerun atlas context build");
+      throw new GateFailedError("Context content pack is stale or does not match the current manifest; rerun sigil context build");
     }
     const blockingGaps = parsedManifest.gaps.filter((gap) => gap.severity === "blocking");
     if (blockingGaps.length > 0 || parsedPack.blocking_gaps.length > 0) {
@@ -144,7 +144,7 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
       mediaType: "text/markdown",
       sensitivity: "confidential",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     for (const dependsOnArtifactId of [taskBrief.artifactId, contextManifest.artifactId, contextPack.artifactId]) {
@@ -176,7 +176,7 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
                 {
                   role: "system",
                   content:
-                    "You are Atlas planning assistant. Produce a concise implementation contract draft in Markdown."
+                    "You are Sigil planning assistant. Produce a concise implementation contract draft in Markdown."
                 },
                 { role: "user", content: prompt }
               ],
@@ -191,13 +191,13 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
         schema_version: 2,
         content_version: artifacts.filter((artifact) => artifact.type === "ai_planning_draft").length + 1,
         created_at: now,
-        producer: { type: "atlas" },
+        producer: { type: "sigil" },
         sensitivity: "confidential",
         parents: [taskBrief.artifactId, contextManifest.artifactId, contextPack.artifactId, artifactId],
         content_sha256: "0".repeat(64),
         metadata: {
           planning_package_artifact_id: artifactId,
-          next_gate: "atlas contract import <file>",
+          next_gate: "sigil contract import <file>",
           data_egress: {
             destination: isCloudAiProvider(options.ai.provider) ? "cloud" : "local",
             consent: options.ai.cloudDataConsent === true,
@@ -236,7 +236,7 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
         mediaType: "application/json",
         sensitivity: "confidential",
         status: aiDraft.ready_label === "blocked" ? "rejected" : "valid",
-        producerType: "atlas",
+        producerType: "sigil",
         createdAt: now
       });
       for (const dependsOnArtifactId of [taskBrief.artifactId, contextManifest.artifactId, contextPack.artifactId, artifactId]) {
@@ -254,7 +254,7 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "planning.exported",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: options.ai === undefined ? "Planning package exported" : "AI-assisted planning package exported",
       metadata: {
@@ -268,10 +268,10 @@ export async function exportPlanningPackage(options: ExportPlanningPackageInput 
       planningArtifactId: artifactId,
       ...(aiPlanningDraftArtifactId === undefined ? {} : { aiPlanningDraftArtifactId }),
       state: next,
-      nextCommand: "atlas contract import <file>"
+      nextCommand: "sigil contract import <file>"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
@@ -286,7 +286,7 @@ function renderAiPlanningPrompt(input: {
   readonly contextPackId: string;
   readonly contextPackHash: string;
 }): string {
-  return `Create an implementation contract draft for Atlas.
+  return `Create an implementation contract draft for Sigil.
 
 Hard requirements:
 - Reference task brief ${input.taskBriefId} (${input.taskBriefHash}).
@@ -318,7 +318,7 @@ function renderPlanningMarkdown(input: {
   readonly contextManifest: string;
   readonly contextPack: string;
 }): string {
-  return `# Atlas Planning Package
+  return `# Sigil Planning Package
 
 Session: ${input.sessionId}
 

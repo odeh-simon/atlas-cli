@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import ts from "typescript";
-import { redactSecretText } from "@atlas/security";
+import { redactSecretText } from "@sigil/security";
 
 export type ContextSourceKind = "file" | "instruction" | "test" | "operation" | "evidence";
 export type ContextCategory = "source" | "test" | "architecture" | "contract" | "schema" | "migration" | "operation" | "config" | "instruction";
@@ -130,7 +130,7 @@ export interface DiscoveryGap {
 }
 
 export interface ContextDiscoveryResult {
-  readonly algorithm: { readonly name: "atlas-semantic-context"; readonly version: "3.0.0" };
+  readonly algorithm: { readonly name: "sigil-semantic-context"; readonly version: "3.0.0" };
   readonly configSha256: string;
   readonly effectiveConfig: ContextDiscoveryConfig;
   readonly taskTerms: readonly string[];
@@ -187,7 +187,7 @@ const defaults: ContextDiscoveryConfig = {
   requireResolvedImports: false
 };
 
-const excludedDirectories = new Set([".atlas", ".git", ".next", ".turbo", "build", "coverage", "dist", "node_modules", "out", "target"]);
+const excludedDirectories = new Set([".sigil", ".git", ".next", ".turbo", "build", "coverage", "dist", "node_modules", "out", "target"]);
 const excludedFileNames = new Set(["pnpm-lock.yaml", "package-lock.json", "yarn.lock"]);
 const includedExtensions = new Set([".cjs", ".css", ".html", ".js", ".json", ".jsx", ".md", ".mjs", ".ts", ".tsx", ".txt", ".yaml", ".yml"]);
 const semanticExtensions = new Set([".cjs", ".js", ".jsx", ".mjs", ".ts", ".tsx"]);
@@ -224,16 +224,16 @@ interface RawRelation {
 }
 
 export function readContextDiscoveryConfig(rootPath: string): { readonly config: ContextDiscoveryConfig; readonly sha256: string } {
-  const configPath = join(rootPath, "atlas.config.json");
+  const configPath = join(rootPath, "sigil.config.json");
   if (!existsSync(configPath)) return effectiveConfig(undefined);
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(configPath, "utf8")) as unknown;
   } catch (error) {
-    throw new ContextConfigurationError(`atlas.config.json is malformed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new ContextConfigurationError(`sigil.config.json is malformed: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new ContextConfigurationError("atlas.config.json must be an object");
+    throw new ContextConfigurationError("sigil.config.json must be an object");
   }
   const context = (parsed as Record<string, unknown>).context;
   return effectiveConfig(context);
@@ -377,7 +377,7 @@ export function discoverContextSources(options: ContextDiscoveryOptions): Contex
   const omittedScanCount = listed.omittedCount + Math.max(0, candidates.length - selectionItems.length);
   const freshness = omittedScanCount > 0 || excludedCandidates.length > 0 || graphTruncated ? "partial" : "fresh";
   return {
-    algorithm: { name: "atlas-semantic-context", version: "3.0.0" },
+    algorithm: { name: "sigil-semantic-context", version: "3.0.0" },
     configSha256,
     effectiveConfig: config,
     taskTerms,
@@ -938,7 +938,7 @@ function categoryForPath(uri: string, content: string, config: ContextDiscoveryC
   if (/(^|\/)(schema|schemas)(\/|$)|schema\.[^.]+$/.test(lower)) return "schema";
   if (/(^|\/)(migration|migrations)(\/|$)/.test(lower)) return "migration";
   if (/(^|\/)(runbook|runbooks|ops|operations)(\/|$)|dockerfile|compose\.ya?ml$/.test(lower)) return "operation";
-  if (/(^|\/)(package\.json|tsconfig[^/]*\.json|atlas\.config\.json|vite\.config\.|vitest\.config\.|eslint)/.test(lower)) return "config";
+  if (/(^|\/)(package\.json|tsconfig[^/]*\.json|sigil\.config\.json|vite\.config\.|vitest\.config\.|eslint)/.test(lower)) return "config";
   return "source";
 }
 

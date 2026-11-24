@@ -17,7 +17,7 @@ import {
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-lifecycle-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-lifecycle-"));
   tempRoots.push(root);
   return root;
 }
@@ -43,7 +43,7 @@ describe("lifecycle overlays", () => {
     const imported = await importContextManifest({ cwd, env, filePath: manifestPath });
 
     expect(paused.session.paused).toBe(true);
-    expect(pausedStatus.nextCommands).toEqual(["atlas resume"]);
+    expect(pausedStatus.nextCommands).toEqual(["sigil resume"]);
     expect(resumed.session.paused).toBe(false);
     expect(imported.state).toBe("context_ready");
   });
@@ -62,7 +62,7 @@ describe("lifecycle overlays", () => {
     const imported = await importContextManifest({ cwd, env, filePath: manifestPath });
 
     expect(archived.session.archived).toBe(true);
-    expect(archivedStatus.nextCommands).toEqual(["atlas unarchive"]);
+    expect(archivedStatus.nextCommands).toEqual(["sigil unarchive"]);
     expect(unarchived.session.archived).toBe(false);
     expect(imported.state).toBe("context_ready");
   });
@@ -91,7 +91,7 @@ describe("lifecycle overlays", () => {
 
 async function prepareStartedSession(root: string) {
   const cwd = join(root, "repo");
-  const env = { ATLAS_HOME: join(root, "home") };
+  const env = { SIGIL_HOME: join(root, "home") };
   mkdirSync(cwd, { recursive: true });
   writeFileSync(join(cwd, "README.md"), "fixture\n");
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });

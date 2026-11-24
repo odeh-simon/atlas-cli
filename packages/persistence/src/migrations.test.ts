@@ -9,7 +9,7 @@ const tempRoots: string[] = [];
 const now = () => new Date("2026-07-12T12:00:00.000Z");
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-persistence-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-persistence-"));
   tempRoots.push(root);
   return root;
 }
@@ -23,7 +23,7 @@ afterEach(() => {
 describe("migration harness", () => {
   it("applies sorted migrations and records checksums", async () => {
     const root = tempRoot();
-    const dbPath = join(root, "atlas.db");
+    const dbPath = join(root, "sigil.db");
     const result = await applyMigrations({
       dbPath,
       backupDirectory: join(root, "backups"),
@@ -45,7 +45,7 @@ describe("migration harness", () => {
 
   it("skips migrations that were already applied with the same checksum", async () => {
     const root = tempRoot();
-    const dbPath = join(root, "atlas.db");
+    const dbPath = join(root, "sigil.db");
     const migrations = [{ version: 1, name: "create_marker", sql: "CREATE TABLE marker (id INTEGER PRIMARY KEY);" }];
 
     await applyMigrations({ dbPath, backupDirectory: join(root, "backups"), now, migrations });
@@ -57,7 +57,7 @@ describe("migration harness", () => {
 
   it("restores the previous database when a migration fails", async () => {
     const root = tempRoot();
-    const dbPath = join(root, "atlas.db");
+    const dbPath = join(root, "sigil.db");
     await applyMigrations({
       dbPath,
       backupDirectory: join(root, "backups"),
@@ -89,7 +89,7 @@ describe("migration harness", () => {
 describe("evidence index core migration (v7)", () => {
   it("applies v7 on a fresh database and creates the additive evidence tables", async () => {
     const root = tempRoot();
-    const dbPath = join(root, "atlas.db");
+    const dbPath = join(root, "sigil.db");
 
     const result = await applyMigrations({
       dbPath,
@@ -129,7 +129,7 @@ describe("evidence index core migration (v7)", () => {
 
   it("applies v8 on a pre-existing v7 database and preserves evidence rows", async () => {
     const root = tempRoot();
-    const dbPath = join(root, "atlas.db");
+    const dbPath = join(root, "sigil.db");
 
     await applyMigrations({
       dbPath,
@@ -166,7 +166,7 @@ describe("evidence index core migration (v7)", () => {
 
   it("applies v7 on a pre-existing v6 database and preserves legacy rows", async () => {
     const root = tempRoot();
-    const dbPath = join(root, "atlas.db");
+    const dbPath = join(root, "sigil.db");
 
     await applyMigrations({
       dbPath,

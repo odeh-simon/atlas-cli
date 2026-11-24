@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-export const adaptersFigmaPackage = "@atlas/adapters-figma";
+export const adaptersFigmaPackage = "@sigil/adapters-figma";
 
 export interface FigmaAdapterHealth {
   readonly provider: "figma";

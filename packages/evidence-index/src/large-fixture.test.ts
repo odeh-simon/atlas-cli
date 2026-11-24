@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { CancellationError } from "@atlas/domain";
+import { CancellationError } from "@sigil/domain";
 import {
   getEvidenceIndexSnapshotPayload,
   readCurrentIndexSnapshot,
   saveDatabase
-} from "@atlas/persistence";
+} from "@sigil/persistence";
 
 import { updateEvidenceIndex } from "./engine.js";
 
@@ -17,7 +17,7 @@ const tempRoots: string[] = [];
 const NOW = () => new Date("2026-08-05T06:00:00.000Z");
 const TARGET_FILES = 2000;
 
-function tempRoot(prefix = "atlas-evidence-large-"): string {
+function tempRoot(prefix = "sigil-evidence-large-"): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   tempRoots.push(root);
   return root;
@@ -85,8 +85,8 @@ describe.skipIf(!commandSucceedsGit())("large fixture performance and safety", (
     const repo = tempRoot();
     const stats = generateFixture(repo);
     git(repo, ["init"]);
-    git(repo, ["config", "user.name", "Atlas Test"]);
-    git(repo, ["config", "user.email", "atlas@example.test"]);
+    git(repo, ["config", "user.name", "Sigil Test"]);
+    git(repo, ["config", "user.email", "sigil@example.test"]);
     git(repo, ["add", "."]);
     git(repo, ["commit", "-m", "fixture"]);
 
@@ -142,8 +142,8 @@ describe.skipIf(!commandSucceedsGit())("large fixture performance and safety", (
     const repo = tempRoot();
     generateFixture(repo, 600);
     git(repo, ["init"]);
-    git(repo, ["config", "user.name", "Atlas Test"]);
-    git(repo, ["config", "user.email", "atlas@example.test"]);
+    git(repo, ["config", "user.name", "Sigil Test"]);
+    git(repo, ["config", "user.email", "sigil@example.test"]);
     git(repo, ["add", "."]);
     git(repo, ["commit", "-m", "fixture"]);
 
@@ -174,8 +174,8 @@ describe.skipIf(!commandSucceedsGit())("large fixture performance and safety", (
     const repo = tempRoot();
     generateFixture(repo, 300);
     git(repo, ["init"]);
-    git(repo, ["config", "user.name", "Atlas Test"]);
-    git(repo, ["config", "user.email", "atlas@example.test"]);
+    git(repo, ["config", "user.name", "Sigil Test"]);
+    git(repo, ["config", "user.email", "sigil@example.test"]);
     git(repo, ["add", "."]);
     git(repo, ["commit", "-m", "fixture"]);
 
@@ -217,20 +217,20 @@ function commandSucceedsGit(): boolean {
   }
 }
 
-async function openEngineDbSafe(root: string): Promise<{ dbPath: string; db: Awaited<ReturnType<typeof import("@atlas/persistence").openDatabase>> }> {
+async function openEngineDbSafe(root: string): Promise<{ dbPath: string; db: Awaited<ReturnType<typeof import("@sigil/persistence").openDatabase>> }> {
   await migrateEngineDb(root);
   return openExistingEngineDb(root);
 }
 
 function evidenceDbPathFor(root: string): string {
-  const dataDir = join(tmpdir(), `atlas-evdb-lg-${basename(root)}`);
+  const dataDir = join(tmpdir(), `sigil-evdb-lg-${basename(root)}`);
   mkdirSync(dataDir, { recursive: true });
   tempRoots.push(dataDir);
-  return join(dataDir, "atlas.db");
+  return join(dataDir, "sigil.db");
 }
 
 async function migrateEngineDb(root: string): Promise<void> {
-  const { applyMigrations, coreMigrations } = await import("@atlas/persistence");
+  const { applyMigrations, coreMigrations } = await import("@sigil/persistence");
   await applyMigrations({
     dbPath: evidenceDbPathFor(root),
     backupDirectory: join(dirname(evidenceDbPathFor(root)), "backups"),
@@ -239,8 +239,8 @@ async function migrateEngineDb(root: string): Promise<void> {
   });
 }
 
-async function openExistingEngineDb(root: string): Promise<{ dbPath: string; db: Awaited<ReturnType<typeof import("@atlas/persistence").openDatabase>> }> {
-  const { openDatabase } = await import("@atlas/persistence");
+async function openExistingEngineDb(root: string): Promise<{ dbPath: string; db: Awaited<ReturnType<typeof import("@sigil/persistence").openDatabase>> }> {
+  const { openDatabase } = await import("@sigil/persistence");
   const dbPath = evidenceDbPathFor(root);
   return { dbPath, db: await openDatabase(dbPath) };
 }

@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getStatus, openAtlasRuntime, prepareFixBatch } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { getStatus, openSigilRuntime, prepareFixBatch } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 import { prepareReviewImported } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-fix-batch-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-fix-batch-"));
   tempRoots.push(root);
   return root;
 }
@@ -29,15 +29,15 @@ describe("prepareFixBatch", () => {
 
     const result = await prepareFixBatch({ cwd, env });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const fixBatches = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "fix_batch"
     );
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result.state).toBe("fix_ready");
     expect(result.findingIds).toEqual(["REV-001"]);
-    expect(status.nextCommands[0]).toBe("atlas implement export --manual");
+    expect(status.nextCommands[0]).toBe("sigil implement export --manual");
     expect(fixBatches).toHaveLength(1);
   });
 });

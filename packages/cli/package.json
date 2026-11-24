@@ -1,11 +1,11 @@
 {
-  "name": "@atlas/cli",
+  "name": "@sigil/cli",
   "version": "0.0.0",
   "type": "module",
   "private": true,
-  "description": "Atlas local-first workflow orchestration CLI",
+  "description": "Sigil local-first workflow orchestration CLI",
   "bin": {
-    "atlas": "./dist/index.js"
+    "sigil": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -22,18 +22,18 @@
     "check": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@atlas/adapters-claude-code": "workspace:*",
-    "@atlas/adapters-codex": "workspace:*",
-    "@atlas/adapters-figma": "workspace:*",
-    "@atlas/adapters-github": "workspace:*",
-    "@atlas/adapters-linear": "workspace:*",
-    "@atlas/app-services": "workspace:*",
-    "@atlas/checks": "workspace:*",
-    "@atlas/diagnostics": "workspace:*",
-    "@atlas/domain": "workspace:*",
-    "@atlas/git": "workspace:*",
-    "@atlas/llm": "workspace:*",
-    "@atlas/security": "workspace:*"
+    "@sigil/adapters-claude-code": "workspace:*",
+    "@sigil/adapters-codex": "workspace:*",
+    "@sigil/adapters-figma": "workspace:*",
+    "@sigil/adapters-github": "workspace:*",
+    "@sigil/adapters-linear": "workspace:*",
+    "@sigil/app-services": "workspace:*",
+    "@sigil/checks": "workspace:*",
+    "@sigil/diagnostics": "workspace:*",
+    "@sigil/domain": "workspace:*",
+    "@sigil/git": "workspace:*",
+    "@sigil/llm": "workspace:*",
+    "@sigil/security": "workspace:*"
   },
   "devDependencies": {
     "@types/pngjs": "^6.0.5",

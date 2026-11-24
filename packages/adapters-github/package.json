@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/adapters-github",
+  "name": "@sigil/adapters-github",
   "version": "0.0.0",
   "type": "module",
   "private": true,

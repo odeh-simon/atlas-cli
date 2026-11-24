@@ -3,14 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { CancellationError } from "@atlas/domain";
+import { CancellationError } from "@sigil/domain";
 import {
   abandonForeignRunningBuilds,
   getEvidenceIndexSnapshotPayload,
   queryOne,
   readCurrentIndexSnapshot,
   saveDatabase
-} from "@atlas/persistence";
+} from "@sigil/persistence";
 
 import { updateEvidenceIndex } from "./engine.js";
 import { createCommittedRepo, openEngineDb } from "./test-helpers.js";
@@ -18,7 +18,7 @@ import { createCommittedRepo, openEngineDb } from "./test-helpers.js";
 const tempRoots: string[] = [];
 const NOW = () => new Date("2026-08-03T08:00:00.000Z");
 
-function tempRoot(prefix = "atlas-evidence-cancel-"): string {
+function tempRoot(prefix = "sigil-evidence-cancel-"): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   tempRoots.push(root);
   return root;

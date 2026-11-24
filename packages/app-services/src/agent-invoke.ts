@@ -1,14 +1,14 @@
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { invokeClaudeCode } from "@atlas/adapters-claude-code";
-import { invokeCodex } from "@atlas/adapters-codex";
-import { StateTransitionError } from "@atlas/domain";
-import { addArtifactDependency, appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
-import { type ProcessRunResult } from "@atlas/process-runner";
-import { agentRunLogSchema, executionReportSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { invokeClaudeCode } from "@sigil/adapters-claude-code";
+import { invokeCodex } from "@sigil/adapters-codex";
+import { StateTransitionError } from "@sigil/domain";
+import { addArtifactDependency, appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@sigil/persistence";
+import { type ProcessRunResult } from "@sigil/process-runner";
+import { agentRunLogSchema, executionReportSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
 import { readWorkflowGitSnapshot, type WorkflowGitChangedFile, type WorkflowGitSnapshot } from "./git-safeguards.js";
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { captureImplementationDiff } from "./implementation-diff.js";
 import { assertImplementationGitBase, readAndValidateImplementationPackage } from "./implementation-bindings.js";
 
@@ -57,7 +57,7 @@ export type AgentInvoker = (input: AgentInvokerInput) => Promise<AgentInvocation
 export async function invokeImplementationAgent(
   input: InvokeImplementationAgentInput
 ): Promise<InvokeImplementationAgentResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -271,10 +271,10 @@ export async function invokeImplementationAgent(
       agentClaimsComplete: report.agent_claims_complete ?? false,
       changedFiles: report.changed_files,
       state: next,
-      nextCommand: "atlas checks run"
+      nextCommand: "sigil checks run"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
@@ -316,7 +316,7 @@ interface ParsedAgentCompletionReport {
 }
 
 function parseAgentCompletionReport(stdout: string, stderr: string): ParsedAgentCompletionReport {
-  const marker = "ATLAS_EXECUTION_REPORT_JSON:";
+  const marker = "SIGIL_EXECUTION_REPORT_JSON:";
   const line = `${stdout}\n${stderr}`
     .split(/\r?\n/)
     .map((candidate) => candidate.trim())
@@ -348,7 +348,7 @@ function parseAgentCompletionReport(stdout: string, stderr: string): ParsedAgent
       present: true,
       agentClaimsComplete: false,
       changedFiles: [],
-      limitations: ["Agent emitted malformed ATLAS_EXECUTION_REPORT_JSON"]
+      limitations: ["Agent emitted malformed SIGIL_EXECUTION_REPORT_JSON"]
     };
   }
 }

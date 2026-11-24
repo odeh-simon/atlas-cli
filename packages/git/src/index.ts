@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
-import { GitSafetyError } from "@atlas/domain";
+import { GitSafetyError } from "@sigil/domain";
 
-export const gitPackage = "@atlas/git";
+export const gitPackage = "@sigil/git";
 
 export interface GitAdapterOptions {
   readonly cwd?: string | undefined;

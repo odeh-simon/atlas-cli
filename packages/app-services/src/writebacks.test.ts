@@ -10,7 +10,7 @@ import { prepareApprovedContract } from "./test-support.js";
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-writebacks-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-writebacks-"));
   tempRoots.push(root);
   return root;
 }
@@ -32,7 +32,7 @@ describe("recordAdapterWriteback", () => {
       mode: "dry-run",
       status: "prepared",
       target: "CLI-103",
-      summary: "Atlas would post completion evidence."
+      summary: "Sigil would post completion evidence."
     });
 
     const artifact = readLatestJsonArtifact(root, result.sessionId, "adapter_writeback");

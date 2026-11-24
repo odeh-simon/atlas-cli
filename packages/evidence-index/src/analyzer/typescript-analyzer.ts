@@ -2,7 +2,7 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import ts from "typescript";
 
-import { CancellationError, PersistenceError, deriveId, stableHash } from "@atlas/domain";
+import { CancellationError, PersistenceError, deriveId, stableHash } from "@sigil/domain";
 import {
   TYPESCRIPT_ANALYZER_NAME,
   TYPESCRIPT_ANALYZER_VERSION,
@@ -12,7 +12,7 @@ import {
   type EvidenceSymbol,
   type EvidenceTestAssociation,
   type EvidenceConfigEvidence
-} from "@atlas/schemas";
+} from "@sigil/schemas";
 
 export const TYPESCRIPT_ANALYZER_FINGERPRINT = fingerprintForAnalyzer();
 
@@ -369,7 +369,7 @@ export function createTypeScriptAnalyzer(): EvidenceAnalyzer {
 
       // Config evidence
       for (const cand of candidates) {
-        if (cand.file.uri.endsWith("package.json") || cand.file.uri.endsWith("tsconfig.json") || cand.file.uri === "atlas.config.json") {
+        if (cand.file.uri.endsWith("package.json") || cand.file.uri.endsWith("tsconfig.json") || cand.file.uri === "sigil.config.json") {
           configEvidence.push({
             config_evidence_id: deriveId("evcfg", [input.repositoryId, cand.file.uri, cand.sha]),
             uri: cand.file.uri,
@@ -406,7 +406,7 @@ export function createTypeScriptAnalyzer(): EvidenceAnalyzer {
 
       // Determine status
       let status: typeof gaps[0]["severity"] extends string ? string : never = "completed";
-      let analyzerStatus: import("@atlas/schemas").AnalyzerStatus = "completed";
+      let analyzerStatus: import("@sigil/schemas").AnalyzerStatus = "completed";
       if (input.signal?.aborted) analyzerStatus = "cancelled";
       else if (gaps.some((g) => g.severity === "blocking" && g.blocking)) analyzerStatus = "failed";
       else if (truncated || gaps.some((g) => g.severity === "warning")) analyzerStatus = "partial";

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-export const adaptersLinearPackage = "@atlas/adapters-linear";
+export const adaptersLinearPackage = "@sigil/adapters-linear";
 
 export interface LinearAdapterHealth {
   readonly provider: "linear";
@@ -83,7 +83,7 @@ export async function commentLinearIssue(input: CommentLinearIssueInput): Promis
       authorization: input.apiKey
     },
     body: JSON.stringify({
-      query: `mutation AtlasComment($issueId: String!, $body: String!) {
+      query: `mutation SigilComment($issueId: String!, $body: String!) {
         commentCreate(input: { issueId: $issueId, body: $body }) {
           success
           comment { id }
@@ -125,7 +125,7 @@ export async function fetchLinearIssue(input: FetchLinearIssueInput): Promise<Li
       authorization: input.apiKey
     },
     body: JSON.stringify({
-      query: `query AtlasIssue($id: String!) {
+      query: `query SigilIssue($id: String!) {
         issue(id: $id) {
           id
           identifier

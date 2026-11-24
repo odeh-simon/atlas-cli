@@ -1,1 +1,1 @@
-export const adaptersOsPackage = "@atlas/adapters-os";
+export const adaptersOsPackage = "@sigil/adapters-os";

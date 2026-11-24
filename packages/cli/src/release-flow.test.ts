@@ -16,15 +16,15 @@ afterEach(() => {
 
 describe("release workflow smoke", () => {
   it("runs the manual CLI flow from intake through audited completion", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-release-flow-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-release-flow-"));
     tempRoots.push(root);
     const repository = join(root, "repo");
-    const atlasHome = join(root, "home");
+    const sigilHome = join(root, "home");
     mkdirSync(repository, { recursive: true });
     writeFileSync(join(repository, "README.md"), "# Release flow fixture\n");
     execFileSync("git", ["init", "-b", "main"], { cwd: repository, stdio: "ignore" });
-    execFileSync("git", ["config", "user.email", "atlas-tests@example.invalid"], { cwd: repository, stdio: "ignore" });
-    execFileSync("git", ["config", "user.name", "Atlas Tests"], { cwd: repository, stdio: "ignore" });
+    execFileSync("git", ["config", "user.email", "sigil-tests@example.invalid"], { cwd: repository, stdio: "ignore" });
+    execFileSync("git", ["config", "user.name", "Sigil Tests"], { cwd: repository, stdio: "ignore" });
     execFileSync("git", ["add", "README.md"], { cwd: repository, stdio: "ignore" });
     execFileSync("git", ["commit", "-m", "fixture"], { cwd: repository, stdio: "ignore" });
     const contractPath = join(root, "contract.json");
@@ -43,14 +43,14 @@ describe("release workflow smoke", () => {
     writeFileSync(reviewPath, JSON.stringify({ summary: "Release smoke review passed.", findings: [] }));
 
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const transcript: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...values) => transcript.push(values.join(" ")));
     vi.spyOn(console, "error").mockImplementation((...values) => transcript.push(values.join(" ")));
 
     try {
       process.chdir(repository);
-      process.env.ATLAS_HOME = atlasHome;
+      process.env.SIGIL_HOME = sigilHome;
       const commands: readonly string[][] = [
         ["start", "--manual", "--title", "Release smoke", "--objective", "Prove the complete CLI flow"],
         ["context", "build"],
@@ -71,16 +71,16 @@ describe("release workflow smoke", () => {
 
       for (const command of commands) {
         const code = await main([...command]);
-        expect(code, `atlas ${command.join(" ")}\n${transcript.slice(-8).join("\n")}`).toBe(0);
+        expect(code, `sigil ${command.join(" ")}\n${transcript.slice(-8).join("\n")}`).toBe(0);
       }
 
       expect(transcript).toContain("State: completed");
       expect(transcript).toContain("Doctor: passed");
-      expect(transcript).toContain("Next: atlas complete --check");
+      expect(transcript).toContain("Next: sigil complete --check");
       expect(transcript.some((line) => line.startsWith("Writeback: art_"))).toBe(true);
-      const sessionDirectories = readdirSync(join(atlasHome, "artifacts")).filter((name) => name.startsWith("ses_"));
+      const sessionDirectories = readdirSync(join(sigilHome, "artifacts")).filter((name) => name.startsWith("ses_"));
       expect(sessionDirectories).toHaveLength(1);
-      const artifactTypes = readdirSync(join(atlasHome, "artifacts", sessionDirectories[0]!));
+      const artifactTypes = readdirSync(join(sigilHome, "artifacts", sessionDirectories[0]!));
       expect(artifactTypes).toEqual(
         expect.arrayContaining([
           "task_brief",
@@ -95,8 +95,8 @@ describe("release workflow smoke", () => {
       );
     } finally {
       process.chdir(previousCwd);
-      if (previousAtlasHome === undefined) delete process.env.ATLAS_HOME;
-      else process.env.ATLAS_HOME = previousAtlasHome;
+      if (previousSigilHome === undefined) delete process.env.SIGIL_HOME;
+      else process.env.SIGIL_HOME = previousSigilHome;
     }
   });
 });
@@ -104,7 +104,7 @@ describe("release workflow smoke", () => {
 function validContract(): Record<string, unknown> {
   return {
     status: "valid",
-    objective: { heading: "Objective", body_markdown: "Prove the packaged Atlas workflow." },
+    objective: { heading: "Objective", body_markdown: "Prove the packaged Sigil workflow." },
     scope: { in_scope: ["Release smoke"], out_of_scope: ["Live provider writes"] },
     approved_decisions: [{ id: "release-decision", decision: "Use fixtures", rationale: "Keep release tests deterministic." }],
     technical_approach: { heading: "Technical Approach", body_markdown: "Exercise every manual workflow gate." },

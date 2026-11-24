@@ -4,15 +4,15 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { openAtlasRuntime, orchestrateRun } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listFindingsForSession } from "@atlas/persistence";
+import { openSigilRuntime, orchestrateRun } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listFindingsForSession } from "@sigil/persistence";
 import { prepareCheckedImplementation } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-orchestrate-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-orchestrate-"));
   tempRoots.push(root);
   return root;
 }
@@ -45,7 +45,7 @@ describe("orchestrateRun", () => {
           exitCode: 0,
           signal: undefined,
           stdout:
-            'ATLAS_EXECUTION_REPORT_JSON: {"agent_claims_complete":true,"changed_files":["src/view.tsx"],"limitations":[]}',
+            'SIGIL_EXECUTION_REPORT_JSON: {"agent_claims_complete":true,"changed_files":["src/view.tsx"],"limitations":[]}',
           stderr: "",
           timedOut: false,
           startedAt: "2026-07-12T12:00:00.000Z",
@@ -97,9 +97,9 @@ describe("orchestrateRun", () => {
 
     expect(result.status).toBe("succeeded");
     expect(result.state).toBe("completion_ready");
-    expect(result.steps.map((step) => step.command)).toContain("atlas fix prepare");
-    expect(result.steps.map((step) => step.command)).toContain("atlas implement --agent");
-    expect(result.steps.map((step) => step.command)).not.toContain("atlas findings disposition");
+    expect(result.steps.map((step) => step.command)).toContain("sigil fix prepare");
+    expect(result.steps.map((step) => step.command)).toContain("sigil implement --agent");
+    expect(result.steps.map((step) => step.command)).not.toContain("sigil findings disposition");
     expect(reviewCalls).toBe(2);
 
     const orchestration = readLatestJsonArtifact(root, result.sessionId, "orchestration_run");
@@ -128,7 +128,7 @@ describe("orchestrateRun", () => {
           status: "succeeded",
           exitCode: 0,
           signal: undefined,
-          stdout: 'ATLAS_EXECUTION_REPORT_JSON: {"agent_claims_complete":true,"changed_files":[],"limitations":[]}',
+          stdout: 'SIGIL_EXECUTION_REPORT_JSON: {"agent_claims_complete":true,"changed_files":[],"limitations":[]}',
           stderr: "",
           timedOut: false,
           startedAt: "2026-07-12T12:00:00.000Z",
@@ -151,11 +151,11 @@ describe("orchestrateRun", () => {
     });
 
     expect(result.status).toBe("blocked");
-    const runtime = await openAtlasRuntime(prepared);
+    const runtime = await openSigilRuntime(prepared);
     try {
       expect(listFindingsForSession(runtime.db, result.sessionId).find((finding) => finding.findingId === "REV-001")?.status).toBe("open");
     } finally {
-      closeAtlasRuntime(runtime, false);
+      closeSigilRuntime(runtime, false);
     }
   });
 });

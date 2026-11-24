@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError, ValidationError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { StateTransitionError, ValidationError } from "@sigil/domain";
 import {
   appendEvent,
   addArtifactDependency,
@@ -13,12 +13,12 @@ import {
   listSessionsForRepository,
   updateFindingStatus,
   updateSessionState
-} from "@atlas/persistence";
-import { findingSchema, reviewPackageSchema, reviewReportSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { findingSchema, reviewPackageSchema, reviewReportSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { readVerifiedArtifactText } from "./evidence.js";
 
 export interface ImportReviewReportInput extends RuntimeOptions {
@@ -54,7 +54,7 @@ export interface ImportReviewReportResult {
 }
 
 export async function importReviewReport(input: ImportReviewReportInput): Promise<ImportReviewReportResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -75,7 +75,7 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
       parsedPackage.implementation_actor_id === undefined ||
       parsedPackage.implementation_run_id === undefined
     ) {
-      throw new StateTransitionError("Legacy review package lacks independent-review bindings; rerun atlas review prepare");
+      throw new StateTransitionError("Legacy review package lacks independent-review bindings; rerun sigil review prepare");
     }
     const now = new Date().toISOString();
     const artifactId = newId("art");
@@ -265,8 +265,8 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
       findingIds: report.findings.map((finding) => finding.finding_id),
       state: next,
       nextCommand: remainingOpenFindings.length > 0
-        ? "atlas findings disposition <id>"
-        : "atlas complete --check"
+        ? "sigil findings disposition <id>"
+        : "sigil complete --check"
     };
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -274,7 +274,7 @@ export async function importReviewReport(input: ImportReviewReportInput): Promis
     }
     throw error;
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

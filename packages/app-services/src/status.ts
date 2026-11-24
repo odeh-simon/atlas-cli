@@ -1,6 +1,6 @@
 import {
-  closeAtlasRuntime,
-  openAtlasRuntime,
+  closeSigilRuntime,
+  openSigilRuntime,
   repoIdForPath,
   type RuntimeOptions
 } from "./runtime.js";
@@ -11,9 +11,9 @@ import {
   listSessionsForRepository,
   type FindingRecord,
   type SessionRecord
-} from "@atlas/persistence";
-import { allowedCommands } from "@atlas/workflow-engine";
-import { contextContentPackSchema, contextManifestSchema } from "@atlas/schemas";
+} from "@sigil/persistence";
+import { allowedCommands } from "@sigil/workflow-engine";
+import { contextContentPackSchema, contextManifestSchema } from "@sigil/schemas";
 import { readVerifiedArtifactText } from "./evidence.js";
 import { assertContextManifestFresh } from "./context-pack.js";
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
@@ -36,7 +36,7 @@ export interface SessionStatus {
 }
 
 export async function getStatus(options: RuntimeOptions = {}): Promise<SessionStatus> {
-  const runtime = await openAtlasRuntime(options);
+  const runtime = await openSigilRuntime(options);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -45,7 +45,7 @@ export async function getStatus(options: RuntimeOptions = {}): Promise<SessionSt
         session: undefined,
         artifactCount: 0,
         eventCount: 0,
-        nextCommands: ["atlas start --manual --title <title> --objective <objective>"]
+        nextCommands: ["sigil start --manual --title <title> --objective <objective>"]
       };
     }
 
@@ -59,7 +59,7 @@ export async function getStatus(options: RuntimeOptions = {}): Promise<SessionSt
       ...(context === undefined ? {} : { context })
     };
   } finally {
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
   }
 }
 
@@ -76,15 +76,15 @@ function nextCommandsForSession(
   }
 
   if (session.archived) {
-    return ["atlas unarchive"];
+    return ["sigil unarchive"];
   }
 
   if (session.paused) {
-    return ["atlas resume"];
+    return ["sigil resume"];
   }
 
   if (["context_ready", "planning_ready", "contract_draft", "contract_approved"].includes(session.primaryState) && !hasSemanticContext) {
-    return ["atlas context build"];
+    return ["sigil context build"];
   }
 
   const hasOpenFindings = findings.some((finding) => finding.status === "open" || finding.status === "reopened");
@@ -179,32 +179,32 @@ function commandPriority(state: string, command: string, hasOpenFindings: boolea
 function commandToCli(command: string): string {
   switch (command) {
     case "import_context":
-      return "atlas context import <file>";
+      return "sigil context import <file>";
     case "export_plan":
-      return "atlas plan";
+      return "sigil plan";
     case "import_contract":
-      return "atlas contract import <file>";
+      return "sigil contract import <file>";
     case "approve_contract":
-      return "atlas approve contract";
+      return "sigil approve contract";
     case "export_agent_package":
-      return "atlas implement export --manual";
+      return "sigil implement export --manual";
     case "import_execution_result":
-      return "atlas execution import <file>";
+      return "sigil execution import <file>";
     case "run_basic_check":
-      return "atlas checks run";
+      return "sigil checks run";
     case "prepare_review":
-      return "atlas review prepare";
+      return "sigil review prepare";
     case "import_review":
-      return "atlas review import <file> --actor <trusted-reviewer-id>";
+      return "sigil review import <file> --actor <trusted-reviewer-id>";
     case "dispose_findings":
-      return "atlas findings disposition <id>";
+      return "sigil findings disposition <id>";
     case "prepare_fix_batch":
-      return "atlas fix prepare";
+      return "sigil fix prepare";
     case "evaluate_completion":
-      return "atlas complete --check";
+      return "sigil complete --check";
     case "approve_completion":
-      return "atlas approve completion";
+      return "sigil approve completion";
     default:
-      return `atlas ${command}`;
+      return `sigil ${command}`;
   }
 }

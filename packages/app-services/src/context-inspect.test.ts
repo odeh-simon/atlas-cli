@@ -13,10 +13,10 @@ afterEach(() => {
 
 describe("inspectContextManifest", () => {
   it("summarizes the latest context manifest without listing omitted scan files", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-context-inspect-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-context-inspect-"));
     tempRoots.push(root);
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(join(cwd, "src"), { recursive: true });
     for (let index = 0; index < 30; index += 1) {
       writeFileSync(join(cwd, "src", `file-${index}.ts`), `export const value${index} = ${index};\n`);

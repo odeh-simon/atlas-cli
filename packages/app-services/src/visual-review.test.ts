@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { getArtifactRecord } from "@atlas/persistence";
+import { getArtifactRecord } from "@sigil/persistence";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -10,11 +10,11 @@ import {
   captureVisualPage,
   compareVisualEvidence,
   importFigmaVisualEvidence,
-  openAtlasRuntime,
+  openSigilRuntime,
   runAiVisualReview,
   startManualTask
 } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
+import { closeSigilRuntime } from "./runtime.js";
 
 const tempRoots: string[] = [];
 
@@ -60,12 +60,12 @@ describe("runAiVisualReview", () => {
         };
       }
     });
-    const runtime = await openAtlasRuntime({ cwd: fixture.cwd, env: fixture.env });
+    const runtime = await openSigilRuntime({ cwd: fixture.cwd, env: fixture.env });
     const record = getArtifactRecord(runtime.db, result.reviewArtifactId);
     const artifact = JSON.parse(
       readFileSync(join(runtime.paths.artifactRoot, record?.storageUri ?? ""), "utf8")
     ) as Record<string, any>;
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result).toMatchObject({ status: "findings", findingCount: 1, blockingCount: 0 });
     expect(artifact).toMatchObject({
@@ -101,10 +101,10 @@ async function createComparisonFixture(): Promise<{
   readonly env: NodeJS.ProcessEnv;
   readonly comparisonArtifactId: string;
 }> {
-  const root = mkdtempSync(join(tmpdir(), "atlas-visual-review-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-visual-review-"));
   tempRoots.push(root);
   const cwd = join(root, "repo");
-  const env = { ATLAS_HOME: join(root, "home") };
+  const env = { SIGIL_HOME: join(root, "home") };
   const png = pngFixture();
   mkdirSync(cwd, { recursive: true });
   await startManualTask({ cwd, env, title: "Visual review", objective: "Review the dashboard against Figma" });

@@ -70,7 +70,7 @@ describe("runProcess", () => {
   });
 
   it("rejects cwd outside an allowed root", async () => {
-    const root = join(tmpdir(), `atlas-runner-${Date.now()}`);
+    const root = join(tmpdir(), `sigil-runner-${Date.now()}`);
     const allowed = join(root, "allowed");
     const outside = join(root, "outside");
     mkdirSync(allowed, { recursive: true });
@@ -93,9 +93,9 @@ describe("runProcess", () => {
   it("passes only allowlisted environment variables", async () => {
     const result = await runProcess({
       command: process.execPath,
-      args: ["-e", "console.log(`${process.env.ATLAS_ALLOWED}:${process.env.ATLAS_BLOCKED ?? 'missing'}`)"],
-      env: { ATLAS_ALLOWED: "yes", ATLAS_BLOCKED: "secret" },
-      envAllowlist: ["ATLAS_ALLOWED"]
+      args: ["-e", "console.log(`${process.env.SIGIL_ALLOWED}:${process.env.SIGIL_BLOCKED ?? 'missing'}`)"],
+      env: { SIGIL_ALLOWED: "yes", SIGIL_BLOCKED: "secret" },
+      envAllowlist: ["SIGIL_ALLOWED"]
     });
 
     expect(result.stdout.trim()).toBe("yes:missing");

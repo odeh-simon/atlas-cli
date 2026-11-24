@@ -1,4 +1,4 @@
-import { PersistenceError, type SessionDisposition, type WorkflowState, isWorkflowState } from "@atlas/domain";
+import { PersistenceError, type SessionDisposition, type WorkflowState, isWorkflowState } from "@sigil/domain";
 import type initSqlJs from "sql.js";
 
 import { optionalString, queryAll, queryOne, requiredNumber, requiredString } from "./sql.js";
@@ -50,7 +50,7 @@ export interface CreateSessionInput {
   readonly now: string;
 }
 
-export type ActorType = "user" | "atlas" | "adapter" | "agent";
+export type ActorType = "user" | "sigil" | "adapter" | "agent";
 
 export interface EventRecord {
   readonly eventId: string;

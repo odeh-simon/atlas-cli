@@ -5,8 +5,8 @@ All ADRs are `Accepted for M0 review` unless noted. Each ADR may be revisited on
 ## ADR-001: TypeScript and Node.js Platform
 
 - Status: Accepted for M0 review.
-- Context: Atlas is a cross-platform CLI integrating Git, SaaS APIs, JSON/Markdown schemas, and local processes.
-- Decision: Implement Atlas in TypeScript on Node.js.
+- Context: Sigil is a cross-platform CLI integrating Git, SaaS APIs, JSON/Markdown schemas, and local processes.
+- Decision: Implement Sigil in TypeScript on Node.js.
 - Rationale: Strong ecosystem for CLIs, schemas, SaaS SDKs, Markdown, process APIs, and cross-platform packaging.
 - Alternatives considered: Go for static binary; Rust for safety; Python for scripting speed.
 - Consequences: Requires Node runtime and dependency governance; faster adapter development.
@@ -96,10 +96,10 @@ All ADRs are `Accepted for M0 review` unless noted. Each ADR may be revisited on
 
 - Decision: Canonical artifacts live under user data directory; optional gitignored project mirror/link is allowed.
 - Rationale: Avoids committing sensitive handoff content by default.
-- Alternatives: Project-local `.atlas` by default; DB-only.
+- Alternatives: Project-local `.sigil` by default; DB-only.
 - Consequences: Sessions are machine-local unless exported.
 - Risks: Discoverability lower.
-- Mitigations: `atlas status` paths and export.
+- Mitigations: `sigil status` paths and export.
 - PRD: OQ-003, OQ-010, AT-ART-001.
 - Revisit when: Team sharing becomes V2 scope.
 
@@ -116,9 +116,9 @@ All ADRs are `Accepted for M0 review` unless noted. Each ADR may be revisited on
 
 ## ADR-011: Project Configuration Location
 
-- Decision: Use `atlas.config.json` at repo root for secret-free project config and `atlas.local.json` for machine-local overrides.
+- Decision: Use `sigil.config.json` at repo root for secret-free project config and `sigil.local.json` for machine-local overrides.
 - Rationale: Explicit, portable, easy to validate.
-- Alternatives: `.atlas/config.json`, package.json field.
+- Alternatives: `.sigil/config.json`, package.json field.
 - Consequences: Adds root file if committed.
 - Risks: Repo noise or accidental secrets.
 - Mitigations: schema rejects secret values; local file gitignored by init.

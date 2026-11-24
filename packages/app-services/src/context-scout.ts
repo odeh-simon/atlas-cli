@@ -2,26 +2,26 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { discoverContextSources } from "@atlas/context-discovery";
-import { StateTransitionError, ValidationError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { discoverContextSources } from "@sigil/context-discovery";
+import { StateTransitionError, ValidationError } from "@sigil/domain";
 import {
   assertAiDataConsent,
   createAiCompletion,
   isCloudAiProvider,
   type AiProviderConfig,
   type AiCompletionResponse
-} from "@atlas/llm";
+} from "@sigil/llm";
 import {
   addArtifactDependency,
   appendEvent,
   createArtifactRecord,
   listArtifactsForSession,
   listSessionsForRepository
-} from "@atlas/persistence";
-import { aiContextRecommendationSchema } from "@atlas/schemas";
+} from "@sigil/persistence";
+import { aiContextRecommendationSchema } from "@sigil/schemas";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface RunAiContextScoutInput extends RuntimeOptions {
   readonly provider: AiProviderConfig;
@@ -54,7 +54,7 @@ const scoutResponseSchema = z.object({
 
 export async function runAiContextScout(input: RunAiContextScoutInput): Promise<RunAiContextScoutResult> {
   assertAiDataConsent(input.provider, "code-context", input.cloudDataConsent);
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -101,7 +101,7 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
               {
                 role: "system",
                 content:
-                  "You are Atlas context scout. Return strict JSON with recommendations, missing_context, and questions."
+                  "You are Sigil context scout. Return strict JSON with recommendations, missing_context, and questions."
               },
               { role: "user", content: prompt }
             ],
@@ -118,7 +118,7 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       schema_version: 1,
       content_version: artifacts.filter((artifact) => artifact.type === "ai_context_recommendation").length + 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [taskBrief.artifactId],
       content_sha256: "0".repeat(64),
@@ -162,7 +162,7 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       mediaType: "application/json",
       sensitivity: "confidential",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     addArtifactDependency(runtime.db, {
@@ -174,7 +174,7 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "context.ai_scouted",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "AI context recommendation created",
       metadata: {
@@ -191,7 +191,7 @@ export async function runAiContextScout(input: RunAiContextScoutInput): Promise<
       missingContextCount: recommendation.missing_context.length
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

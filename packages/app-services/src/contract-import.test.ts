@@ -10,23 +10,23 @@ import {
   exportPlanningPackage,
   getStatus,
   importContract,
-  openAtlasRuntime,
+  openSigilRuntime,
   startManualTask
 } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-contract-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-contract-"));
   tempRoots.push(root);
   return root;
 }
 
 async function preparePlanning(root: string) {
   const cwd = join(root, "repo");
-  const env = { ATLAS_HOME: join(root, "home") };
+  const env = { SIGIL_HOME: join(root, "home") };
   mkdirSync(cwd, { recursive: true });
   writeFileSync(join(cwd, "README.md"), "# Fixture\n");
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
@@ -74,7 +74,7 @@ describe("importContract", () => {
 
     expect(result.state).toBe("contract_draft");
     expect(status.session?.primaryState).toBe("contract_draft");
-    expect(status.nextCommands[0]).toBe("atlas approve contract");
+    expect(status.nextCommands[0]).toBe("sigil approve contract");
   });
 
   it("stores an invalid contract as rejected without advancing state", async () => {
@@ -88,11 +88,11 @@ describe("importContract", () => {
       "Implementation contract failed validation"
     );
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const contracts = listArtifactsForSession(runtime.db, status.session?.sessionId ?? "").filter(
       (artifact) => artifact.type === "implementation_contract"
     );
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(status.session?.primaryState).toBe("planning_ready");
     expect(contracts[0]?.status).toBe("rejected");
@@ -113,12 +113,12 @@ describe("importContract", () => {
     writeFileSync(contractPath, JSON.stringify(changed));
     const imported = await importContract({ cwd, env, filePath: contractPath });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const contracts = listArtifactsForSession(runtime.db, imported.sessionId).filter(
       (artifact) => artifact.type === "implementation_contract"
     );
     const latest = contracts.at(-1);
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(imported.state).toBe("contract_draft");
     expect(status.session?.primaryState).toBe("contract_draft");

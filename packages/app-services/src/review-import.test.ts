@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getStatus, importReviewReport, openAtlasRuntime } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { createFinding, listArtifactsForSession, listFindingsForSession } from "@atlas/persistence";
+import { getStatus, importReviewReport, openSigilRuntime } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { createFinding, listArtifactsForSession, listFindingsForSession } from "@sigil/persistence";
 import { prepareReviewReady } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-review-import-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-review-import-"));
   tempRoots.push(root);
   return root;
 }
@@ -48,13 +48,13 @@ describe("importReviewReport", () => {
 
     const result = await importReviewReport({ cwd, env, filePath: reviewPath, reviewerActorId: "human:reviewer" });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const findings = listFindingsForSession(runtime.db, result.sessionId);
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result.state).toBe("review_imported");
     expect(status.session?.primaryState).toBe("review_imported");
-    expect(status.nextCommands[0]).toBe("atlas findings disposition <id>");
+    expect(status.nextCommands[0]).toBe("sigil findings disposition <id>");
     expect(findings).toEqual([
       expect.objectContaining({
         findingId: "REV-001",
@@ -98,7 +98,7 @@ describe("importReviewReport", () => {
   it("does not resolve findings from free-form or substring-collision evidence", async () => {
     const root = tempRoot();
     const { cwd, env } = await prepareReviewReady(root);
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const sessionId = runtime.db.exec("SELECT session_id FROM sessions")[0]?.values[0]?.[0] as string;
     const reviewPackage = listArtifactsForSession(runtime.db, sessionId).filter((artifact) => artifact.type === "review_package").at(-1);
     const parsedPackage = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, reviewPackage?.storageUri ?? ""), "utf8")) as {
@@ -118,7 +118,7 @@ describe("importReviewReport", () => {
       status: "open",
       now: new Date().toISOString()
     });
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
 
     await expect(importReviewReport({
       cwd,

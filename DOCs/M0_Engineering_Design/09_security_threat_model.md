@@ -4,16 +4,16 @@
 
 ```mermaid
 flowchart LR
-    User["User"] --> Atlas["Atlas trusted core"]
-    Repo["Repository files\nuntrusted"] --> Atlas
-    Imports["Imported contracts/reviews\nuntrusted"] --> Atlas
-    Agents["Coding agents\nuntrusted output"] --> Atlas
-    SaaS["Linear/GitHub/Figma\nexternal"] --> Atlas
-    OS["Local OS/keychain/processes"] <--> Atlas
+    User["User"] --> Sigil["Sigil trusted core"]
+    Repo["Repository files\nuntrusted"] --> Sigil
+    Imports["Imported contracts/reviews\nuntrusted"] --> Sigil
+    Agents["Coding agents\nuntrusted output"] --> Sigil
+    SaaS["Linear/GitHub/Figma\nexternal"] --> Sigil
+    OS["Local OS/keychain/processes"] <--> Sigil
     Models["External model services\nmanual handoff"] <--> User
 ```
 
-Atlas trusts only its signed code, validated configuration, SQLite transactions, verified artifact hashes, and explicit user approvals. Repository files, imported artifacts, SaaS text, and agent output are untrusted data.
+Sigil trusts only its signed code, validated configuration, SQLite transactions, verified artifact hashes, and explicit user approvals. Repository files, imported artifacts, SaaS text, and agent output are untrusted data.
 
 ## Threat Matrix
 
@@ -37,11 +37,11 @@ Atlas trusts only its signed code, validated configuration, SQLite transactions,
 | Tampered SQLite data | Session integrity | Local attacker | Edit DB | False approvals/state | Low/Med | User-local permissions, hashes for artifacts | Integrity checks, event invariants | Restore backup, recovery_required | Medium | NFR-005 |
 | Tampered artifact files | Contract integrity | Local attacker/tool | Modify approved file | Intent drift | Medium | SHA-256 verification | Resume/status hash check | Restore backup/re-import/reapprove | Low | AT-ART-001 |
 | Unsafe URL opening | User machine | Task content | Open `file:`/custom malicious scheme | Exfil/RCE | Medium | Scheme allowlist, optional preview | Audit open attempts | Block | Low | AT-PLN-002 |
-| Dependency supply chain | Atlas install | Package attacker | Malicious dependency | RCE/secret theft | Medium | Lockfile, scanning, provenance, minimal deps | CI security scan | Patch/revoke release | Medium | Security 12 |
+| Dependency supply chain | Sigil install | Package attacker | Malicious dependency | RCE/secret theft | Medium | Lockfile, scanning, provenance, minimal deps | CI security scan | Patch/revoke release | Medium | Security 12 |
 | Credential theft | Integration tokens | Local attacker/process | Read config/logs/artifacts | Provider compromise | Medium | Keychain aliases, redaction, no plaintext | Secret tests, doctor | Credential removal guidance | Medium | AT-AUTH-001 |
-| Cross-session leakage | Task privacy | Atlas bug/user | Wrong artifact in package | Confidential data leak | Low/Med | Session-scoped queries, dependency checks | Traceability matrix tests | Invalidate artifact, notify user | Low | NFR-009 |
+| Cross-session leakage | Task privacy | Sigil bug/user | Wrong artifact in package | Confidential data leak | Low/Med | Session-scoped queries, dependency checks | Traceability matrix tests | Invalidate artifact, notify user | Low | NFR-009 |
 | Diagnostic bundle leakage | Logs/artifacts | Support workflow | Bundle includes sensitive content | Data leak | Medium | Preview manifest, content-free default, redaction | User approval required | Delete regenerated bundle | Low | NFR-009 |
-| Unsafe repair operations | Work/session | Atlas bug | Doctor deletes/modifies user files | Data loss | Low | Repair preview, no repo mutation, quarantine not delete | Audit repair plan | Restore from backup | Low | NFR-019 |
+| Unsafe repair operations | Work/session | Sigil bug | Doctor deletes/modifies user files | Data loss | Low | Repair preview, no repo mutation, quarantine not delete | Audit repair plan | Restore from backup | Low | NFR-019 |
 | Denial of service huge repos/outputs | Availability | Repo/agent | Massive files/logs/search results | Hang/disk fill | High | Budgets, timeouts, output caps | Progress/metrics | Partial results, abort, cleanup | Medium | AT-CTX-005 |
 
 ## Security Requirements for Implementation

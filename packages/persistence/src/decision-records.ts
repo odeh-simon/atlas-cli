@@ -1,4 +1,4 @@
-import { PersistenceError, type DecisionRecordKind, type MaterialChangeCategory } from "@atlas/domain";
+import { PersistenceError, type DecisionRecordKind, type MaterialChangeCategory } from "@sigil/domain";
 import type initSqlJs from "sql.js";
 
 import { optionalString, queryAll, queryOne, requiredString } from "./sql.js";

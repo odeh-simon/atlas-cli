@@ -1,21 +1,21 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { sha256Bytes } from "@atlas/artifacts";
+import { sha256Bytes } from "@sigil/artifacts";
 import {
   getActiveLock,
   listArtifactsForSession,
   listSessionsForRepository,
   type ArtifactRecord,
   type LockRecord
-} from "@atlas/persistence";
-import { hasCredential, type CredentialProvider } from "@atlas/security";
+} from "@sigil/persistence";
+import { hasCredential, type CredentialProvider } from "@sigil/security";
 
 import {
-  closeAtlasRuntime,
-  openAtlasRuntime,
+  closeSigilRuntime,
+  openSigilRuntime,
   repoIdForPath,
-  resolveAtlasPaths,
+  resolveSigilPaths,
   type RuntimeOptions
 } from "./runtime.js";
 
@@ -40,7 +40,7 @@ export interface DoctorOptions extends RuntimeOptions {
 }
 
 export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorResult> {
-  const paths = resolveAtlasPaths(options);
+  const paths = resolveSigilPaths(options);
   const runtimeVersion = options.runtimeVersion ?? process.versions.node;
   const issues: DoctorIssue[] = [
     ...inspectRuntimeVersion(runtimeVersion),
@@ -53,12 +53,12 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorResu
 
   let runtime;
   try {
-    runtime = await openAtlasRuntime(options);
+    runtime = await openSigilRuntime(options);
   } catch {
     issues.push({
       severity: "error",
       code: "storage.open_failed",
-      summary: "Atlas could not open or migrate its local data store",
+      summary: "Sigil could not open or migrate its local data store",
       recovery: `Keep the current files intact, inspect backups under ${paths.backupDirectory}, and restore the newest known-good database before retrying.`
     });
     return doctorResult({ runtimeVersion, dataRoot: paths.dataRoot, issues });
@@ -89,7 +89,7 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorResu
       issues
     });
   } finally {
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
   }
 }
 
@@ -117,8 +117,8 @@ function inspectRuntimeVersion(version: string): DoctorIssue[] {
     {
       severity: "error",
       code: "runtime.unsupported_node",
-      summary: `Node.js ${version} is unsupported; Atlas requires Node.js 22 or newer`,
-      recovery: "Install or activate Node.js 22+, rebuild Atlas, and rerun atlas doctor."
+      summary: `Node.js ${version} is unsupported; Sigil requires Node.js 22 or newer`,
+      recovery: "Install or activate Node.js 22+, rebuild Sigil, and rerun sigil doctor."
     }
   ];
 }
@@ -130,7 +130,7 @@ function inspectRecoveryFiles(dbPath: string): DoctorIssue[] {
       severity: "error",
       code: "storage.interrupted_write",
       summary: "An interrupted database write file is present",
-      recovery: "Confirm no Atlas process is running, preserve the .tmp file, and rerun doctor before deciding whether recovery is required."
+      recovery: "Confirm no Sigil process is running, preserve the .tmp file, and rerun doctor before deciding whether recovery is required."
     });
   }
   if (existsSync(`${dbPath}.failed`)) {
@@ -145,7 +145,7 @@ function inspectRecoveryFiles(dbPath: string): DoctorIssue[] {
 }
 
 function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv | undefined): DoctorIssue[] {
-  const configPath = join(cwd, "atlas.config.json");
+  const configPath = join(cwd, "sigil.config.json");
   if (!existsSync(configPath)) return [];
   let config: DoctorConfig;
   try {
@@ -155,8 +155,8 @@ function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv 
       {
         severity: "error",
         code: "config.invalid_json",
-        summary: "atlas.config.json is not valid JSON",
-        recovery: "Fix the JSON syntax or restore atlas.config.json from version control."
+        summary: "sigil.config.json is not valid JSON",
+        recovery: "Fix the JSON syntax or restore sigil.config.json from version control."
       }
     ];
   }
@@ -178,7 +178,7 @@ function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv 
         severity: "warning",
         code: "credential.missing",
         summary: `Configured ${provider} credential alias is missing: ${tokenAlias}`,
-        recovery: `Run atlas auth add --provider ${provider} --alias ${tokenAlias} --value-env <ENV_VAR>.`
+        recovery: `Run sigil auth add --provider ${provider} --alias ${tokenAlias} --value-env <ENV_VAR>.`
       });
     }
   }
@@ -190,7 +190,7 @@ function inspectConfiguredCredentialAliases(cwd: string, env: NodeJS.ProcessEnv 
         severity: "warning",
         code: "credential.missing",
         summary: `Configured AI credential alias is missing: ${tokenAlias}`,
-        recovery: `Run atlas auth add --provider ai --alias ${tokenAlias} --value-env <ENV_VAR>.`
+        recovery: `Run sigil auth add --provider ai --alias ${tokenAlias} --value-env <ENV_VAR>.`
       });
     }
   }
@@ -300,7 +300,7 @@ function inspectLock(lock: LockRecord, now: Date): DoctorIssue[] {
       severity: "warning",
       code: "lock.stale",
       summary: `Active ${lock.scope} lock is expired: ${lock.lockId}`,
-      recovery: "If no Atlas process is running, release the stale lock before continuing."
+      recovery: "If no Sigil process is running, release the stale lock before continuing."
     }
   ];
 }

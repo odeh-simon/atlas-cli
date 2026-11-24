@@ -1,8 +1,8 @@
-# Atlas Next-Actions Implementation Prompt
+# Sigil Next-Actions Implementation Prompt
 
-You are the implementation and assessment agent for the immediate Atlas production-readiness actions. Work in the existing Atlas CLI repository and prepare a reviewable result covering checkpoint/status reconciliation, test-suite reliability, and estimates for the remaining ATL backlog.
+You are the implementation and assessment agent for the immediate Sigil production-readiness actions. Work in the existing Sigil CLI repository and prepare a reviewable result covering checkpoint/status reconciliation, test-suite reliability, and estimates for the remaining ATL backlog.
 
-Do not treat this as authorization to implement later Atlas batches. Preserve all existing user work. Do not reset, clean, stash, overwrite, or silently relocate dirty files. Do not approve your own work or report an issue Done without the required independent approval evidence.
+Do not treat this as authorization to implement later Sigil batches. Preserve all existing user work. Do not reset, clean, stash, overwrite, or silently relocate dirty files. Do not approve your own work or report an issue Done without the required independent approval evidence.
 
 ## Outcome
 
@@ -18,7 +18,7 @@ Keep implementation changes limited to fixes required to make the existing valid
 
 Re-read every item below before acting; these are observations, not permission to assume the state is unchanged.
 
-- Branch: `codex/atlas-production-orchestration`.
+- Branch: `codex/sigil-production-orchestration`.
 - HEAD: `6bdc200` — `Checkpoint B3.2: incremental indexing, invalidation and historical snapshots (ATL-14)`.
 - ATL-14 and ATL-15 both showed `Backlog` in Linear, despite the B3.2 checkpoint commit and uncommitted analyzer work in the checkout.
 - The worktree was dirty. It included tracked evidence-index, persistence, schema, lockfile, release-script, and design-document changes; untracked `.freebuff/`, ATL-14/ATL-15 prompt documents, `opencode.json`, analyzer code, and analyzer tests were also present.
@@ -33,7 +33,7 @@ Re-read every item below before acting; these are observations, not permission t
 Before changing files or Linear, read:
 
 1. Repository `AGENTS.md` files and the global working agreement at `~/.agent-squad/core/AGENTS.md`.
-2. `DOCs/Atlas_Implementation_Context.md`, especially Sections 1, 5, 7–10, and 12.
+2. `DOCs/Sigil_Implementation_Context.md`, especially Sections 1, 5, 7–10, and 12.
 3. Linear issues `ATL-3`, `ATL-13`, `ATL-14`, and `ATL-15`, including dependency relations and current state history.
 4. `DOCs/ATL-14_Implementation_Prompt.md` and `DOCs/ATL-15_Implementation_Prompt.md`.
 5. The complete current `git status`, staged and unstaged diff, untracked-file inventory, and recent commit history.
@@ -44,7 +44,7 @@ The governing implementation context and issue acceptance criteria outrank this 
 ## Worktree and change-safety rules
 
 - Capture branch, HEAD, Node/pnpm versions, platform, status, and diff before any edit.
-- Inspect untracked files without printing or exposing credential contents. Do not alter `atlas.config.json`, `.freebuff/`, `opencode.json`, or other unrelated user-owned files.
+- Inspect untracked files without printing or exposing credential contents. Do not alter `sigil.config.json`, `.freebuff/`, `opencode.json`, or other unrelated user-owned files.
 - Keep one primary writer. Do not reset, checkout, rebase, amend, commit, stash, or clean the existing worktree.
 - Separate inherited changes from your own changes in the final report. Keep any new edits narrowly scoped and reviewable.
 - Do not implement ATL-16 or any later batch.
@@ -95,7 +95,7 @@ Investigate the full-suite worker timeouts without treating the passing isolated
 
 ## Required deliverables
 
-Create a concise, reviewable report at `DOCs/Atlas_Next_Actions_Assessment.md` containing:
+Create a concise, reviewable report at `DOCs/Sigil_Next_Actions_Assessment.md` containing:
 
 1. Baseline fingerprints and exact repository/Linear state observed.
 2. ATL-14 acceptance-to-evidence mapping and independent-approval state.

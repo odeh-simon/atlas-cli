@@ -1,4 +1,4 @@
-import { PersistenceError, type FindingSeverity, type FindingStatus } from "@atlas/domain";
+import { PersistenceError, type FindingSeverity, type FindingStatus } from "@sigil/domain";
 import type initSqlJs from "sql.js";
 
 import { optionalString, queryAll, queryOne, requiredNumber, requiredString } from "./sql.js";

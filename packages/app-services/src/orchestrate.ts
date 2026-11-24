@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { GateFailedError, StateTransitionError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { GateFailedError, StateTransitionError } from "@sigil/domain";
 import {
   appendEvent,
   createArtifactRecord,
   listArtifactsForSession,
   listFindingsForSession,
   listSessionsForRepository
-} from "@atlas/persistence";
-import { orchestrationRunSchema } from "@atlas/schemas";
+} from "@sigil/persistence";
+import { orchestrationRunSchema } from "@sigil/schemas";
 
 import { buildContextManifest } from "./context-build.js";
 import { evaluateCompletion } from "./completion.js";
@@ -20,7 +20,7 @@ import { invokeImplementationAgent, type AgentInvoker, type ImplementationAgentP
 import { prepareFixBatch } from "./fix-batch.js";
 import { prepareReviewPackage } from "./review-prepare.js";
 import { runBasicCheck } from "./checks.js";
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { readVerifiedArtifactText } from "./evidence.js";
 
 export type OrchestrateUntil = "context-ready" | "planning-ready" | "checks-completed" | "completion-ready";
@@ -89,32 +89,32 @@ export async function orchestrateRun(input: OrchestrateRunInput): Promise<Orches
     const state = snapshot.session.primaryState;
     if (state === "intake_ready") {
       const result = await buildContextManifest(input);
-      steps.push(step("atlas context build", state, result.state, "succeeded", "Context built", [result.contextArtifactId]));
+      steps.push(step("sigil context build", state, result.state, "succeeded", "Context built", [result.contextArtifactId]));
       continue;
     }
 
     if (state === "context_ready") {
       const result = await exportPlanningPackage(input);
-      steps.push(step("atlas plan", state, result.state, "succeeded", "Planning package exported", [result.planningArtifactId]));
+      steps.push(step("sigil plan", state, result.state, "succeeded", "Planning package exported", [result.planningArtifactId]));
       continue;
     }
 
     if (state === "planning_ready" || state === "contract_draft") {
       blockedReason = "Contract import and approval are manual gates";
-      steps.push(step("atlas contract import <file>", state, state, "blocked", blockedReason, []));
+      steps.push(step("sigil contract import <file>", state, state, "blocked", blockedReason, []));
       break;
     }
 
     if (state === "contract_approved") {
       const result = await exportManualAgentPackage(input);
-      steps.push(step("atlas implement export --manual", state, result.state, "succeeded", "Agent package exported", [result.packageArtifactId]));
+      steps.push(step("sigil implement export --manual", state, result.state, "succeeded", "Agent package exported", [result.packageArtifactId]));
       continue;
     }
 
     if (state === "implementation_ready") {
       if (input.agentProvider === undefined) {
         blockedReason = "Implementation-ready orchestration requires an agent provider";
-        steps.push(step("atlas implement --agent <codex|claude>", state, state, "blocked", blockedReason, []));
+        steps.push(step("sigil implement --agent <codex|claude>", state, state, "blocked", blockedReason, []));
         break;
       }
       const result = await invokeImplementationAgent({
@@ -124,7 +124,7 @@ export async function orchestrateRun(input: OrchestrateRunInput): Promise<Orches
         agentInvoker: input.agentInvoker
       });
       steps.push(
-        step("atlas implement --agent", state, result.state, "succeeded", "Implementation agent invoked", [
+        step("sigil implement --agent", state, result.state, "succeeded", "Implementation agent invoked", [
           result.agentRunLogArtifactId,
           result.executionReportArtifactId
         ])
@@ -134,7 +134,7 @@ export async function orchestrateRun(input: OrchestrateRunInput): Promise<Orches
 
     if (state === "implementation_reconciled") {
       const result = await runBasicCheck(input);
-      steps.push(step("atlas checks run", state, result.state, "succeeded", "Checks completed", [result.checkResultArtifactId]));
+      steps.push(step("sigil checks run", state, result.state, "succeeded", "Checks completed", [result.checkResultArtifactId]));
       continue;
     }
 
@@ -153,18 +153,18 @@ export async function orchestrateRun(input: OrchestrateRunInput): Promise<Orches
       const hasReviewReport = snapshot.artifacts.some((artifact) => artifact.type === "review_report" && artifact.status === "valid");
       if (hasReviewReport && openBlockingFindingIds(snapshot.findings).length === 0) {
         const result = await evaluateCompletion(input);
-        steps.push(step("atlas complete --check", state, result.state, "succeeded", "Completion gates passed", []));
+        steps.push(step("sigil complete --check", state, result.state, "succeeded", "Completion gates passed", []));
         continue;
       }
       const result = await prepareReviewPackage(input);
-      steps.push(step("atlas review prepare", state, result.state, "succeeded", "Review package prepared", [result.reviewPackageArtifactId]));
+      steps.push(step("sigil review prepare", state, result.state, "succeeded", "Review package prepared", [result.reviewPackageArtifactId]));
       continue;
     }
 
     if (state === "review_ready") {
       if (input.reviewer === undefined) {
         blockedReason = "Review-ready orchestration requires a reviewer or manual review import";
-        steps.push(step("atlas review import <file> --actor <trusted-reviewer-id>", state, state, "blocked", blockedReason, []));
+        steps.push(step("sigil review import <file> --actor <trusted-reviewer-id>", state, state, "blocked", blockedReason, []));
         break;
       }
       if (input.reviewerActorId === undefined || input.reviewerActorId.trim().length === 0) {
@@ -184,7 +184,7 @@ export async function orchestrateRun(input: OrchestrateRunInput): Promise<Orches
         reviewerActorId: input.reviewerActorId,
         reviewerRunId: `reviewrun_${runId}_${iteration + 1}`
       });
-      steps.push(step("atlas review import", state, result.state, "succeeded", "Review report imported", [result.reviewReportArtifactId]));
+      steps.push(step("sigil review import", state, result.state, "succeeded", "Review report imported", [result.reviewReportArtifactId]));
       continue;
     }
 
@@ -192,22 +192,22 @@ export async function orchestrateRun(input: OrchestrateRunInput): Promise<Orches
       const blockingFindings = openBlockingFindingIds(snapshot.findings);
       if (blockingFindings.length === 0) {
         const result = await evaluateCompletion(input);
-        steps.push(step("atlas complete --check", state, result.state, "succeeded", "Completion gates passed", []));
+        steps.push(step("sigil complete --check", state, result.state, "succeeded", "Completion gates passed", []));
         continue;
       }
       const result = await prepareFixBatch(input);
-      steps.push(step("atlas fix prepare", state, result.state, "succeeded", "Fix batch prepared", [result.fixBatchArtifactId]));
+      steps.push(step("sigil fix prepare", state, result.state, "succeeded", "Fix batch prepared", [result.fixBatchArtifactId]));
       continue;
     }
 
     if (state === "fix_ready") {
       const result = await exportManualAgentPackage(input);
-      steps.push(step("atlas implement export --manual", state, result.state, "succeeded", "Fix package exported", [result.packageArtifactId]));
+      steps.push(step("sigil implement export --manual", state, result.state, "succeeded", "Fix package exported", [result.packageArtifactId]));
       continue;
     }
 
     blockedReason = `No orchestrator action is available from state ${state}`;
-    steps.push(step("atlas orchestrate", state, state, "blocked", blockedReason, []));
+    steps.push(step("sigil orchestrate", state, state, "blocked", blockedReason, []));
     break;
   }
 
@@ -238,7 +238,7 @@ async function finishOrchestration(
     readonly blockedReason?: string | undefined;
   }
 ): Promise<OrchestrateRunResult> {
-  const runtime = await openAtlasRuntime(options);
+  const runtime = await openSigilRuntime(options);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
     const now = new Date().toISOString();
@@ -250,7 +250,7 @@ async function finishOrchestration(
       schema_version: 1,
       content_version: listArtifactsForSession(runtime.db, input.sessionId).filter((candidate) => candidate.type === "orchestration_run").length + 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "internal",
       parents: input.steps.flatMap((step) => step.artifact_ids),
       content_sha256: "0".repeat(64),
@@ -283,14 +283,14 @@ async function finishOrchestration(
       mediaType: "application/json",
       sensitivity: "internal",
       status: input.status === "succeeded" ? "valid" : "rejected",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
       sessionId: input.sessionId,
       eventType: "orchestration.completed",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: `Orchestration ${input.status}`,
       metadata: { orchestrationRunArtifactId: artifactId, runId: input.runId, until: input.until }
@@ -304,12 +304,12 @@ async function finishOrchestration(
       blockedReason: input.blockedReason
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
 async function readWorkflowSnapshot(options: RuntimeOptions) {
-  const runtime = await openAtlasRuntime(options);
+  const runtime = await openSigilRuntime(options);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
     return {
@@ -326,7 +326,7 @@ async function readWorkflowSnapshot(options: RuntimeOptions) {
             )
     };
   } finally {
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
   }
 }
 

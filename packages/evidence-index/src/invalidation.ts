@@ -1,9 +1,9 @@
-import { deriveId } from "@atlas/domain";
+import { deriveId } from "@sigil/domain";
 import type {
   EvidenceClassificationRow,
   EvidenceFileRow,
   EvidenceInvalidationRow
-} from "@atlas/persistence";
+} from "@sigil/persistence";
 import type {
   EvidenceApiEvidence,
   EvidenceConfigEvidence,
@@ -16,7 +16,7 @@ import type {
   EvidenceSensitivity,
   EvidenceSymbol,
   EvidenceTestAssociation
-} from "@atlas/schemas";
+} from "@sigil/schemas";
 
 import type { HashedFileEvidence } from "./scan.js";
 

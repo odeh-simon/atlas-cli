@@ -1,8 +1,8 @@
 import { basename, join } from "node:path";
 import { readFileSync } from "node:fs";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError, ValidationError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { StateTransitionError, ValidationError } from "@sigil/domain";
 import {
   addArtifactDependency,
   appendEvent,
@@ -10,16 +10,16 @@ import {
   getArtifactRecord,
   listArtifactsForSession,
   listSessionsForRepository
-} from "@atlas/persistence";
-import { figmaVisualEvidenceSchema, visualCaptureSchema, visualComparisonSchema } from "@atlas/schemas";
+} from "@sigil/persistence";
+import { figmaVisualEvidenceSchema, visualCaptureSchema, visualComparisonSchema } from "@sigil/schemas";
 import {
   comparePngImages,
   playwrightVisualCaptureAdapter,
   type CapturePageInput,
   type VisualCaptureAdapter
-} from "@atlas/visual-qa";
+} from "@sigil/visual-qa";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface CaptureVisualPageInput extends RuntimeOptions, CapturePageInput {
   readonly captureAdapter?: VisualCaptureAdapter | undefined;
@@ -76,10 +76,10 @@ export interface CompareVisualEvidenceResult {
 }
 
 export async function captureVisualPage(input: CaptureVisualPageInput): Promise<CaptureVisualPageResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
-    if (session === undefined) throw new StateTransitionError("Visual capture requires an active Atlas session");
+    if (session === undefined) throw new StateTransitionError("Visual capture requires an active Sigil session");
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     const captured = await (input.captureAdapter ?? playwrightVisualCaptureAdapter).capture(input);
     const now = new Date().toISOString();
@@ -100,7 +100,7 @@ export async function captureVisualPage(input: CaptureVisualPageInput): Promise<
       schema_version: 1,
       content_version: nextVersion(artifacts, "visual_capture"),
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [snapshot.artifactId],
       content_sha256: "0".repeat(64),
@@ -124,7 +124,7 @@ export async function captureVisualPage(input: CaptureVisualPageInput): Promise<
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "visual.captured",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "Visual snapshot captured",
       metadata: { captureArtifactId, snapshotArtifactId: snapshot.artifactId, url: captured.url }
@@ -138,7 +138,7 @@ export async function captureVisualPage(input: CaptureVisualPageInput): Promise<
       browserChannel: captured.browserChannel
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
@@ -155,10 +155,10 @@ export async function importFigmaVisualEvidence(
   if (!Number.isFinite(scale) || scale < 0.01 || scale > 4) {
     throw new ValidationError("Figma evidence scale must be between 0.01 and 4");
   }
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
-    if (session === undefined) throw new StateTransitionError("Figma visual evidence requires an active Atlas session");
+    if (session === undefined) throw new StateTransitionError("Figma visual evidence requires an active Sigil session");
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     const now = new Date().toISOString();
     const reference = storeBinaryArtifact(runtime, {
@@ -216,7 +216,7 @@ export async function importFigmaVisualEvidence(
       referenceSha256: reference.sha256
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
@@ -227,10 +227,10 @@ export async function compareVisualEvidence(input: CompareVisualEvidenceInput): 
   if ((input.actualPath === undefined) === (input.actualArtifactId === undefined)) {
     throw new ValidationError("Visual comparison requires exactly one of actualPath or actualArtifactId");
   }
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
-    if (session === undefined) throw new StateTransitionError("Visual comparison requires an active Atlas session");
+    if (session === undefined) throw new StateTransitionError("Visual comparison requires an active Sigil session");
     const artifacts = listArtifactsForSession(runtime.db, session.sessionId);
     const now = new Date().toISOString();
     const reference =
@@ -286,7 +286,7 @@ export async function compareVisualEvidence(input: CompareVisualEvidenceInput): 
       schema_version: 1,
       content_version: nextVersion(artifacts, "visual_comparison"),
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [reference.artifactId, actual.artifactId, ...(diff === undefined ? [] : [diff.artifactId])],
       content_sha256: "0".repeat(64),
@@ -326,7 +326,7 @@ export async function compareVisualEvidence(input: CompareVisualEvidenceInput): 
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "visual.compared",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: `Visual comparison ${comparison.status}`,
       metadata: { comparisonArtifactId, status: comparison.status, diffRatio: comparison.diffRatio }
@@ -343,12 +343,12 @@ export async function compareVisualEvidence(input: CompareVisualEvidenceInput): 
       diffRatio: comparison.diffRatio
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
 function storeBinaryArtifact(
-  runtime: Awaited<ReturnType<typeof openAtlasRuntime>>,
+  runtime: Awaited<ReturnType<typeof openSigilRuntime>>,
   input: {
     readonly sessionId: string;
     readonly type: "visual_snapshot" | "visual_reference" | "visual_diff";
@@ -382,14 +382,14 @@ function storeBinaryArtifact(
     mediaType: input.mediaType,
     sensitivity: "confidential",
     status: "valid",
-    producerType: "atlas",
+    producerType: "sigil",
     createdAt: input.now
   });
   return { artifactId, absolutePath: written.absolutePath, storageUri: written.storageUri, sha256: written.sha256 };
 }
 
 function storeJsonArtifact(
-  runtime: Awaited<ReturnType<typeof openAtlasRuntime>>,
+  runtime: Awaited<ReturnType<typeof openSigilRuntime>>,
   artifact: { readonly artifact_id: string; readonly session_id: string; readonly type: string; readonly content_version: number },
   now: string
 ): void {
@@ -414,13 +414,13 @@ function storeJsonArtifact(
     mediaType: "application/json",
     sensitivity: "confidential",
     status: "valid",
-    producerType: "atlas",
+    producerType: "sigil",
     createdAt: now
   });
 }
 
 function resolveVisualArtifact(
-  runtime: Awaited<ReturnType<typeof openAtlasRuntime>>,
+  runtime: Awaited<ReturnType<typeof openSigilRuntime>>,
   sessionId: string,
   artifactId: string,
   type: "visual_reference" | "visual_snapshot"

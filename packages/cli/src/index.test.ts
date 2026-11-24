@@ -11,7 +11,7 @@ const tempRoots: string[] = [];
 const gitAvailable = commandSucceeds(["--version"]);
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-cli-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-cli-"));
   tempRoots.push(root);
   return root;
 }
@@ -30,8 +30,8 @@ describe("cli", () => {
     const code = await main(["--help"]);
 
     expect(code).toBe(0);
-    expect(logs.join("\n")).toContain("atlas git status");
-    expect(logs.join("\n")).toContain("atlas git preflight");
+    expect(logs.join("\n")).toContain("sigil git status");
+    expect(logs.join("\n")).toContain("sigil git preflight");
   });
 
   it.skipIf(!gitAvailable)("prints read-only Git repository facts", async () => {
@@ -45,7 +45,7 @@ describe("cli", () => {
 
       expect(code).toBe(0);
       expect(logs).toContain(`Root: ${realpathSync(repo).replaceAll("\\", "/")}`);
-      expect(logs).toContain("Branch: atlas-test");
+      expect(logs).toContain("Branch: sigil-test");
       expect(logs.some((line) => /^HEAD: [a-f0-9]{40}$/i.test(line))).toBe(true);
       expect(logs).toContain("Dirty: no");
       expect(logs).toContain("Changed files: 0");
@@ -61,12 +61,12 @@ describe("cli", () => {
 
     try {
       process.chdir(repo);
-      const code = await main(["git", "preflight", "--base", "atlas-test", "--target", "atlas-work"]);
+      const code = await main(["git", "preflight", "--base", "sigil-test", "--target", "sigil-work"]);
 
       expect(code).toBe(0);
-      expect(logs).toContain("PASS Current branch matches base branch atlas-test");
+      expect(logs).toContain("PASS Current branch matches base branch sigil-test");
       expect(logs).toContain("PASS Working tree is clean");
-      expect(logs).toContain("PASS Target branch is available: atlas-work");
+      expect(logs).toContain("PASS Target branch is available: sigil-work");
       expect(logs).toContain("Result: pass");
     } finally {
       process.chdir(previousCwd);
@@ -81,7 +81,7 @@ describe("cli", () => {
 
     try {
       process.chdir(repo);
-      const code = await main(["git", "preflight", "--base", "atlas-test"]);
+      const code = await main(["git", "preflight", "--base", "sigil-test"]);
 
       expect(code).toBe(1);
       expect(logs.some((line) => /^FAIL Working tree is dirty with 1 changed file\(s\)$/.test(line))).toBe(true);
@@ -97,21 +97,21 @@ describe("cli", () => {
     const code = await main(["--help"]);
 
     expect(code).toBe(0);
-    expect(logs.join("\n")).toContain("atlas context build");
-    expect(logs.join("\n")).toContain("atlas context inspect");
-    expect(logs.join("\n")).toContain("atlas context summarize");
-    expect(logs.join("\n")).toContain("atlas figma inspect");
-    expect(logs.join("\n")).toContain("atlas github inspect");
-    expect(logs.join("\n")).toContain("atlas git diff-safeguards");
-    expect(logs.join("\n")).toContain("atlas checks design-scan");
-    expect(logs.join("\n")).toContain("atlas fix prepare");
-    expect(logs.join("\n")).toContain("atlas doctor");
-    expect(logs.join("\n")).toContain("atlas artifacts show");
-    expect(logs.join("\n")).toContain("atlas ai providers health");
-    expect(logs.join("\n")).toContain("atlas visual capture");
-    expect(logs.join("\n")).toContain("atlas visual compare");
-    expect(logs.join("\n")).toContain("atlas visual review");
-    expect(logs.join("\n")).toContain("atlas figma evidence");
+    expect(logs.join("\n")).toContain("sigil context build");
+    expect(logs.join("\n")).toContain("sigil context inspect");
+    expect(logs.join("\n")).toContain("sigil context summarize");
+    expect(logs.join("\n")).toContain("sigil figma inspect");
+    expect(logs.join("\n")).toContain("sigil github inspect");
+    expect(logs.join("\n")).toContain("sigil git diff-safeguards");
+    expect(logs.join("\n")).toContain("sigil checks design-scan");
+    expect(logs.join("\n")).toContain("sigil fix prepare");
+    expect(logs.join("\n")).toContain("sigil doctor");
+    expect(logs.join("\n")).toContain("sigil artifacts show");
+    expect(logs.join("\n")).toContain("sigil ai providers health");
+    expect(logs.join("\n")).toContain("sigil visual capture");
+    expect(logs.join("\n")).toContain("sigil visual compare");
+    expect(logs.join("\n")).toContain("sigil visual review");
+    expect(logs.join("\n")).toContain("sigil figma evidence");
   });
 
   it("requires a URL for visual capture", async () => {
@@ -120,7 +120,7 @@ describe("cli", () => {
     const code = await main(["visual", "capture"]);
 
     expect(code).toBe(2);
-    expect(logs).toContain("atlas visual capture requires --url <url>");
+    expect(logs).toContain("sigil visual capture requires --url <url>");
   });
 
   it("compares visual evidence and exposes the binary diff path", async () => {
@@ -135,12 +135,12 @@ describe("cli", () => {
     writeFileSync(referencePath, png);
     writeFileSync(actualPath, png);
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       await main(["start", "--manual", "--title", "Visual QA", "--objective", "Compare screenshots"]);
       logs.length = 0;
 
@@ -165,7 +165,7 @@ describe("cli", () => {
       expect(logs.join("\n")).toContain("Path:");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
     }
   });
 
@@ -181,7 +181,7 @@ describe("cli", () => {
     writeFileSync(referencePath, png);
     writeFileSync(actualPath, png);
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -200,13 +200,13 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const previousFetch = globalThis.fetch;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       await main(["start", "--manual", "--title", "Figma QA", "--objective", "Review implementation fidelity"]);
       logs.length = 0;
       expect(
@@ -249,7 +249,7 @@ describe("cli", () => {
       expect(logs.some((line) => line.startsWith("Visual review: art_"))).toBe(true);
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
       globalThis.fetch = previousFetch;
     }
   });
@@ -260,12 +260,12 @@ describe("cli", () => {
     mkdirSync(repo, { recursive: true });
     writeFileSync(join(repo, "README.md"), "# Planning fixture\n");
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
 
       const startCode = await main([
         "start",
@@ -288,7 +288,7 @@ describe("cli", () => {
       expect(logs.join("\n")).toContain("Show stored artifact content");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
     }
   });
 
@@ -299,12 +299,12 @@ describe("cli", () => {
     writeFileSync(join(repo, "src", "target.ts"), "export const target = true;\n");
     writeFileSync(join(repo, "src", "target.test.ts"), "expect(true).toBe(true);\n");
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       await main(["start", "--manual", "--title", "Target", "--objective", "Update target source"]);
       await main(["context", "build", "--max-files", "1", "--max-bytes", "1000"]);
       logs.length = 0;
@@ -321,7 +321,7 @@ describe("cli", () => {
       expect(logs.some((line) => line.includes("file budget exceeded"))).toBe(true);
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
     }
   });
 
@@ -331,20 +331,20 @@ describe("cli", () => {
     const code = await main(["--", "--help"]);
 
     expect(code).toBe(0);
-    expect(logs.join("\n")).toContain("Atlas 0.0.0");
+    expect(logs.join("\n")).toContain("Sigil 0.0.0");
   });
 
-  it("prints Atlas async errors without leaking stack traces", async () => {
+  it("prints Sigil async errors without leaking stack traces", async () => {
     const root = tempRoot();
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
 
       const code = await main(["checks", "run"]);
 
@@ -353,23 +353,23 @@ describe("cli", () => {
       expect(logs.join("\n")).not.toContain("at runBasicCheck");
     } finally {
       process.chdir(previousCwd);
-      if (previousAtlasHome === undefined) {
-        delete process.env.ATLAS_HOME;
+      if (previousSigilHome === undefined) {
+        delete process.env.SIGIL_HOME;
       } else {
-        process.env.ATLAS_HOME = previousAtlasHome;
+        process.env.SIGIL_HOME = previousSigilHome;
       }
     }
   });
 
   it("stores credential aliases from environment variables without printing secrets", async () => {
     const root = tempRoot();
-    const previousAtlasHome = process.env.ATLAS_HOME;
-    const previousToken = process.env.ATLAS_TEST_FIGMA_TOKEN;
+    const previousSigilHome = process.env.SIGIL_HOME;
+    const previousToken = process.env.SIGIL_TEST_FIGMA_TOKEN;
     const logs = captureLogs();
 
     try {
-      process.env.ATLAS_HOME = join(root, "home");
-      process.env.ATLAS_TEST_FIGMA_TOKEN = "figd_test_secret_token";
+      process.env.SIGIL_HOME = join(root, "home");
+      process.env.SIGIL_TEST_FIGMA_TOKEN = "figd_test_secret_token";
 
       const addCode = await main([
         "auth",
@@ -379,7 +379,7 @@ describe("cli", () => {
         "--alias",
         "figma.default",
         "--value-env",
-        "ATLAS_TEST_FIGMA_TOKEN"
+        "SIGIL_TEST_FIGMA_TOKEN"
       ]);
       const listCode = await main(["auth", "list"]);
 
@@ -388,8 +388,8 @@ describe("cli", () => {
       expect(logs.join("\n")).toContain("figma.default figma");
       expect(logs.join("\n")).not.toContain("figd_test_secret_token");
     } finally {
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
-      restoreEnv("ATLAS_TEST_FIGMA_TOKEN", previousToken);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
+      restoreEnv("SIGIL_TEST_FIGMA_TOKEN", previousToken);
     }
   });
 
@@ -398,7 +398,7 @@ describe("cli", () => {
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -410,14 +410,14 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
-    const previousToken = process.env.ATLAS_TEST_FIGMA_TOKEN;
+    const previousSigilHome = process.env.SIGIL_HOME;
+    const previousToken = process.env.SIGIL_TEST_FIGMA_TOKEN;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
-      process.env.ATLAS_TEST_FIGMA_TOKEN = "figd_test_secret_token";
+      process.env.SIGIL_HOME = join(root, "home");
+      process.env.SIGIL_TEST_FIGMA_TOKEN = "figd_test_secret_token";
       await main([
         "auth",
         "add",
@@ -426,7 +426,7 @@ describe("cli", () => {
         "--alias",
         "figma.default",
         "--value-env",
-        "ATLAS_TEST_FIGMA_TOKEN"
+        "SIGIL_TEST_FIGMA_TOKEN"
       ]);
 
       const code = await main(["adapters", "health"]);
@@ -437,8 +437,8 @@ describe("cli", () => {
       expect(logs).toContain("codex: configured");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
-      restoreEnv("ATLAS_TEST_FIGMA_TOKEN", previousToken);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
+      restoreEnv("SIGIL_TEST_FIGMA_TOKEN", previousToken);
     }
   });
 
@@ -447,7 +447,7 @@ describe("cli", () => {
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -489,7 +489,7 @@ describe("cli", () => {
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({ schemaVersion: 1, project: { name: "fixture", baseBranch: "main" } })
     );
     const previousCwd = process.cwd();
@@ -506,7 +506,7 @@ describe("cli", () => {
         "hetzner.default",
         "--allow-cloud-code"
       ]);
-      const config = JSON.parse(readFileSync(join(repo, "atlas.config.json"), "utf8")) as {
+      const config = JSON.parse(readFileSync(join(repo, "sigil.config.json"), "utf8")) as {
         ai: { allowCloudCodeContext: boolean; providers: Array<Record<string, unknown>> };
       };
 
@@ -533,7 +533,7 @@ describe("cli", () => {
       Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nXcAAAAASUVORK5CYII=", "base64")
     );
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -552,13 +552,13 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const previousFetch = globalThis.fetch;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       globalThis.fetch = (async (_url, init) => {
         const body = JSON.parse(String(init?.body)) as { messages: Array<{ content: unknown[] }> };
         expect(body.messages[0]?.content).toHaveLength(2);
@@ -576,7 +576,7 @@ describe("cli", () => {
       expect(logs).toContain("The interface is visually stable.");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
       globalThis.fetch = previousFetch;
     }
   });
@@ -587,7 +587,7 @@ describe("cli", () => {
     mkdirSync(repo, { recursive: true });
     writeFileSync(join(repo, "package.json"), "{\"name\":\"fixture\"}\n");
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -604,12 +604,12 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       await main(["start", "--manual", "--title", "Target", "--objective", "Update target source"]);
       const code = await main(["context", "build", "--ai"]);
 
@@ -619,7 +619,7 @@ describe("cli", () => {
       );
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
     }
   });
 
@@ -628,7 +628,7 @@ describe("cli", () => {
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -674,7 +674,7 @@ describe("cli", () => {
     writeFileSync(join(repo, "README.md"), "# Fixture\n");
     writeFileSync(join(repo, "src", "target.ts"), "export const target = true;\n");
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -692,13 +692,13 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const previousFetch = globalThis.fetch;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       globalThis.fetch = (async () =>
         new Response(
           JSON.stringify({
@@ -737,7 +737,7 @@ describe("cli", () => {
       expect(logs).toContain("State: context_ready");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
       globalThis.fetch = previousFetch;
     }
   });
@@ -750,7 +750,7 @@ describe("cli", () => {
     writeFileSync(join(repo, "README.md"), "# Fixture\n");
     writeFileSync(join(repo, "src", "target.ts"), "export const target = true;\n");
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -768,13 +768,13 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const previousFetch = globalThis.fetch;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       globalThis.fetch = (async () =>
         new Response(JSON.stringify({ message: { content: "not json" } }), { status: 200 })) as typeof fetch;
 
@@ -798,7 +798,7 @@ describe("cli", () => {
       expect(logs).toContain("State: context_ready");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
       globalThis.fetch = previousFetch;
     }
   });
@@ -809,7 +809,7 @@ describe("cli", () => {
     mkdirSync(repo, { recursive: true });
     writeFileSync(join(repo, "package.json"), "{\"name\":\"fixture\"}\n");
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -827,13 +827,13 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const previousFetch = globalThis.fetch;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       globalThis.fetch = (async () => {
         throw new Error("fetch should not be called");
       }) as typeof fetch;
@@ -844,10 +844,10 @@ describe("cli", () => {
 
       expect(code).toBe(0);
       expect(logs.filter((line) => line.startsWith("Built context art_"))).toHaveLength(2);
-      expect(logs).toContain("Next: atlas plan");
+      expect(logs).toContain("Next: sigil plan");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
       globalThis.fetch = previousFetch;
     }
   });
@@ -858,7 +858,7 @@ describe("cli", () => {
     mkdirSync(repo, { recursive: true });
     writeFileSync(join(repo, "README.md"), "# Planning fixture\n");
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -876,13 +876,13 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
+    const previousSigilHome = process.env.SIGIL_HOME;
     const previousFetch = globalThis.fetch;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
+      process.env.SIGIL_HOME = join(root, "home");
       globalThis.fetch = (async () =>
         new Response(JSON.stringify({ message: { content: "## Objective\nShip the planned work." } }), {
           status: 200
@@ -896,10 +896,10 @@ describe("cli", () => {
       expect(logs.some((line) => line.startsWith("Planning package: art_"))).toBe(true);
       expect(logs.some((line) => line.startsWith("AI planning draft: art_"))).toBe(true);
       expect(logs).toContain("State: planning_ready");
-      expect(logs).toContain("Next: atlas contract import <file>");
+      expect(logs).toContain("Next: sigil contract import <file>");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
       globalThis.fetch = previousFetch;
     }
   });
@@ -909,7 +909,7 @@ describe("cli", () => {
     const repo = join(root, "repo");
     mkdirSync(repo, { recursive: true });
     writeFileSync(
-      join(repo, "atlas.config.json"),
+      join(repo, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -927,16 +927,16 @@ describe("cli", () => {
       })
     );
     const previousCwd = process.cwd();
-    const previousAtlasHome = process.env.ATLAS_HOME;
-    const previousToken = process.env.ATLAS_TEST_AI_TOKEN;
+    const previousSigilHome = process.env.SIGIL_HOME;
+    const previousToken = process.env.SIGIL_TEST_AI_TOKEN;
     const previousFetch = globalThis.fetch;
     const logs = captureLogs();
 
     try {
       process.chdir(repo);
-      process.env.ATLAS_HOME = join(root, "home");
-      process.env.ATLAS_TEST_AI_TOKEN = "sk_example_secret_token";
-      await main(["auth", "add", "--provider", "ai", "--alias", "cloud.default", "--value-env", "ATLAS_TEST_AI_TOKEN"]);
+      process.env.SIGIL_HOME = join(root, "home");
+      process.env.SIGIL_TEST_AI_TOKEN = "sk_example_secret_token";
+      await main(["auth", "add", "--provider", "ai", "--alias", "cloud.default", "--value-env", "SIGIL_TEST_AI_TOKEN"]);
       globalThis.fetch = (async (_url, init) => {
         expect(init?.headers).toMatchObject({ authorization: "Bearer sk_example_secret_token" });
         return new Response(JSON.stringify({ data: [{ id: "free-model" }] }), { status: 200 });
@@ -949,8 +949,8 @@ describe("cli", () => {
       expect(logs.join("\n")).not.toContain("sk_example_secret_token");
     } finally {
       process.chdir(previousCwd);
-      restoreEnv("ATLAS_HOME", previousAtlasHome);
-      restoreEnv("ATLAS_TEST_AI_TOKEN", previousToken);
+      restoreEnv("SIGIL_HOME", previousSigilHome);
+      restoreEnv("SIGIL_TEST_AI_TOKEN", previousToken);
       globalThis.fetch = previousFetch;
     }
   });
@@ -960,7 +960,7 @@ describe("cli", () => {
     const fixturePath = join(root, "linear.json");
     writeFileSync(
       fixturePath,
-      JSON.stringify({ identifier: "ENG-42", title: "Build intake", state: { name: "Todo" }, labels: ["atlas"] })
+      JSON.stringify({ identifier: "ENG-42", title: "Build intake", state: { name: "Todo" }, labels: ["sigil"] })
     );
     const logs = captureLogs();
 
@@ -969,7 +969,7 @@ describe("cli", () => {
     expect(code).toBe(0);
     expect(logs).toContain("Issue: ENG-42");
     expect(logs).toContain("Title: Build intake");
-    expect(logs).toContain("Labels: atlas");
+    expect(logs).toContain("Labels: sigil");
   });
 
   it("inspects a Figma URL", async () => {
@@ -990,11 +990,11 @@ describe("cli", () => {
   it("inspects a GitHub URL", async () => {
     const logs = captureLogs();
 
-    const code = await main(["github", "inspect", "https://github.com/acme/atlas/pull/12"]);
+    const code = await main(["github", "inspect", "https://github.com/acme/sigil/pull/12"]);
 
     expect(code).toBe(0);
     expect(logs).toContain("Kind: pull_request");
-    expect(logs).toContain("Repository: acme/atlas");
+    expect(logs).toContain("Repository: acme/sigil");
     expect(logs).toContain("Number: 12");
   });
 
@@ -1004,7 +1004,7 @@ describe("cli", () => {
     const code = await main(["decisions", "record", "--kind", "decision"]);
 
     expect(code).toBe(2);
-    expect(logs).toContain("atlas decisions record requires --yes");
+    expect(logs).toContain("sigil decisions record requires --yes");
   });
 });
 
@@ -1023,9 +1023,9 @@ function createRepo(): string {
   const repo = tempRoot();
   mkdirSync(repo, { recursive: true });
   git(repo, ["init"]);
-  git(repo, ["checkout", "-b", "atlas-test"]);
-  git(repo, ["config", "user.name", "Atlas Test"]);
-  git(repo, ["config", "user.email", "atlas@example.test"]);
+  git(repo, ["checkout", "-b", "sigil-test"]);
+  git(repo, ["config", "user.name", "Sigil Test"]);
+  git(repo, ["config", "user.email", "sigil@example.test"]);
   writeFileSync(join(repo, "README.md"), "hello\n");
   git(repo, ["add", "README.md"]);
   git(repo, ["commit", "-m", "initial"]);

@@ -4,15 +4,15 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { PNG } from "pngjs";
 
-import { approveContract, getStatus, importContract, openAtlasRuntime, prepareReviewPackage, runBasicCheck } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { approveContract, getStatus, importContract, openSigilRuntime, prepareReviewPackage, runBasicCheck } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 import { prepareCheckedImplementation, prepareExecution } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-review-prepare-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-review-prepare-"));
   tempRoots.push(root);
   return root;
 }
@@ -30,15 +30,15 @@ describe("prepareReviewPackage", () => {
 
     const result = await prepareReviewPackage({ cwd, env });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const reviewPackages = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "review_package"
     );
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result.state).toBe("review_ready");
     expect(status.session?.primaryState).toBe("review_ready");
-    expect(status.nextCommands[0]).toBe("atlas review import <file> --actor <trusted-reviewer-id>");
+    expect(status.nextCommands[0]).toBe("sigil review import <file> --actor <trusted-reviewer-id>");
     expect(reviewPackages).toHaveLength(1);
   });
 
@@ -57,7 +57,7 @@ describe("prepareReviewPackage", () => {
     const { cwd, env } = await prepareExecution(root, ({ cwd: fixtureCwd }) => {
       writeFileSync(join(fixtureCwd, "baseline.png"), png);
       writeFileSync(
-        join(fixtureCwd, "atlas.config.json"),
+        join(fixtureCwd, "sigil.config.json"),
         JSON.stringify({
           schemaVersion: 1,
           project: { name: "fixture", baseBranch: "main" },
@@ -103,11 +103,11 @@ describe("prepareReviewPackage", () => {
   it("rejects old execution evidence after the approved contract is superseded", async () => {
     const root = tempRoot();
     const { cwd, env } = await prepareCheckedImplementation(root);
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const artifacts = listArtifactsForSession(runtime.db, runtime.db.exec("SELECT session_id FROM sessions")[0]?.values[0]?.[0] as string);
     const oldContract = artifacts.filter((artifact) => artifact.type === "implementation_contract" && artifact.status === "approved").at(-1);
     const oldContent = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, oldContract?.storageUri ?? ""), "utf8")) as Record<string, any>;
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
     oldContent.objective = { heading: "Objective", body_markdown: "Superseding objective requiring new execution." };
     const contractPath = join(root, "superseding-contract.json");
     writeFileSync(contractPath, JSON.stringify(oldContent));

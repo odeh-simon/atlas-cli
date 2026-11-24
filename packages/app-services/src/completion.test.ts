@@ -17,18 +17,18 @@ import {
   importContract,
   importExecutionResult,
   importReviewReport,
-  openAtlasRuntime,
+  openSigilRuntime,
   runBasicCheck,
   startManualTask
 } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listApprovalsForSession, listArtifactsForSession } from "@atlas/persistence";
+import { closeSigilRuntime } from "./runtime.js";
+import { listApprovalsForSession, listArtifactsForSession } from "@sigil/persistence";
 import { prepareCheckedImplementation, prepareExecution, prepareReviewImported, prepareReviewReady } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-completion-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-completion-"));
   tempRoots.push(root);
   return root;
 }
@@ -55,10 +55,10 @@ describe("completion approval", () => {
     const evaluated = await evaluateCompletion({ cwd, env });
     const approved = await approveCompletion({ cwd, env, actorId: "tester" });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const artifacts = listArtifactsForSession(runtime.db, approved.sessionId);
     const approvals = listApprovalsForSession(runtime.db, approved.sessionId);
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(evaluated.state).toBe("completion_ready");
     expect(approved.state).toBe("completed");
@@ -117,12 +117,12 @@ describe("completion approval", () => {
   it("blocks completion when the passing check result is stale against Git", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     initGitRepository(cwd);
     writeFileSync(join(cwd, "README.md"), "Initial docs\n");
     git(cwd, "add", "README.md");
-    git(cwd, "-c", "user.email=atlas@example.test", "-c", "user.name=Atlas", "commit", "-m", "Initial");
+    git(cwd, "-c", "user.email=sigil@example.test", "-c", "user.name=Sigil", "commit", "-m", "Initial");
 
     await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
     await buildContextManifest({ cwd, env, maxFiles: 10, maxBytes: 50_000 });
@@ -177,7 +177,7 @@ describe("completion approval", () => {
     const original = pngFixture([255, 255, 255, 255]);
     writeFileSync(baselinePath, original);
     writeFileSync(
-      join(cwd, "atlas.config.json"),
+      join(cwd, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -220,7 +220,7 @@ describe("completion approval", () => {
     const baseline = pngFixture([255, 255, 255, 255]);
     writeFileSync(join(cwd, "baseline.png"), baseline);
     writeFileSync(
-      join(cwd, "atlas.config.json"),
+      join(cwd, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },

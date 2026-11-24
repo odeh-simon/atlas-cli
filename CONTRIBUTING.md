@@ -1,10 +1,10 @@
-# Contributing to Atlas
+# Contributing to Sigil
 
-Thanks for your interest in Atlas. This guide explains how to set up the project, what a good contribution looks like and how changes get reviewed.
+Thanks for your interest in Sigil. This guide explains how to set up the project, what a good contribution looks like and how changes get reviewed.
 
 ## Ground rules
 
-- **Keep humans in control.** Atlas exists to make AI-assisted development auditable. Changes must not remove, weaken or silently bypass an approval, review or completion gate. If a change affects a gate, say so in the pull request and explain why it is safe.
+- **Keep humans in control.** Sigil exists to make AI-assisted development auditable. Changes must not remove, weaken or silently bypass an approval, review or completion gate. If a change affects a gate, say so in the pull request and explain why it is safe.
 - **No secrets, ever.** Do not commit tokens, credentials, private issue or design links, or real customer data, including in tests and fixtures. Use obviously fake values such as `figd_test_secret`.
 - **Be kind.** Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
@@ -13,8 +13,8 @@ Thanks for your interest in Atlas. This guide explains how to set up the project
 Requirements: Node.js 22+, pnpm 9+ and Git.
 
 ```bash
-git clone https://github.com/<your-username>/atlas-cli.git
-cd atlas-cli
+git clone https://github.com/<your-username>/sigil.git
+cd sigil
 pnpm install --frozen-lockfile
 pnpm check
 pnpm test
@@ -33,7 +33,7 @@ All tests should pass before you change anything. If they do not, open an issue 
 
 ## Architecture rules
 
-Atlas follows a hexagonal (ports-and-adapters) design:
+Sigil follows a hexagonal (ports-and-adapters) design:
 
 - Core packages (`domain`, `workflow-engine`, `app-services`) must not import adapters or call external services directly.
 - Every external system lives behind an adapter that implements the contracts in `adapter-contracts`.
@@ -47,7 +47,7 @@ New adapters are one of the most useful contributions (for example Jira, GitLab 
 1. Lives in its own package, `packages/adapters-<name>`.
 2. Implements the relevant contract from `adapter-contracts`.
 3. Reads credentials only through credential aliases, never from config values or hard-coded strings.
-4. Supports a health check so `atlas adapters health` can report on it.
+4. Supports a health check so `sigil adapters health` can report on it.
 5. Has tests that run against fixtures, without network access or real credentials.
 
 Look at an existing adapter such as `adapters-linear` or `adapters-github` as a reference.
@@ -62,7 +62,7 @@ You may use AI tools to help write your contribution. You are responsible for ev
 
 ## Review
 
-A maintainer will review your pull request, may ask for changes, and will merge it once checks pass and the change fits the project's direction. Thank you for helping improve Atlas.
+A maintainer will review your pull request, may ask for changes, and will merge it once checks pass and the change fits the project's direction. Thank you for helping improve Sigil.
 
 ## License
 

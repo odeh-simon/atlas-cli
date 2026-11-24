@@ -1,6 +1,6 @@
-import { runProcess, type ProcessRunResult } from "@atlas/process-runner";
+import { runProcess, type ProcessRunResult } from "@sigil/process-runner";
 
-export const adaptersClaudeCodePackage = "@atlas/adapters-claude-code";
+export const adaptersClaudeCodePackage = "@sigil/adapters-claude-code";
 
 export interface ClaudeCodeAdapterHealth {
   readonly provider: "claude-code";
@@ -42,7 +42,7 @@ export function getClaudeCodeAdapterHealth(
 
 export function formatClaudeCodePackage(input: ClaudeCodeInvocationPackage): string {
   return [
-    "# Atlas Claude Code Handoff",
+    "# Sigil Claude Code Handoff",
     "",
     `Mode: ${input.mode}`,
     `Artifacts: ${input.artifactIds.join(", ") || "(none)"}`,

@@ -20,13 +20,13 @@ const tempRoots: string[] = [];
 const now = "2026-07-12T12:00:00.000Z";
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-artifact-records-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-artifact-records-"));
   tempRoots.push(root);
   return root;
 }
 
 async function openSessionDb(root: string) {
-  const dbPath = join(root, "atlas.db");
+  const dbPath = join(root, "sigil.db");
   await applyMigrations({
     dbPath,
     backupDirectory: join(root, "backups"),
@@ -67,7 +67,7 @@ describe("artifact metadata records", () => {
       mediaType: "text/markdown",
       sensitivity: "internal",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     const child = createArtifactRecord(db, {
@@ -82,7 +82,7 @@ describe("artifact metadata records", () => {
       mediaType: "application/json",
       sensitivity: "confidential",
       status: "draft",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
 

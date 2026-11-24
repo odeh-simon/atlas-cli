@@ -4,16 +4,16 @@
 
 | Field | Value |
 | --- | --- |
-| Product | Atlas |
+| Product | Sigil |
 | Document | Engineering Design Specification |
 | Milestone | M0 |
 | Status | Draft for review |
 | Date | 12 July 2026 |
-| PRD baseline | Atlas V1 PRD v1.0 |
+| PRD baseline | Sigil V1 PRD v1.0 |
 
 ## 2. Executive Technical Summary
 
-Atlas V1 is a local TypeScript/Node CLI with a deterministic workflow engine, SQLite metadata store, immutable artifact files, safe Git/process adapters, and provider-neutral integration adapters. The core owns state, approvals, gates, artifact dependencies, and recovery. External tools supply data or execute work through constrained interfaces and cannot mutate Atlas state directly.
+Sigil V1 is a local TypeScript/Node CLI with a deterministic workflow engine, SQLite metadata store, immutable artifact files, safe Git/process adapters, and provider-neutral integration adapters. The core owns state, approvals, gates, artifact dependencies, and recovery. External tools supply data or execute work through constrained interfaces and cannot mutate Sigil state directly.
 
 The design favors ordinary mutable state plus append-only audit events over full event sourcing. SQLite is authoritative for workflow metadata; content-addressed artifact files are authoritative for large human/machine handoff bytes. Every state-changing transition writes artifacts first to a staging path, then commits database metadata and audit events in a transaction, then atomically promotes files. Recovery reconciles both sides by content hash and event records.
 
@@ -30,7 +30,7 @@ The PRD is normative for product behavior. This design records technical mechani
 ## 5. Architectural Goals
 
 - Deterministic, auditable state transitions.
-- Local-first operation without Atlas cloud dependency.
+- Local-first operation without Sigil cloud dependency.
 - Human approvals for contracts, overrides, findings disposition, and completion.
 - Provider-neutral adapters for Linear, GitHub, Figma, Claude Code, Codex, clipboard, opener, and credentials.
 - Non-destructive Git and filesystem behavior.
@@ -40,17 +40,17 @@ The PRD is normative for product behavior. This design records technical mechani
 
 ## 6. Architectural Non-Goals
 
-- Atlas is not a coding agent or autonomous project manager.
-- Atlas does not control consumer ChatGPT sessions.
-- Atlas does not replace Git, Linear, Figma, GitHub, or CI.
-- Atlas does not guarantee pixel fidelity without configured comparison tooling.
-- Atlas does not perform destructive Git actions in V1.
+- Sigil is not a coding agent or autonomous project manager.
+- Sigil does not control consumer ChatGPT sessions.
+- Sigil does not replace Git, Linear, Figma, GitHub, or CI.
+- Sigil does not guarantee pixel fidelity without configured comparison tooling.
+- Sigil does not perform destructive Git actions in V1.
 
 ## 7. Assumptions
 
 - Implementation language is TypeScript on Node.js LTS.
-- The user runs Atlas from or against a Git repository.
-- SQLite and artifact files live under the user's local Atlas data directory by default.
+- The user runs Sigil from or against a Git repository.
+- SQLite and artifact files live under the user's local Sigil data directory by default.
 - Project config may be committed if secret-free; local overrides are ignored by Git.
 - Supported OS baseline is current macOS, Ubuntu LTS, and supported Windows versions validated in CI.
 
@@ -77,7 +77,7 @@ The PRD is normative for product behavior. This design records technical mechani
 
 ```mermaid
 flowchart LR
-    Dev["Developer"] --> CLI["Atlas CLI"]
+    Dev["Developer"] --> CLI["Sigil CLI"]
     CLI --> Store["Local SQLite + artifact store"]
     CLI --> Git["Local Git repository"]
     CLI --> Linear["Linear API"]
@@ -109,7 +109,7 @@ flowchart TB
 
 ## 12. Runtime Architecture
 
-Atlas runs as foreground CLI processes. Each invocation loads configuration, acquires a session/project lock when needed, reconciles state, executes one command, writes audit events, releases locks, and exits. Long-running agent/check commands remain owned child processes of that Atlas invocation; V1 has no daemon.
+Sigil runs as foreground CLI processes. Each invocation loads configuration, acquires a session/project lock when needed, reconciles state, executes one command, writes audit events, releases locks, and exits. Long-running agent/check commands remain owned child processes of that Sigil invocation; V1 has no daemon.
 
 ## 13. Module and Package Boundaries
 
@@ -157,7 +157,7 @@ Dependencies point inward toward domain/contracts. Provider adapters depend on s
 
 ## 16. Process Model
 
-- One foreground Atlas process per command.
+- One foreground Sigil process per command.
 - Session lock prevents concurrent mutation of the same session.
 - Project lock prevents conflicting project config writes.
 - Child processes are spawned with explicit executable and argument arrays.
@@ -217,7 +217,7 @@ Precedence from low to high:
 5. Session overrides.
 6. Command flags.
 
-Security-sensitive unknown fields are rejected. `atlas config explain <key>` reports value, source, and redaction.
+Security-sensitive unknown fields are rejected. `sigil config explain <key>` reports value, source, and redaction.
 
 ## 23. Context-Discovery Architecture
 
@@ -239,7 +239,7 @@ flowchart LR
 
 ## 25. Coding-Agent Execution Architecture
 
-Atlas generates an implementation or fix package from the approved contract, validates Git/context freshness, invokes the selected adapter, records process facts, captures logs, validates any completion report, and independently reconciles Git/check evidence. Process success, agent claim, Git changes, passing checks, and product completion are separate facts.
+Sigil generates an implementation or fix package from the approved contract, validates Git/context freshness, invokes the selected adapter, records process facts, captures logs, validates any completion report, and independently reconciles Git/check evidence. Process success, agent claim, Git changes, passing checks, and product completion are separate facts.
 
 ## 26. Local Command-Runner Architecture
 
@@ -313,11 +313,11 @@ Security controls include keychain credential aliases, redaction pipeline, path 
 
 ## 36. Privacy Model
 
-Atlas is local-first. Remote transfers occur only through configured adapters, product telemetry configured under the approved telemetry policy, or manual developer action. Product telemetry is privacy-preserving and content-free: it may include event categories, timings, counts, statuses, adapter capability outcomes, and anonymized/coarsened environment facts, but never source code, prompts, diffs, secrets, filenames, repository URLs, raw issue text, raw design text, or artifact content. Session export and diagnostics carry sensitivity labels and preview manifests.
+Sigil is local-first. Remote transfers occur only through configured adapters, product telemetry configured under the approved telemetry policy, or manual developer action. Product telemetry is privacy-preserving and content-free: it may include event categories, timings, counts, statuses, adapter capability outcomes, and anonymized/coarsened environment facts, but never source code, prompts, diffs, secrets, filenames, repository URLs, raw issue text, raw design text, or artifact content. Session export and diagnostics carry sensitivity labels and preview manifests.
 
 ## 37. Threat Model
 
-The detailed threat model is in `09_security_threat_model.md`. Trust boundaries: user, Atlas core, repository, imported artifacts, coding agents, SaaS integrations, OS, and external model services.
+The detailed threat model is in `09_security_threat_model.md`. Trust boundaries: user, Sigil core, repository, imported artifacts, coding agents, SaaS integrations, OS, and external model services.
 
 ## 38. Testing Architecture
 
@@ -333,7 +333,7 @@ Recommended package manager is `pnpm`; publish as an npm CLI package with `bin` 
 
 ## 41. Upgrade and Migration Strategy
 
-SQLite migrations are versioned and transactional. Before migration, Atlas writes a backup copy of the DB and records artifact hashes. Failed migration restores prior usable state. Artifact schema upgrades create new versions; approved artifact bytes are never rewritten.
+SQLite migrations are versioned and transactional. Before migration, Sigil writes a backup copy of the DB and records artifact hashes. Failed migration restores prior usable state. Artifact schema upgrades create new versions; approved artifact bytes are never rewritten.
 
 ## 42. Performance Considerations
 
@@ -360,8 +360,8 @@ SQLite plus immutable files adds reconciliation complexity but gives durable que
 | ID | Approved decision | Human approval before full M1? |
 | --- | --- | --- |
 | OQ-001 Node/OS versions | Node 22 LTS; latest supported Windows, latest macOS, Ubuntu LTS | Approved |
-| OQ-002 Project config commit default | Commit `atlas.config.json`; keep `atlas.local.json` ignored | Approved |
-| OQ-003 Data layout | User data directory canonical; optional project `.atlas/artifacts` link | Approved |
+| OQ-002 Project config commit default | Commit `sigil.config.json`; keep `sigil.local.json` ignored | Approved |
+| OQ-003 Data layout | User data directory canonical; optional project `.sigil/artifacts` link | Approved |
 | OQ-004 Contract structure | Markdown with fenced JSON metadata block plus required headings | Approved |
 | OQ-005 Agent versions | Publish tested matrix; manual export fallback | Approved |
 | OQ-006 Agent commits | Default no; explicit future policy only | Approved |
@@ -399,7 +399,7 @@ sequenceDiagram
     participant WF as Workflow
     participant Store
     participant Agent
-    Dev->>CLI: atlas start / context / plan
+    Dev->>CLI: sigil start / context / plan
     CLI->>WF: transition commands
     WF->>Store: write session + artifacts + events
     Dev->>CLI: contract import + approve
@@ -486,7 +486,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph Trusted["Atlas trusted core"]
+    subgraph Trusted["Sigil trusted core"]
         WF["Workflow"]
         DB["SQLite metadata"]
         Sec["Security/redaction"]

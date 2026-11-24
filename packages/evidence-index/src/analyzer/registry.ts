@@ -1,4 +1,4 @@
-import { PersistenceError } from "@atlas/domain";
+import { PersistenceError } from "@sigil/domain";
 
 import type { EvidenceAnalyzer } from "./contract.js";
 import { createTypeScriptAnalyzer } from "./typescript-analyzer.js";

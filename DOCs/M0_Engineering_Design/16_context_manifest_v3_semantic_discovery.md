@@ -2,9 +2,9 @@
 
 ## Production invariant
 
-Planning and implementation may proceed only from a current, immutable v3 context manifest and its matching v3 content pack. A legacy v1/v2 manifest remains readable for diagnosis, but it cannot claim semantic completeness and must be refreshed with `atlas context build`.
+Planning and implementation may proceed only from a current, immutable v3 context manifest and its matching v3 content pack. A legacy v1/v2 manifest remains readable for diagnosis, but it cannot claim semantic completeness and must be refreshed with `sigil context build`.
 
-The deterministic discovery engine is authoritative for repository facts. An AI scout may rerank only repository candidates that Atlas actually indexed. Unknown AI paths are retained as visible warnings and never become evidence.
+The deterministic discovery engine is authoritative for repository facts. An AI scout may rerank only repository candidates that Sigil actually indexed. Unknown AI paths are retained as visible warnings and never become evidence.
 
 ## Discovery pipeline
 
@@ -31,7 +31,7 @@ The v3 content pack binds the task and manifest artifact IDs/hashes and copies t
 
 ## Freshness and recovery
 
-Before planning or implementation-package export, Atlas revalidates:
+Before planning or implementation-package export, Sigil revalidates:
 
 - current task-brief hash;
 - project context configuration hash;
@@ -39,11 +39,11 @@ Before planning or implementation-package export, Atlas revalidates:
 - every selected source and active instruction SHA-256;
 - every evidence fragment's source binding, line range, and fact excerpt.
 
-A mismatch blocks the gate and recommends `atlas context build`. Refresh is allowed from intake, context-ready, planning, contract-draft, and contract-approved states; it returns the workflow to context-ready so downstream planning and contract evidence must be regenerated. Refresh is intentionally unavailable after implementation starts because implementation changes selected sources by design; later gates use the immutable pre-execution pack and exact diff bindings instead.
+A mismatch blocks the gate and recommends `sigil context build`. Refresh is allowed from intake, context-ready, planning, contract-draft, and contract-approved states; it returns the workflow to context-ready so downstream planning and contract evidence must be regenerated. Refresh is intentionally unavailable after implementation starts because implementation changes selected sources by design; later gates use the immutable pre-execution pack and exact diff bindings instead.
 
 ## Project configuration
 
-`atlas.config.json` may define a strict `context` object:
+`sigil.config.json` may define a strict `context` object:
 
 ```json
 {
@@ -67,7 +67,7 @@ A mismatch blocks the gate and recommends `atlas context build`. Refresh is allo
 }
 ```
 
-Unknown fields, malformed values, missing required pins/categories/globs, and unsafe required inputs fail closed. `atlas context inspect --json` exposes the effective settings and hash; the normal inspect/status output summarizes instruction coverage, semantic evidence, gaps, exclusions, and budget pressure without dumping source content.
+Unknown fields, malformed values, missing required pins/categories/globs, and unsafe required inputs fail closed. `sigil context inspect --json` exposes the effective settings and hash; the normal inspect/status output summarizes instruction coverage, semantic evidence, gaps, exclusions, and budget pressure without dumping source content.
 
 ## Current limits
 

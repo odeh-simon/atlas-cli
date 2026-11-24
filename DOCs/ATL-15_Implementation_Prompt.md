@@ -1,6 +1,6 @@
 # ATL-15 Implementation Prompt
 
-You are the implementing agent for Linear issue `ATL-15`, **B3.3 - Add analyzer interface and TypeScript semantic graph v2**, in the Atlas CLI repository.
+You are the implementing agent for Linear issue `ATL-15`, **B3.3 - Add analyzer interface and TypeScript semantic graph v2**, in the Sigil CLI repository.
 
 Your job is to implement the approved analyzer contract and TypeScript/JavaScript semantic graph v2 on top of the approved ATL-14 evidence-index checkpoint, then produce a review-ready handoff. Do not implement ATL-16 query/CLI behavior, mark ATL-15 Done, or approve your own implementation.
 
@@ -13,14 +13,14 @@ ATL-15 is blocked by ATL-14. Start implementation only when all of the following
 3. ATL-14 has an immutable checkpoint commit and is marked Done in Linear.
 4. The ATL-15 branch starts from that approved checkpoint with no inherited, unexplained dirty files.
 
-At the time this prompt was finalized, the repository was on `codex/atlas-production-orchestration` at `6bdc2009f3d6040aadf7cbe594d67a3a8d46937e`, a commit titled `Checkpoint B3.2: incremental indexing, invalidation and historical snapshots (ATL-14)`. However, Linear still reported ATL-14 as Backlog and no independent approval evidence was established during prompt preparation. Treat `6bdc200` as a candidate dependency checkpoint, not an approved ATL-15 base, until the review evidence and Linear state are reconciled. If the gate is not satisfied, stop after reporting the exact dependency state; do not begin B3.3.
+At the time this prompt was finalized, the repository was on `codex/sigil-production-orchestration` at `6bdc2009f3d6040aadf7cbe594d67a3a8d46937e`, a commit titled `Checkpoint B3.2: incremental indexing, invalidation and historical snapshots (ATL-14)`. However, Linear still reported ATL-14 as Backlog and no independent approval evidence was established during prompt preparation. Treat `6bdc200` as a candidate dependency checkpoint, not an approved ATL-15 base, until the review evidence and Linear state are reconciled. If the gate is not satisfied, stop after reporting the exact dependency state; do not begin B3.3.
 
 ## Authority and required reading
 
 Read these sources before changing code, in this order:
 
-1. `DOCs/Atlas_V1_Product_Requirements_Document.md`, version 2.0, for product behavior, safety boundaries, and release requirements.
-2. The Linear document `Atlas Implementation Context and Production-Orchestration Plan`, mirrored at `DOCs/Atlas_Implementation_Context.md`, especially Sections 1, 5, 7, 8 Batch 3, 9, and 10.
+1. `DOCs/Sigil_V1_Product_Requirements_Document.md`, version 2.0, for product behavior, safety boundaries, and release requirements.
+2. The Linear document `Sigil Implementation Context and Production-Orchestration Plan`, mirrored at `DOCs/Sigil_Implementation_Context.md`, especially Sections 1, 5, 7, 8 Batch 3, 9, and 10.
 3. Linear issue `ATL-15`, including its dependency, outcome, primary code boundary, deliverables, acceptance criteria, non-goals, and stop conditions.
 4. The independently approved ATL-14 checkpoint and its review/evidence packet.
 5. `DOCs/M0_Engineering_Design/16_context_manifest_v3_semantic_discovery.md`.

@@ -22,13 +22,13 @@ importers:
 
   packages/adapters-claude-code:
     dependencies:
-      '@atlas/process-runner':
+      '@sigil/process-runner':
         specifier: workspace:*
         version: link:../process-runner
 
   packages/adapters-codex:
     dependencies:
-      '@atlas/process-runner':
+      '@sigil/process-runner':
         specifier: workspace:*
         version: link:../process-runner
 
@@ -42,52 +42,52 @@ importers:
 
   packages/app-services:
     dependencies:
-      '@atlas/adapters-claude-code':
+      '@sigil/adapters-claude-code':
         specifier: workspace:*
         version: link:../adapters-claude-code
-      '@atlas/adapters-codex':
+      '@sigil/adapters-codex':
         specifier: workspace:*
         version: link:../adapters-codex
-      '@atlas/adapters-figma':
+      '@sigil/adapters-figma':
         specifier: workspace:*
         version: link:../adapters-figma
-      '@atlas/adapters-linear':
+      '@sigil/adapters-linear':
         specifier: workspace:*
         version: link:../adapters-linear
-      '@atlas/artifacts':
+      '@sigil/artifacts':
         specifier: workspace:*
         version: link:../artifacts
-      '@atlas/checks':
+      '@sigil/checks':
         specifier: workspace:*
         version: link:../checks
-      '@atlas/context-discovery':
+      '@sigil/context-discovery':
         specifier: workspace:*
         version: link:../context-discovery
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
-      '@atlas/git':
+      '@sigil/git':
         specifier: workspace:*
         version: link:../git
-      '@atlas/llm':
+      '@sigil/llm':
         specifier: workspace:*
         version: link:../llm
-      '@atlas/persistence':
+      '@sigil/persistence':
         specifier: workspace:*
         version: link:../persistence
-      '@atlas/process-runner':
+      '@sigil/process-runner':
         specifier: workspace:*
         version: link:../process-runner
-      '@atlas/schemas':
+      '@sigil/schemas':
         specifier: workspace:*
         version: link:../schemas
-      '@atlas/security':
+      '@sigil/security':
         specifier: workspace:*
         version: link:../security
-      '@atlas/visual-qa':
+      '@sigil/visual-qa':
         specifier: workspace:*
         version: link:../visual-qa
-      '@atlas/workflow-engine':
+      '@sigil/workflow-engine':
         specifier: workspace:*
         version: link:../workflow-engine
       zod:
@@ -103,52 +103,52 @@ importers:
 
   packages/artifacts:
     dependencies:
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
 
   packages/checks:
     dependencies:
-      '@atlas/process-runner':
+      '@sigil/process-runner':
         specifier: workspace:*
         version: link:../process-runner
 
   packages/cli:
     dependencies:
-      '@atlas/adapters-claude-code':
+      '@sigil/adapters-claude-code':
         specifier: workspace:*
         version: link:../adapters-claude-code
-      '@atlas/adapters-codex':
+      '@sigil/adapters-codex':
         specifier: workspace:*
         version: link:../adapters-codex
-      '@atlas/adapters-figma':
+      '@sigil/adapters-figma':
         specifier: workspace:*
         version: link:../adapters-figma
-      '@atlas/adapters-github':
+      '@sigil/adapters-github':
         specifier: workspace:*
         version: link:../adapters-github
-      '@atlas/adapters-linear':
+      '@sigil/adapters-linear':
         specifier: workspace:*
         version: link:../adapters-linear
-      '@atlas/app-services':
+      '@sigil/app-services':
         specifier: workspace:*
         version: link:../app-services
-      '@atlas/checks':
+      '@sigil/checks':
         specifier: workspace:*
         version: link:../checks
-      '@atlas/diagnostics':
+      '@sigil/diagnostics':
         specifier: workspace:*
         version: link:../diagnostics
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
-      '@atlas/git':
+      '@sigil/git':
         specifier: workspace:*
         version: link:../git
-      '@atlas/llm':
+      '@sigil/llm':
         specifier: workspace:*
         version: link:../llm
-      '@atlas/security':
+      '@sigil/security':
         specifier: workspace:*
         version: link:../security
     devDependencies:
@@ -163,7 +163,7 @@ importers:
 
   packages/context-discovery:
     dependencies:
-      '@atlas/security':
+      '@sigil/security':
         specifier: workspace:*
         version: link:../security
       typescript:
@@ -176,29 +176,29 @@ importers:
 
   packages/evidence-index:
     dependencies:
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
-      '@atlas/git':
+      '@sigil/git':
         specifier: workspace:*
         version: link:../git
-      '@atlas/persistence':
+      '@sigil/persistence':
         specifier: workspace:*
         version: link:../persistence
-      '@atlas/schemas':
+      '@sigil/schemas':
         specifier: workspace:*
         version: link:../schemas
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
     devDependencies:
-      '@atlas/test-utils':
+      '@sigil/test-utils':
         specifier: workspace:*
         version: link:../test-utils
 
   packages/git:
     dependencies:
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
 
@@ -206,17 +206,17 @@ importers:
 
   packages/persistence:
     dependencies:
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
-      '@atlas/schemas':
+      '@sigil/schemas':
         specifier: workspace:*
         version: link:../schemas
       sql.js:
         specifier: ^1.14.1
         version: 1.14.1
     devDependencies:
-      '@atlas/test-utils':
+      '@sigil/test-utils':
         specifier: workspace:*
         version: link:../test-utils
       '@types/sql.js':
@@ -231,7 +231,7 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
 
@@ -239,7 +239,7 @@ importers:
 
   packages/test-utils:
     dependencies:
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
 
@@ -261,10 +261,10 @@ importers:
 
   packages/workflow-engine:
     dependencies:
-      '@atlas/domain':
+      '@sigil/domain':
         specifier: workspace:*
         version: link:../domain
-      '@atlas/schemas':
+      '@sigil/schemas':
         specifier: workspace:*
         version: link:../schemas
 

@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { listArtifactsForSession } from "@atlas/persistence";
+import { listArtifactsForSession } from "@sigil/persistence";
 
-import { closeAtlasRuntime, openAtlasRuntime } from "./runtime.js";
+import { closeSigilRuntime, openSigilRuntime } from "./runtime.js";
 import { buildContextManifest, inspectContextManifest, runAiContextScout, startManualTask } from "./index.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-context-scout-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-context-scout-"));
   tempRoots.push(root);
   return root;
 }
@@ -26,7 +26,7 @@ describe("runAiContextScout", () => {
   it("stores AI context recommendations from task brief and candidate snippets", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(join(cwd, "package.json"), "{\"name\":\"fixture\"}\n");
     writeFileSync(join(cwd, "README.md"), "# Fixture\n");
@@ -75,7 +75,7 @@ describe("runAiContextScout", () => {
     expect(prompts[0]).toContain("Build reusable table value components for regression-stable cells");
     expect(prompts[0]).toContain("ReusableTableCell");
 
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     try {
       const artifacts = listArtifactsForSession(runtime.db, result.sessionId);
       expect(artifacts).toEqual(
@@ -88,14 +88,14 @@ describe("runAiContextScout", () => {
         ])
       );
     } finally {
-      closeAtlasRuntime(runtime);
+      closeSigilRuntime(runtime);
     }
   });
 
   it("rejects malformed AI scout JSON", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(join(cwd, "package.json"), "{\"name\":\"fixture\"}\n");
     await startManualTask({ cwd, env, title: "Task", objective: "Objective", taskKey: "TASK-1" });
@@ -122,7 +122,7 @@ describe("runAiContextScout", () => {
   it("accepts fenced JSON and preserves invented paths for deterministic gap reporting", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(join(cwd, "src"), { recursive: true });
     writeFileSync(join(cwd, "package.json"), "{\"name\":\"fixture\"}\n");
     writeFileSync(join(cwd, "src", "table-cells.tsx"), "export function TableCells() { return null; }\n");
@@ -162,7 +162,7 @@ describe("runAiContextScout", () => {
   it("limits candidate snippets by provider input budget", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(join(cwd, "package.json"), "{\"name\":\"fixture\"}\n");
     for (let index = 0; index < 8; index += 1) {
@@ -199,7 +199,7 @@ describe("runAiContextScout", () => {
   it("blocks cloud context egress without explicit consent", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
 
     await expect(

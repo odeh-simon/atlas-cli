@@ -1,5 +1,5 @@
-import type { MaterialChangeCategory } from "@atlas/domain";
-import type { ImplementationContract } from "@atlas/schemas";
+import type { MaterialChangeCategory } from "@sigil/domain";
+import type { ImplementationContract } from "@sigil/schemas";
 
 export interface ContractSectionDiff {
   readonly section: string;

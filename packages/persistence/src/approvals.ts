@@ -1,4 +1,4 @@
-import { PersistenceError, type ApprovalType } from "@atlas/domain";
+import { PersistenceError, type ApprovalType } from "@sigil/domain";
 import type initSqlJs from "sql.js";
 
 import { optionalString, queryAll, queryOne, requiredString } from "./sql.js";

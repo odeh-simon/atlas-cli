@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/persistence",
+  "name": "@sigil/persistence",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -10,12 +10,12 @@
     "check": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@atlas/domain": "workspace:*",
-    "@atlas/schemas": "workspace:*",
+    "@sigil/domain": "workspace:*",
+    "@sigil/schemas": "workspace:*",
     "sql.js": "^1.14.1"
   },
   "devDependencies": {
-    "@atlas/test-utils": "workspace:*",
+    "@sigil/test-utils": "workspace:*",
     "@types/sql.js": "^1.4.11"
   }
 }

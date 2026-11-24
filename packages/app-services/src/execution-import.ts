@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError, ValidationError } from "@atlas/domain";
-import { addArtifactDependency, appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@atlas/persistence";
-import { executionReportSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { StateTransitionError, ValidationError } from "@sigil/domain";
+import { addArtifactDependency, appendEvent, createArtifactRecord, listArtifactsForSession, listSessionsForRepository, updateSessionState } from "@sigil/persistence";
+import { executionReportSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { captureImplementationDiff } from "./implementation-diff.js";
 import { assertImplementationGitBase, readAndValidateImplementationPackage } from "./implementation-bindings.js";
 
@@ -24,7 +24,7 @@ export interface ImportExecutionResultResult {
 }
 
 export async function importExecutionResult(input: ImportExecutionResultInput): Promise<ImportExecutionResultResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -150,7 +150,7 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
       executionReportArtifactId: artifactId,
       state: next,
       processStatus: report.process_status,
-      nextCommand: "atlas checks run"
+      nextCommand: "sigil checks run"
     };
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -158,6 +158,6 @@ export async function importExecutionResult(input: ImportExecutionResultInput): 
     }
     throw error;
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }

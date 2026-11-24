@@ -5,9 +5,9 @@ coverage/
 .DS_Store
 *.tsbuildinfo
 *.stackdump
-atlas.local.json
-.atlas/
+sigil.local.json
+.sigil/
 release/
 
-# Local Atlas configuration (copy atlas.config.example.json)
-atlas.config.json
+# Local Sigil configuration (copy sigil.config.example.json)
+sigil.config.json

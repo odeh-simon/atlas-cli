@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Atlas aims to be a welcoming project for everyone, whatever their background, identity or level of experience.
+Sigil aims to be a welcoming project for everyone, whatever their background, identity or level of experience.
 
 ## Expected behavior
 

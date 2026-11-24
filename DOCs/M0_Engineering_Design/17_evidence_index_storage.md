@@ -12,10 +12,10 @@ The index records facts about a repository at a point in time. It never changes 
 - `stableHash(value)` is SHA-256 over canonical JSON UTF-8 bytes.
 - `deriveId(prefix, parts)` returns `` `${prefix}_${sha256(parts.join("\u0000")).slice(0, 20)}` ``. The NUL separator makes part boundaries unambiguous (`["ab","c"]` never collides with `["a","bc"]`).
 - Repository identity derives only from content. Root paths are canonicalized **before** hashing by `canonicalizeRepositoryRootPath`: backslash
-es become forward slashes, a leading drive letter is lowercased (`C:\work\atlas` and `C:/work/atlas` both canonicalize to `c:/work/atlas`), and trailing slashes are stripped on every platform. `root_path_hash` is SHA-256 of the canonical form and `repository_id = deriveId("evrepo", [root_path_hash])`, so path-spelling variants of the same checkout share one repository identity while raw absolute paths are never persisted anywhere.
+es become forward slashes, a leading drive letter is lowercased (`C:\work\sigil` and `C:/work/sigil` both canonicalize to `c:/work/sigil`), and trailing slashes are stripped on every platform. `root_path_hash` is SHA-256 of the canonical form and `repository_id = deriveId("evrepo", [root_path_hash])`, so path-spelling variants of the same checkout share one repository identity while raw absolute paths are never persisted anywhere.
 - These primitives replicate the recipes already used by semantic discovery and git safeguards (modulo the codepoint sort, which is stricter). Those local copies remain untouched until a later consolidation batch.
 
-## Schema surface (`@atlas/schemas/evidence-index`)
+## Schema surface (`@sigil/schemas/evidence-index`)
 
 `EVIDENCE_INDEX_SCHEMA_VERSION = 1` governs the payload and snapshot contract:
 
@@ -65,7 +65,7 @@ Blobs referenced by `storage_uri` live under `<store-root>/<namespace>/<sha256>`
 
 `assertSupportedIndexSchema` refuses index access when either guard trips:
 
-- `MAX(schema_migrations.version)` exceeds the highest known core migration (database written by a newer Atlas);
+- `MAX(schema_migrations.version)` exceeds the highest known core migration (database written by a newer Sigil);
 - `MAX(evidence_index_snapshots.schema_version)` exceeds `EVIDENCE_INDEX_SCHEMA_VERSION`.
 
 Both raise `MigrationError` (RecoveryRequired exit code). Legacy sessions and artifacts stay fully readable across the upgrade because v7 is additive. This policy is scoped to explicit index access only; runtime open paths are not wired to it yet.
@@ -85,7 +85,7 @@ Both raise `MigrationError` (RecoveryRequired exit code). Legacy sessions and ar
 
 ## Known limitations
 
-- **Single writer:** SQLite transactions serialize writers, but Atlas's advisory lock system does not yet cover evidence-index commits. Two processes committing concurrently will see one transaction block or fail rather than corrupt data; cross-process coordination lands with Batch 11 orchestration.
+- **Single writer:** SQLite transactions serialize writers, but Sigil's advisory lock system does not yet cover evidence-index commits. Two processes committing concurrently will see one transaction block or fail rather than corrupt data; cross-process coordination lands with Batch 11 orchestration.
 - **Incremental analyzer:** B3.3 analyzer runs incrementally (only changed files plus dependents) via `changedUris` and `analyzerVersionChanged`; unchanged semantic rows are carried forward from `previous` payload. Full re-analysis occurs on `gitReset` or version change.
 
 ## Extension points

@@ -14,8 +14,8 @@
 Recommended default:
 
 ```text
-<userData>/atlas/
-  atlas.db
+<userData>/sigil/
+  sigil.db
   artifacts/
     <repo_hash>/<session_id>/<artifact_type>/<version>-<sha256-prefix>.md
     <repo_hash>/<session_id>/<artifact_type>/<version>-<sha256-prefix>.json
@@ -28,9 +28,9 @@ Recommended default:
 Project config:
 
 ```text
-<repo>/atlas.config.json
-<repo>/atlas.local.json
-<repo>/.atlas/            # optional gitignored mirror or links only
+<repo>/sigil.config.json
+<repo>/sigil.local.json
+<repo>/.sigil/            # optional gitignored mirror or links only
 ```
 
 ## Entity-Relationship Diagram
@@ -115,7 +115,7 @@ Unique: `(repo_id, task_source, task_key)` where task_key not null and dispositi
 | `media_type` | text | e.g. text/markdown, application/json |
 | `sensitivity` | text | check `public,internal,confidential,secret-redacted` |
 | `status` | text | check `draft,valid,rejected,approved,superseded,stale` |
-| `producer_type` | text | check `atlas,user,adapter,agent,import` |
+| `producer_type` | text | check `sigil,user,adapter,agent,import` |
 | `producer_id` | text | nullable |
 | `created_at` | text | not null |
 | `approved_at` | text | nullable |
@@ -139,7 +139,7 @@ Primary key: `(artifact_id, depends_on_artifact_id, dependency_kind)`.
 | `event_id` | text | primary key |
 | `session_id` | text | fk sessions nullable for global events |
 | `event_type` | text | not null |
-| `actor_type` | text | `user,atlas,adapter,agent` |
+| `actor_type` | text | `user,sigil,adapter,agent` |
 | `actor_id` | text | nullable |
 | `command_id` | text | nullable |
 | `occurred_at` | text | not null |
@@ -306,7 +306,7 @@ External deletion is detected by artifact hash verification on `status`, `resume
 
 ## Migration Rollback
 
-Migrations are forward-only in normal operation. If an apply fails, Atlas restores the pre-migration backup and records a failed migration diagnostic. Approved artifact bytes are never rewritten by migration.
+Migrations are forward-only in normal operation. If an apply fails, Sigil restores the pre-migration backup and records a failed migration diagnostic. Approved artifact bytes are never rewritten by migration.
 
 ## Retention, Soft Deletion, and Archival
 

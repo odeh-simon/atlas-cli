@@ -1,1 +1,1 @@
-export const adapterContractsPackage = "@atlas/adapter-contracts";
+export const adapterContractsPackage = "@sigil/adapter-contracts";

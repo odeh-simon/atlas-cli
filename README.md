@@ -1,16 +1,18 @@
-# Atlas CLI
+# Sigil CLI
+
+A sigil is a seal of authority: in Sigil, nothing ships until a human puts their seal on it.
 
 **Auditable, human-gated orchestration for AI-assisted software development.**
 
-Atlas is a local-first command-line tool that coordinates the work around AI coding agents: issue intake, context selection, planning, implementation contracts, agent runs, checks, review and completion. It connects Linear, Git, GitHub, Figma, Claude Code and Codex, and keeps one durable, resumable session per task built from versioned artifacts.
+Sigil is a local-first command-line tool that coordinates the work around AI coding agents: issue intake, context selection, planning, implementation contracts, agent runs, checks, review and completion. It connects Linear, Git, GitHub, Figma, Claude Code and Codex, and keeps one durable, resumable session per task built from versioned artifacts.
 
-Atlas is not an autonomous agent swarm. A human approves every material decision, and every claim Atlas makes about the code can be traced back to evidence in the repository.
+Sigil is not an autonomous agent swarm. A human approves every material decision, and every claim Sigil makes about the code can be traced back to evidence in the repository.
 
-> **Status:** pre-release (`0.0.0`). Atlas is under active development, interfaces may change, and it has not had a public release yet. Feedback and contributions are welcome.
+> **Status:** pre-release (`0.0.0`). Sigil is under active development, interfaces may change, and it has not had a public release yet. Feedback and contributions are welcome.
 
-## Why Atlas
+## Why Sigil
 
-Engineers who use several AI tools spend a lot of time copying context between issue trackers, planning chats, coding agents and review sessions, and it gets easy to lose track of which plan was approved and which code is actually being reviewed. Atlas replaces that with a single auditable workflow:
+Engineers who use several AI tools spend a lot of time copying context between issue trackers, planning chats, coding agents and review sessions, and it gets easy to lose track of which plan was approved and which code is actually being reviewed. Sigil replaces that with a single auditable workflow:
 
 - **Explainable, deterministic context.** Context is selected from repository evidence: TypeScript symbols, module relationships and test-to-code links, within token budgets. Every input is hash-verified. AI may re-rank candidates but cannot invent facts.
 - **Human-approved contracts.** Implementation starts only after a person approves an explicit contract for the task.
@@ -29,31 +31,31 @@ Engineers who use several AI tools spend a lot of time copying context between i
 ## Quick start (from source)
 
 ```bash
-git clone https://github.com/odeh-simon/atlas-cli.git
-cd atlas-cli
+git clone https://github.com/odeh-simon/sigil.git
+cd sigil
 pnpm install --frozen-lockfile
 pnpm build
 pnpm link --global
 
-atlas --version
-atlas doctor
+sigil --version
+sigil doctor
 ```
 
 Copy the example configuration and adjust it for your project:
 
 ```bash
-cp atlas.config.example.json atlas.config.json
+cp sigil.config.example.json sigil.config.json
 ```
 
-`atlas.config.json` is ignored by Git. Never put tokens in it; register them as aliases instead:
+`sigil.config.json` is ignored by Git. Never put tokens in it; register them as aliases instead:
 
 ```bash
 export LINEAR_API_KEY="..."
-atlas auth add --provider linear --alias linear.default --value-env LINEAR_API_KEY
-atlas adapters health
+sigil auth add --provider linear --alias linear.default --value-env LINEAR_API_KEY
+sigil adapters health
 ```
 
-Atlas works without any remote service for manual intake, deterministic context, manual agent handoff, checks, review and completion. Configure only the connections a run needs.
+Sigil works without any remote service for manual intake, deterministic context, manual agent handoff, checks, review and completion. Configure only the connections a run needs.
 
 | Connection | Used for | Credential |
 | --- | --- | --- |
@@ -67,27 +69,27 @@ Atlas works without any remote service for manual intake, deterministic context,
 ## A typical run
 
 ```bash
-atlas git preflight --base main
-atlas start <ISSUE-KEY>                 # or: atlas start --manual --title "..." --objective "..."
-atlas context build --max-files 80
-atlas context inspect --included
-atlas plan --ai
-atlas contract import approved-contract.json
-atlas approve contract --yes            # human gate
-atlas implement --agent codex           # or --agent claude
-atlas checks run
-atlas review prepare
-atlas review import review-report.json
-atlas complete --check
-atlas approve completion --yes          # human gate
-atlas status
+sigil git preflight --base main
+sigil start <ISSUE-KEY>                 # or: sigil start --manual --title "..." --objective "..."
+sigil context build --max-files 80
+sigil context inspect --included
+sigil plan --ai
+sigil contract import approved-contract.json
+sigil approve contract --yes            # human gate
+sigil implement --agent codex           # or --agent claude
+sigil checks run
+sigil review prepare
+sigil review import review-report.json
+sigil complete --check
+sigil approve completion --yes          # human gate
+sigil status
 ```
 
-Writebacks to Linear, GitHub or Figma are opt-in and support `--dry-run`. See [`DOCs/Atlas_CLI_Install_and_Release.md`](DOCs/Atlas_CLI_Install_and_Release.md) for the full runbook, recovery steps and release process.
+Writebacks to Linear, GitHub or Figma are opt-in and support `--dry-run`. See [`DOCs/Sigil_CLI_Install_and_Release.md`](DOCs/Sigil_CLI_Install_and_Release.md) for the full runbook, recovery steps and release process.
 
 ## Architecture
 
-Atlas uses a hexagonal (ports-and-adapters) design in a pnpm monorepo of 25 TypeScript packages. The core never talks to an external system directly; each system has its own adapter behind a shared adapter-contract layer.
+Sigil uses a hexagonal (ports-and-adapters) design in a pnpm monorepo of 25 TypeScript packages. The core never talks to an external system directly; each system has its own adapter behind a shared adapter-contract layer.
 
 | Area | Packages |
 | --- | --- |
@@ -108,9 +110,9 @@ pnpm test            # full Vitest suite
 pnpm release:check   # check, test, bundle and smoke-test a portable release
 ```
 
-## How Atlas was built
+## How Sigil was built
 
-Atlas was designed by its author, who wrote the requirements, architecture and design specs and directed the implementation. AI coding agents (Codex and Claude Code) helped write much of the code, under that direction and through the same contract, check and review discipline Atlas itself enforces.
+Sigil was designed by its author, who wrote the requirements, architecture and design specs and directed the implementation. AI coding agents (Codex and Claude Code) helped write much of the code, under that direction and through the same contract, check and review discipline Sigil itself enforces.
 
 ## Contributing
 

@@ -1,19 +1,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError, ValidationError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { StateTransitionError, ValidationError } from "@sigil/domain";
 import {
   appendEvent,
   createArtifactRecord,
   listArtifactsForSession,
   listSessionsForRepository,
   updateSessionContractArtifact
-} from "@atlas/persistence";
-import { implementationContractSchema } from "@atlas/schemas";
-import { diffImplementationContracts, transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { implementationContractSchema } from "@sigil/schemas";
+import { diffImplementationContracts, transition } from "@sigil/workflow-engine";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface ImportContractInput extends RuntimeOptions {
   readonly filePath: string;
@@ -28,7 +28,7 @@ export interface ImportContractResult {
 }
 
 export async function importContract(input: ImportContractInput): Promise<ImportContractResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -163,10 +163,10 @@ export async function importContract(input: ImportContractInput): Promise<Import
       contractArtifactId: artifactId,
       state: next,
       valid: true,
-      nextCommand: "atlas approve contract"
+      nextCommand: "sigil approve contract"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

@@ -40,34 +40,34 @@ import {
   compareVisualEvidence,
   importFigmaVisualEvidence,
   runAiVisualReview
-} from "@atlas/app-services";
-import { getClaudeCodeAdapterHealth } from "@atlas/adapters-claude-code";
-import { getCodexAdapterHealth } from "@atlas/adapters-codex";
+} from "@sigil/app-services";
+import { getClaudeCodeAdapterHealth } from "@sigil/adapters-claude-code";
+import { getCodexAdapterHealth } from "@sigil/adapters-codex";
 import {
   fetchFigmaFileSnapshot,
   fetchFigmaNodeImage,
   getFigmaAdapterHealth,
   parseFigmaReference,
   readFigmaFixture
-} from "@atlas/adapters-figma";
+} from "@sigil/adapters-figma";
 import {
   commentGitHubPullRequest,
   fetchGitHubRepositorySnapshot,
   getGitHubAdapterHealth,
   parseGitHubReference,
   readGitHubFixture
-} from "@atlas/adapters-github";
+} from "@sigil/adapters-github";
 import {
   commentLinearIssue,
   fetchLinearIssue,
   getLinearAdapterHealth,
   isLinearIssueKey,
   readLinearIssueFixture
-} from "@atlas/adapters-linear";
-import { scanDesignPolicies } from "@atlas/checks";
-import { createTelemetryPreview, telemetryEnabled } from "@atlas/diagnostics";
-import { AtlasError } from "@atlas/domain";
-import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@atlas/git";
+} from "@sigil/adapters-linear";
+import { scanDesignPolicies } from "@sigil/checks";
+import { createTelemetryPreview, telemetryEnabled } from "@sigil/diagnostics";
+import { SigilError } from "@sigil/domain";
+import { preflightGitBranch, readGitRepositoryFacts, summarizeGitDiffSafeguards } from "@sigil/git";
 import {
   assertAiDataConsent,
   defaultHetznerProvider,
@@ -75,14 +75,14 @@ import {
   getAiProviderHealth,
   listAiModels,
   type AiProviderConfig
-} from "@atlas/llm";
+} from "@sigil/llm";
 import {
   getCredentialToken,
   listCredentials,
   removeCredential,
   storeCredential,
   type CredentialProvider
-} from "@atlas/security";
+} from "@sigil/security";
 
 const version = readCliVersion();
 
@@ -307,7 +307,7 @@ function readCliVersion(): string {
 }
 
 function reportCliError(error: unknown): number {
-  if (error instanceof AtlasError) {
+  if (error instanceof SigilError) {
     console.error(error.message);
     if (error.details !== undefined) {
       const failures = error.details.failures;
@@ -327,76 +327,76 @@ function reportCliError(error: unknown): number {
 }
 
 function printHelp(): void {
-  console.log(`Atlas ${version}
+  console.log(`Sigil ${version}
 
 Usage:
-  atlas init --yes
-  atlas start --manual --title <title> --objective <objective> [--task-key <key>]
-  atlas start <LINEAR-ISSUE-KEY>
-  atlas context import <file>
-  atlas context build [--ai] [--ai-provider <alias>] [--max-files <n>] [--max-bytes <n>]
-  atlas context inspect [artifact-id] [--included|--excluded|--all|--json]
-  atlas context summarize [artifact-id]
-  atlas decisions record --kind <decision|deviation> --title <title> --rationale <text> --category <category> --yes
-  atlas plan [--ai] [--ai-provider <alias>]
-  atlas contract import <file>
-  atlas approve contract --yes
-  atlas implement export --manual
-  atlas implement --agent <codex|claude>
-  atlas execution import <file>
-  atlas checks run
-  atlas checks design-scan [--root <path>]
-  atlas review prepare
-  atlas review import <file> --actor <trusted-reviewer-id>
-  atlas findings disposition <id> --resolve --reason <reason> --evidence <artifact-or-reference>
-  atlas fix prepare
-  atlas complete --check
-  atlas approve completion --yes
-  atlas pause
-  atlas resume
-  atlas archive
-  atlas unarchive
-  atlas cancel --yes --reason <reason>
-  atlas git status
-  atlas git preflight [--base <branch>] [--target <branch>] [--allow-dirty]
-  atlas git diff-safeguards [--base <ref>]
-  atlas figma inspect <figma-url|fixture.json>
-  atlas figma evidence <figma-url> [--image <png>] [--scale <0.01-4>]
-  atlas github inspect <github-url|fixture.json>
-  atlas linear inspect <fixture.json>
-  atlas status
-  atlas doctor
-  atlas auth add --provider <figma|github|linear|ai> --alias <alias> --value-env <ENV_VAR>
-  atlas auth list
-  atlas auth remove --alias <alias>
-  atlas adapters health
-  atlas artifacts show <artifact-id>
-  atlas ai providers health
-  atlas ai providers add hetzner --token-alias <alias> [--alias <alias>] [--allow-cloud-code] [--allow-cloud-images]
-  atlas ai models [--provider <alias>]
-  atlas ai vision test <image> [--provider <alias>] [--prompt <text>]
-  atlas visual capture --url <url> [--viewport <desktop|mobile|WIDTHxHEIGHT>] [--full-page]
-  atlas visual compare (--reference <png>|--reference-artifact <id>) (--actual <png>|--actual-artifact <id>)
-  atlas visual review --comparison <id> [--provider <alias>]
-  atlas orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
-  atlas writebacks run --provider <linear|github|figma> --target <id|url> --summary <text> [--dry-run|--yes]
-  atlas telemetry status
-  atlas telemetry preview
-  atlas telemetry enable
-  atlas telemetry disable
+  sigil init --yes
+  sigil start --manual --title <title> --objective <objective> [--task-key <key>]
+  sigil start <LINEAR-ISSUE-KEY>
+  sigil context import <file>
+  sigil context build [--ai] [--ai-provider <alias>] [--max-files <n>] [--max-bytes <n>]
+  sigil context inspect [artifact-id] [--included|--excluded|--all|--json]
+  sigil context summarize [artifact-id]
+  sigil decisions record --kind <decision|deviation> --title <title> --rationale <text> --category <category> --yes
+  sigil plan [--ai] [--ai-provider <alias>]
+  sigil contract import <file>
+  sigil approve contract --yes
+  sigil implement export --manual
+  sigil implement --agent <codex|claude>
+  sigil execution import <file>
+  sigil checks run
+  sigil checks design-scan [--root <path>]
+  sigil review prepare
+  sigil review import <file> --actor <trusted-reviewer-id>
+  sigil findings disposition <id> --resolve --reason <reason> --evidence <artifact-or-reference>
+  sigil fix prepare
+  sigil complete --check
+  sigil approve completion --yes
+  sigil pause
+  sigil resume
+  sigil archive
+  sigil unarchive
+  sigil cancel --yes --reason <reason>
+  sigil git status
+  sigil git preflight [--base <branch>] [--target <branch>] [--allow-dirty]
+  sigil git diff-safeguards [--base <ref>]
+  sigil figma inspect <figma-url|fixture.json>
+  sigil figma evidence <figma-url> [--image <png>] [--scale <0.01-4>]
+  sigil github inspect <github-url|fixture.json>
+  sigil linear inspect <fixture.json>
+  sigil status
+  sigil doctor
+  sigil auth add --provider <figma|github|linear|ai> --alias <alias> --value-env <ENV_VAR>
+  sigil auth list
+  sigil auth remove --alias <alias>
+  sigil adapters health
+  sigil artifacts show <artifact-id>
+  sigil ai providers health
+  sigil ai providers add hetzner --token-alias <alias> [--alias <alias>] [--allow-cloud-code] [--allow-cloud-images]
+  sigil ai models [--provider <alias>]
+  sigil ai vision test <image> [--provider <alias>] [--prompt <text>]
+  sigil visual capture --url <url> [--viewport <desktop|mobile|WIDTHxHEIGHT>] [--full-page]
+  sigil visual compare (--reference <png>|--reference-artifact <id>) (--actual <png>|--actual-artifact <id>)
+  sigil visual review --comparison <id> [--provider <alias>]
+  sigil orchestrate run --until <context-ready|planning-ready|checks-completed|completion-ready>
+  sigil writebacks run --provider <linear|github|figma> --target <id|url> --summary <text> [--dry-run|--yes]
+  sigil telemetry status
+  sigil telemetry preview
+  sigil telemetry enable
+  sigil telemetry disable
 
-Context discovery uses the strict atlas.config.json "context" section. Planning and implementation require a current semantic-complete v3 manifest; legacy or stale context is repaired with atlas context build.
+Context discovery uses the strict sigil.config.json "context" section. Planning and implementation require a current semantic-complete v3 manifest; legacy or stale context is repaired with sigil context build.
 `);
 }
 
 function initCommand(args: string[]): number {
   const yes = args.includes("--yes");
   if (!yes) {
-    console.error("atlas init requires --yes in the walking skeleton");
+    console.error("sigil init requires --yes in the walking skeleton");
     return 2;
   }
 
-  const configPath = join(process.cwd(), "atlas.config.json");
+  const configPath = join(process.cwd(), "sigil.config.json");
   if (existsSync(configPath)) {
     console.log(`Project config already exists: ${configPath}`);
     return 0;
@@ -406,10 +406,10 @@ function initCommand(args: string[]): number {
     configPath,
     `${JSON.stringify(
       {
-        $schema: "./atlas.config.schema.json",
+        $schema: "./sigil.config.schema.json",
         schemaVersion: 1,
         project: {
-          name: "atlas-project",
+          name: "sigil-project",
           baseBranch: "main"
         },
         telemetry: {
@@ -430,7 +430,7 @@ async function startManualCommand(args: string[]): Promise<number> {
   const taskKey = readOption(args, "--task-key", false);
 
   if (title === undefined || objective === undefined) {
-    console.error("atlas start --manual requires --title and --objective");
+    console.error("sigil start --manual requires --title and --objective");
     return 2;
   }
 
@@ -444,12 +444,12 @@ async function startManualCommand(args: string[]): Promise<number> {
 }
 
 async function startLinearCommand(issueKey: string): Promise<number> {
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   const tokenAlias = config.adapters?.linear?.tokenAlias ?? "linear.default";
   const token = getCredentialToken({ alias: tokenAlias, provider: "linear" });
   if (token === undefined) {
     console.error(`Linear credential alias is missing: ${tokenAlias}`);
-    console.error(`Next: atlas auth add --provider linear --alias ${tokenAlias} --value-env LINEAR_API_KEY`);
+    console.error(`Next: sigil auth add --provider linear --alias ${tokenAlias} --value-env LINEAR_API_KEY`);
     return 2;
   }
 
@@ -466,7 +466,7 @@ async function startLinearCommand(issueKey: string): Promise<number> {
 async function statusCommand(): Promise<number> {
   const status = await getStatus();
   if (status.session === undefined) {
-    console.log("No Atlas session found for this repository.");
+    console.log("No Sigil session found for this repository.");
     console.log(`Next: ${status.nextCommands[0]}`);
     return 0;
   }
@@ -503,7 +503,7 @@ async function doctorCommand(): Promise<number> {
 async function artifactsShowCommand(args: string[]): Promise<number> {
   const artifactId = args[0];
   if (artifactId === undefined) {
-    console.error("atlas artifacts show requires an artifact id");
+    console.error("sigil artifacts show requires an artifact id");
     return 2;
   }
 
@@ -522,7 +522,7 @@ function authAddCommand(args: string[]): number {
   const alias = readOption(args, "--alias");
   const valueEnv = readOption(args, "--value-env");
   if (provider === undefined || alias === undefined || valueEnv === undefined) {
-    console.error("atlas auth add requires --provider, --alias, and --value-env");
+    console.error("sigil auth add requires --provider, --alias, and --value-env");
     return 2;
   }
   const token = process.env[valueEnv];
@@ -553,7 +553,7 @@ function authListCommand(): number {
 function authRemoveCommand(args: string[]): number {
   const alias = readOption(args, "--alias");
   if (alias === undefined) {
-    console.error("atlas auth remove requires --alias");
+    console.error("sigil auth remove requires --alias");
     return 2;
   }
   const removed = removeCredential({ alias });
@@ -562,7 +562,7 @@ function authRemoveCommand(args: string[]): number {
 }
 
 function adaptersHealthCommand(): number {
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   const figmaToken = tokenForConfiguredAlias(config.adapters?.figma?.tokenAlias, "figma");
   const githubToken = tokenForConfiguredAlias(config.adapters?.github?.tokenAlias, "github");
   const linearToken = tokenForConfiguredAlias(config.adapters?.linear?.tokenAlias, "linear");
@@ -596,7 +596,7 @@ async function aiCommand(args: string[]): Promise<number> {
     return await aiVisionTestCommand(rest);
   }
 
-  console.error("atlas ai requires providers health, providers add hetzner, or models");
+  console.error("sigil ai requires providers health, providers add hetzner, or models");
   return 2;
 }
 
@@ -604,14 +604,14 @@ function aiProvidersAddHetznerCommand(args: string[]): number {
   const tokenAlias = readOption(args, "--token-alias");
   const alias = readOption(args, "--alias", false) ?? "hetzner.default";
   if (tokenAlias === undefined) {
-    console.error("atlas ai providers add hetzner requires --token-alias <alias>");
+    console.error("sigil ai providers add hetzner requires --token-alias <alias>");
     return 2;
   }
 
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   const provider = defaultHetznerProvider({ alias, tokenAlias });
   const providers = (config.ai?.providers ?? []).filter((candidate) => candidate.alias !== alias);
-  writeAtlasConfig({
+  writeSigilConfig({
     ...config,
     ai: {
       ...config.ai,
@@ -626,7 +626,7 @@ function aiProvidersAddHetznerCommand(args: string[]): number {
   console.log(`Model: ${provider.model}`);
   console.log(`Cloud code context: ${args.includes("--allow-cloud-code") ? "allowed" : "blocked"}`);
   console.log(`Cloud images: ${args.includes("--allow-cloud-images") ? "allowed" : "blocked"}`);
-  console.log(`Next: atlas auth add --provider ai --alias ${tokenAlias} --value-env HETZNER_INFERENCE_API_KEY`);
+  console.log(`Next: sigil auth add --provider ai --alias ${tokenAlias} --value-env HETZNER_INFERENCE_API_KEY`);
   return 0;
 }
 
@@ -635,7 +635,7 @@ async function aiVisionTestCommand(args: string[]): Promise<number> {
   const providerAlias = readOption(args, "--provider", false);
   const prompt = readOption(args, "--prompt", false) ?? "Describe this interface and identify visible UI problems.";
   if (imagePath === undefined) {
-    console.error("atlas ai vision test requires an image path");
+    console.error("sigil ai vision test requires an image path");
     return 2;
   }
   const provider = readConfiguredAiProvider(providerAlias);
@@ -643,7 +643,7 @@ async function aiVisionTestCommand(args: string[]): Promise<number> {
     console.error(providerAlias === undefined ? "No AI provider configured" : `AI provider not configured: ${providerAlias}`);
     return 2;
   }
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   assertAiDataConsent(provider, "image", config.ai?.allowCloudImages);
   const apiKey = tokenForConfiguredAlias(provider.tokenAlias, "ai");
   if (provider.tokenAlias !== undefined && apiKey === undefined) {
@@ -670,14 +670,14 @@ async function aiVisionTestCommand(args: string[]): Promise<number> {
 async function visualCaptureCommand(args: string[]): Promise<number> {
   const url = readOption(args, "--url");
   if (url === undefined) {
-    console.error("atlas visual capture requires --url <url>");
+    console.error("sigil visual capture requires --url <url>");
     return 2;
   }
-  const config = readAtlasConfig().visualQa;
+  const config = readSigilConfig().visualQa;
   const viewport = readVisualViewport(readOption(args, "--viewport", false), config?.viewports);
   const browserChannel = readVisualBrowserChannel(readOption(args, "--browser", false) ?? config?.browserChannel);
   if (browserChannel === undefined) {
-    console.error("atlas visual capture --browser must be auto, msedge, chrome, or chromium");
+    console.error("sigil visual capture --browser must be auto, msedge, chrome, or chromium");
     return 2;
   }
   const timeoutMs = readNumberOption(args, "--timeout-ms") ?? config?.timeoutMs;
@@ -706,11 +706,11 @@ async function visualCompareCommand(args: string[]): Promise<number> {
     (actualPath === undefined) === (actualArtifactId === undefined)
   ) {
     console.error(
-      "atlas visual compare requires exactly one reference (--reference or --reference-artifact) and one actual (--actual or --actual-artifact)"
+      "sigil visual compare requires exactly one reference (--reference or --reference-artifact) and one actual (--actual or --actual-artifact)"
     );
     return 2;
   }
-  const config = readAtlasConfig().visualQa;
+  const config = readSigilConfig().visualQa;
   const pixelThreshold = readRatioOption(args, "--pixel-threshold") ?? config?.pixelThreshold;
   const allowedDiffRatio = readRatioOption(args, "--allowed-ratio") ?? config?.allowedDiffRatio;
   const maxPixels = readNumberOption(args, "--max-pixels") ?? config?.maxPixels;
@@ -737,7 +737,7 @@ async function visualCompareCommand(args: string[]): Promise<number> {
 async function visualReviewCommand(args: string[]): Promise<number> {
   const comparisonArtifactId = readOption(args, "--comparison");
   if (comparisonArtifactId === undefined) {
-    console.error("atlas visual review requires --comparison <artifact-id>");
+    console.error("sigil visual review requires --comparison <artifact-id>");
     return 2;
   }
   const providerAlias = readOption(args, "--provider", false);
@@ -746,7 +746,7 @@ async function visualReviewCommand(args: string[]): Promise<number> {
     console.error(providerAlias === undefined ? "No AI provider configured" : `AI provider not configured: ${providerAlias}`);
     return 2;
   }
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   assertAiDataConsent(provider, "image", config.ai?.allowCloudImages);
   const apiKey = tokenForConfiguredAlias(provider.tokenAlias, "ai");
   if (provider.tokenAlias !== undefined && apiKey === undefined) {
@@ -765,7 +765,7 @@ async function visualReviewCommand(args: string[]): Promise<number> {
   console.log(`Status: ${result.status}`);
   console.log(`Findings: ${result.findingCount} (${result.blockingCount} blocking)`);
   console.log(result.summary);
-  console.log(`Inspect: atlas artifacts show ${result.reviewArtifactId}`);
+  console.log(`Inspect: sigil artifacts show ${result.reviewArtifactId}`);
   return 0;
 }
 
@@ -773,7 +773,7 @@ async function aiProvidersHealthCommand(): Promise<number> {
   const providers = readConfiguredAiProviders();
   if (providers.length === 0) {
     const defaultProvider = defaultOllamaProvider();
-    console.log(`${defaultProvider.alias}: not-configured ${defaultProvider.provider} add ai.providers to atlas.config.json`);
+    console.log(`${defaultProvider.alias}: not-configured ${defaultProvider.provider} add ai.providers to sigil.config.json`);
     return 1;
   }
 
@@ -791,7 +791,7 @@ async function aiProvidersHealthCommand(): Promise<number> {
 
 async function aiModelsCommand(args: string[]): Promise<number> {
   const providers = readConfiguredAiProviders();
-  const alias = readOption(args, "--provider", false) ?? readAtlasConfig().ai?.defaultProviderAlias;
+  const alias = readOption(args, "--provider", false) ?? readSigilConfig().ai?.defaultProviderAlias;
   const provider = alias === undefined ? providers[0] : providers.find((candidate) => candidate.alias === alias);
   if (provider === undefined) {
     console.error(alias === undefined ? "No AI provider configured" : `AI provider not configured: ${alias}`);
@@ -808,7 +808,7 @@ async function aiModelsCommand(args: string[]): Promise<number> {
 function telemetryCommand(args: string[]): number {
   const action = args[0];
   if (action === "status") {
-    const config = readAtlasConfig();
+    const config = readSigilConfig();
     console.log(`Telemetry: ${telemetryEnabled(config.telemetry) ? "enabled" : "disabled"}`);
     console.log("Mode: local config, content-free operational metadata only");
     return 0;
@@ -821,12 +821,12 @@ function telemetryCommand(args: string[]): number {
 
   if (action === "enable" || action === "disable") {
     const enabled = action === "enable";
-    writeAtlasConfig({ ...readAtlasConfig(), telemetry: { enabled } });
+    writeSigilConfig({ ...readSigilConfig(), telemetry: { enabled } });
     console.log(`Telemetry: ${enabled ? "enabled" : "disabled"}`);
     return 0;
   }
 
-  console.error("atlas telemetry requires status, preview, enable, or disable");
+  console.error("sigil telemetry requires status, preview, enable, or disable");
   return 2;
 }
 
@@ -879,7 +879,7 @@ function gitDiffSafeguardsCommand(args: string[]): number {
 function linearInspectCommand(args: string[]): number {
   const filePath = args[0];
   if (filePath === undefined) {
-    console.error("atlas linear inspect requires a fixture path");
+    console.error("sigil linear inspect requires a fixture path");
     return 2;
   }
 
@@ -897,7 +897,7 @@ function linearInspectCommand(args: string[]): number {
 async function figmaInspectCommand(args: string[]): Promise<number> {
   const input = args[0];
   if (input === undefined) {
-    console.error("atlas figma inspect requires a Figma URL or fixture path");
+    console.error("sigil figma inspect requires a Figma URL or fixture path");
     return 2;
   }
 
@@ -911,7 +911,7 @@ async function figmaInspectCommand(args: string[]): Promise<number> {
   }
 
   const reference = parseFigmaReference(input);
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   const token = getCredentialToken({ alias: config.adapters?.figma?.tokenAlias ?? "figma.default", provider: "figma" });
   if (token !== undefined) {
     const snapshot = await fetchFigmaFileSnapshot({ apiKey: token, reference });
@@ -932,21 +932,21 @@ async function figmaInspectCommand(args: string[]): Promise<number> {
 async function figmaEvidenceCommand(args: string[]): Promise<number> {
   const input = args[0];
   if (input === undefined || input.startsWith("--")) {
-    console.error("atlas figma evidence requires a Figma URL");
+    console.error("sigil figma evidence requires a Figma URL");
     return 2;
   }
   const reference = parseFigmaReference(input);
   if (reference.nodeId === undefined) {
-    console.error("atlas figma evidence requires a Figma URL with node-id");
+    console.error("sigil figma evidence requires a Figma URL with node-id");
     return 2;
   }
   const rawScale = readOption(args, "--scale", false);
   const scale = rawScale === undefined ? 1 : Number(rawScale);
   if (!Number.isFinite(scale) || scale < 0.01 || scale > 4) {
-    console.error("atlas figma evidence --scale must be between 0.01 and 4");
+    console.error("sigil figma evidence --scale must be between 0.01 and 4");
     return 2;
   }
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   const maxBytes = config.visualQa?.maxReferenceBytes ?? 10_000_000;
   const imagePath = readOption(args, "--image", false);
   let bytes: Uint8Array;
@@ -978,14 +978,14 @@ async function figmaEvidenceCommand(args: string[]): Promise<number> {
   console.log(`Visual reference: ${result.referenceArtifactId}`);
   console.log(`Path: ${result.referencePath}`);
   console.log(`SHA-256: ${result.referenceSha256}`);
-  console.log(`Next: atlas visual compare --reference-artifact ${result.referenceArtifactId} --actual-artifact <snapshot-id>`);
+  console.log(`Next: sigil visual compare --reference-artifact ${result.referenceArtifactId} --actual-artifact <snapshot-id>`);
   return 0;
 }
 
 async function githubInspectCommand(args: string[]): Promise<number> {
   const input = args[0];
   if (input === undefined) {
-    console.error("atlas github inspect requires a GitHub URL or fixture path");
+    console.error("sigil github inspect requires a GitHub URL or fixture path");
     return 2;
   }
 
@@ -998,7 +998,7 @@ async function githubInspectCommand(args: string[]): Promise<number> {
   }
 
   const reference = parseGitHubReference(input);
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   const token = getCredentialToken({ alias: config.adapters?.github?.tokenAlias ?? "github.default", provider: "github" });
   if (token !== undefined) {
     const snapshot = await fetchGitHubRepositorySnapshot({ token, reference });
@@ -1017,7 +1017,7 @@ async function githubInspectCommand(args: string[]): Promise<number> {
 
 async function decisionsRecordCommand(args: string[]): Promise<number> {
   if (!args.includes("--yes")) {
-    console.error("atlas decisions record requires --yes");
+    console.error("sigil decisions record requires --yes");
     return 2;
   }
   const kind = readOption(args, "--kind");
@@ -1030,7 +1030,7 @@ async function decisionsRecordCommand(args: string[]): Promise<number> {
     rationale === undefined ||
     !isMaterialCategory(category)
   ) {
-    console.error("atlas decisions record requires --kind, --title, --rationale, and valid --category");
+    console.error("sigil decisions record requires --kind, --title, --rationale, and valid --category");
     return 2;
   }
 
@@ -1087,7 +1087,7 @@ async function unarchiveCommand(): Promise<number> {
 
 async function cancelCommand(args: string[]): Promise<number> {
   if (!args.includes("--yes")) {
-    console.error("atlas cancel requires --yes in the walking skeleton");
+    console.error("sigil cancel requires --yes in the walking skeleton");
     return 2;
   }
 
@@ -1102,7 +1102,7 @@ async function cancelCommand(args: string[]): Promise<number> {
 async function contextImportCommand(args: string[]): Promise<number> {
   const filePath = args[0];
   if (filePath === undefined) {
-    console.error("atlas context import requires a file path");
+    console.error("sigil context import requires a file path");
     return 2;
   }
 
@@ -1205,14 +1205,14 @@ async function contextBuildCommand(args: string[]): Promise<number> {
   const status = await getStatus();
   const refreshableStates = new Set(["intake_ready", "context_ready", "planning_ready", "contract_draft", "contract_approved"]);
   if (status.session !== undefined && !refreshableStates.has(status.session.primaryState)) {
-    console.error(`atlas context build cannot safely refresh from state ${status.session.primaryState}`);
+    console.error(`sigil context build cannot safely refresh from state ${status.session.primaryState}`);
     console.log(`Next: ${status.nextCommands[0] ?? "no next command"}`);
     return 2;
   }
 
   let aiRecommendationArtifactId: string | undefined;
   if (useAi) {
-    const config = readAtlasConfig();
+    const config = readSigilConfig();
     const providers = readConfiguredAiProviders();
     const alias = aiProviderAlias ?? config.ai?.defaultProviderAlias;
     const provider = alias === undefined ? providers[0] : providers.find((candidate) => candidate.alias === alias);
@@ -1263,7 +1263,7 @@ async function planCommand(args: string[]): Promise<number> {
     console.error(aiProviderAlias === undefined ? "No AI provider configured" : `AI provider not configured: ${aiProviderAlias}`);
     return 2;
   }
-  const cloudDataConsent = readAtlasConfig().ai?.allowCloudCodeContext;
+  const cloudDataConsent = readSigilConfig().ai?.allowCloudCodeContext;
   if (provider !== undefined) assertAiDataConsent(provider, "code-context", cloudDataConsent);
   const result = await exportPlanningPackage({
     ...(provider === undefined
@@ -1289,11 +1289,11 @@ async function planCommand(args: string[]): Promise<number> {
 async function orchestrateRunCommand(args: string[]): Promise<number> {
   const until = readOrchestrateUntil(readOption(args, "--until"));
   if (until === undefined) {
-    console.error("atlas orchestrate run requires --until <context-ready|planning-ready|checks-completed|completion-ready>");
+    console.error("sigil orchestrate run requires --until <context-ready|planning-ready|checks-completed|completion-ready>");
     return 2;
   }
 
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   const agentProvider =
     config.adapters?.codex?.command !== undefined
       ? "codex"
@@ -1324,7 +1324,7 @@ async function writebacksRunCommand(args: string[]): Promise<number> {
   const dryRun = args.includes("--dry-run");
   const yes = args.includes("--yes");
   if (provider === undefined || target === undefined || summary === undefined || (!dryRun && !yes)) {
-    console.error("atlas writebacks run requires --provider, --target, --summary, and --dry-run or --yes");
+    console.error("sigil writebacks run requires --provider, --target, --summary, and --dry-run or --yes");
     return 2;
   }
 
@@ -1343,9 +1343,9 @@ async function writebacksRunCommand(args: string[]): Promise<number> {
     return 0;
   }
 
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   if (config.writebacks?.enabled !== true) {
-    console.error("Real adapter writebacks require writebacks.enabled: true in atlas.config.json");
+    console.error("Real adapter writebacks require writebacks.enabled: true in sigil.config.json");
     return 2;
   }
   if (provider === "linear") {
@@ -1406,7 +1406,7 @@ async function writebacksRunCommand(args: string[]): Promise<number> {
 async function contractImportCommand(args: string[]): Promise<number> {
   const filePath = args[0];
   if (filePath === undefined) {
-    console.error("atlas contract import requires a file path");
+    console.error("sigil contract import requires a file path");
     return 2;
   }
 
@@ -1420,7 +1420,7 @@ async function contractImportCommand(args: string[]): Promise<number> {
 
 async function approveContractCommand(args: string[]): Promise<number> {
   if (!args.includes("--yes")) {
-    console.error("atlas approve contract requires --yes in the walking skeleton");
+    console.error("sigil approve contract requires --yes in the walking skeleton");
     return 2;
   }
 
@@ -1444,11 +1444,11 @@ async function implementExportManualCommand(): Promise<number> {
 async function implementAgentCommand(args: string[]): Promise<number> {
   const provider = args[0];
   if (provider !== "codex" && provider !== "claude") {
-    console.error("atlas implement --agent requires codex or claude");
+    console.error("sigil implement --agent requires codex or claude");
     return 2;
   }
 
-  const config = readAtlasConfig();
+  const config = readSigilConfig();
   const command = provider === "claude" ? config.adapters?.claudeCode?.command : config.adapters?.codex?.command;
   const result = await invokeImplementationAgent({ provider, command });
   console.log(`Agent: ${result.provider}`);
@@ -1466,7 +1466,7 @@ async function implementAgentCommand(args: string[]): Promise<number> {
 async function executionImportCommand(args: string[]): Promise<number> {
   const filePath = args[0];
   if (filePath === undefined) {
-    console.error("atlas execution import requires a file path");
+    console.error("sigil execution import requires a file path");
     return 2;
   }
 
@@ -1512,7 +1512,7 @@ async function reviewPrepareCommand(): Promise<number> {
 async function reviewImportCommand(args: string[]): Promise<number> {
   const filePath = args[0];
   if (filePath === undefined) {
-    console.error("atlas review import requires a file path");
+    console.error("sigil review import requires a file path");
     return 2;
   }
   const reviewerActorId = readOption(args, "--actor");
@@ -1528,14 +1528,14 @@ async function reviewImportCommand(args: string[]): Promise<number> {
 async function findingDispositionCommand(args: string[]): Promise<number> {
   const findingId = args[0];
   if (findingId === undefined) {
-    console.error("atlas findings disposition requires a finding id");
+    console.error("sigil findings disposition requires a finding id");
     return 2;
   }
   const reason = readOption(args, "--reason") ?? "Accepted in walking skeleton";
   const disposition = args.includes("--resolve") ? "resolve" : "reject";
   const evidence = readOption(args, "--evidence", false);
   if (disposition === "resolve" && evidence === undefined) {
-    console.error("atlas findings disposition --resolve requires --evidence <artifact-or-reference>");
+    console.error("sigil findings disposition --resolve requires --evidence <artifact-or-reference>");
     return 2;
   }
   const result = await disposeFinding({ findingId, disposition, reason, ...(evidence === undefined ? {} : { evidence: [evidence] }) });
@@ -1566,7 +1566,7 @@ async function completeCheckCommand(): Promise<number> {
 
 async function approveCompletionCommand(args: string[]): Promise<number> {
   if (!args.includes("--yes")) {
-    console.error("atlas approve completion requires --yes in the walking skeleton");
+    console.error("sigil approve completion requires --yes in the walking skeleton");
     return 2;
   }
 
@@ -1634,7 +1634,7 @@ function errorMessage(error: unknown): string {
 }
 
 function readConfiguredBaseBranch(): string | undefined {
-  const configPath = join(process.cwd(), "atlas.config.json");
+  const configPath = join(process.cwd(), "sigil.config.json");
   if (!existsSync(configPath)) return undefined;
 
   try {
@@ -1649,7 +1649,7 @@ function readConfiguredBaseBranch(): string | undefined {
   }
 }
 
-interface AtlasCliConfig {
+interface SigilCliConfig {
   readonly schemaVersion?: number | undefined;
   readonly project?: { readonly name?: string | undefined; readonly baseBranch?: string | undefined } | undefined;
   readonly telemetry?: { readonly enabled?: boolean | undefined } | undefined;
@@ -1709,27 +1709,27 @@ function readVisualBrowserChannel(
     : undefined;
 }
 
-function readAtlasConfig(): AtlasCliConfig {
-  const configPath = join(process.cwd(), "atlas.config.json");
+function readSigilConfig(): SigilCliConfig {
+  const configPath = join(process.cwd(), "sigil.config.json");
   if (!existsSync(configPath)) return {};
   try {
-    return JSON.parse(readFileSync(configPath, "utf8")) as AtlasCliConfig;
+    return JSON.parse(readFileSync(configPath, "utf8")) as SigilCliConfig;
   } catch {
     return {};
   }
 }
 
-function writeAtlasConfig(config: AtlasCliConfig): void {
-  const next: AtlasCliConfig = {
+function writeSigilConfig(config: SigilCliConfig): void {
+  const next: SigilCliConfig = {
     ...config,
     schemaVersion: config.schemaVersion ?? 1,
-    project: config.project ?? { name: "atlas-project", baseBranch: "main" }
+    project: config.project ?? { name: "sigil-project", baseBranch: "main" }
   };
-  writeFileSync(join(process.cwd(), "atlas.config.json"), `${JSON.stringify(next, null, 2)}\n`);
+  writeFileSync(join(process.cwd(), "sigil.config.json"), `${JSON.stringify(next, null, 2)}\n`);
 }
 
 function readConfiguredAiProviders(): AiProviderConfig[] {
-  return (readAtlasConfig().ai?.providers ?? []).flatMap((provider) => {
+  return (readSigilConfig().ai?.providers ?? []).flatMap((provider) => {
     if (
       typeof provider.alias !== "string" ||
       (provider.provider !== "ollama" && provider.provider !== "openai-compatible") ||
@@ -1758,7 +1758,7 @@ function readConfiguredAiProviders(): AiProviderConfig[] {
 
 function readConfiguredAiProvider(alias: string | undefined): AiProviderConfig | undefined {
   const providers = readConfiguredAiProviders();
-  const resolvedAlias = alias ?? readAtlasConfig().ai?.defaultProviderAlias;
+  const resolvedAlias = alias ?? readSigilConfig().ai?.defaultProviderAlias;
   return resolvedAlias === undefined ? providers[0] : providers.find((provider) => provider.alias === resolvedAlias);
 }
 

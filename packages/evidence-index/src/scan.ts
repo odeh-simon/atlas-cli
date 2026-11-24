@@ -2,13 +2,13 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, lstatSync, realpathSync, statSync } from "node:fs";
 import { extname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { CancellationError } from "@atlas/domain";
-import { SAFE_SEGMENT_PATTERN, isSafeUriSegments, type EvidenceSensitivity } from "@atlas/schemas";
+import { CancellationError } from "@sigil/domain";
+import { SAFE_SEGMENT_PATTERN, isSafeUriSegments, type EvidenceSensitivity } from "@sigil/schemas";
 
 import type { EvidenceIndexEngineLimits } from "./types.js";
 
 export const excludedDirectories = new Set([
-  ".atlas",
+  ".sigil",
   ".git",
   ".next",
   ".turbo",
@@ -195,7 +195,7 @@ function classifyUri(uri: string, contentHead: Buffer | undefined): string {
   if (/(^|\/)(schema|schemas)(\/|$)|schema\.[^.]+$/.test(lower)) return "schema";
   if (/(^|\/)(migration|migrations)(\/|$)/.test(lower)) return "migration";
   if (/(^|\/)(runbook|runbooks|ops|operations)(\/|$)|dockerfile|compose\.ya?ml$/.test(lower)) return "operation";
-  if (/(^|\/)(package\.json|tsconfig[^/]*\.json|atlas\.config\.json|vite\.config\.|vitest\.config\.|eslint)/.test(lower)) {
+  if (/(^|\/)(package\.json|tsconfig[^/]*\.json|sigil\.config\.json|vite\.config\.|vitest\.config\.|eslint)/.test(lower)) {
     return "config";
   }
   return "source";

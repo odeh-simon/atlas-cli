@@ -3,14 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ArtifactIntegrityError } from "@atlas/domain";
+import { ArtifactIntegrityError } from "@sigil/domain";
 
 import { type ArtifactFilesystem, readVerifiedBlob, sha256Bytes, writeContentAddressedBlob, writeImmutableArtifactContent } from "./index.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-artifacts-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-artifacts-"));
   tempRoots.push(root);
   return root;
 }

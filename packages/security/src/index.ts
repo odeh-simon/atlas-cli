@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-export const securityPackage = "@atlas/security";
+export const securityPackage = "@sigil/security";
 
 export type CredentialProvider = "figma" | "github" | "linear" | "ai";
 
@@ -93,7 +93,7 @@ export function redactSecretText(value: string): string {
 
 export function credentialStorePath(options: CredentialStoreOptions = {}): string {
   const env = options.env ?? process.env;
-  return join(resolve(env.ATLAS_HOME ?? defaultDataRoot()), "credentials.json");
+  return join(resolve(env.SIGIL_HOME ?? defaultDataRoot()), "credentials.json");
 }
 
 function readStore(options: CredentialStoreOptions): CredentialStoreFile {
@@ -153,10 +153,10 @@ function isStoredCredentialRecord(value: unknown): value is StoredCredentialReco
 
 function defaultDataRoot(): string {
   if (process.platform === "win32") {
-    return join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "Atlas");
+    return join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "Sigil");
   }
   if (process.platform === "darwin") {
-    return join(homedir(), "Library", "Application Support", "Atlas");
+    return join(homedir(), "Library", "Application Support", "Sigil");
   }
-  return join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "atlas");
+  return join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "sigil");
 }

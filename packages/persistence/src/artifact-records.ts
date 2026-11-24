@@ -1,4 +1,4 @@
-import { PersistenceError } from "@atlas/domain";
+import { PersistenceError } from "@sigil/domain";
 import type initSqlJs from "sql.js";
 
 import { optionalString, queryAll, queryOne, requiredNumber, requiredString } from "./sql.js";
@@ -7,7 +7,7 @@ type SqlDatabase = initSqlJs.Database;
 
 export type ArtifactSensitivity = "public" | "internal" | "confidential" | "secret-redacted";
 export type ArtifactStatus = "draft" | "valid" | "rejected" | "approved" | "superseded" | "stale";
-export type ArtifactProducerType = "atlas" | "user" | "adapter" | "agent" | "import";
+export type ArtifactProducerType = "sigil" | "user" | "adapter" | "agent" | "import";
 export type ArtifactDependencyKind = "input" | "parent" | "replaces" | "evidence";
 
 export interface ArtifactRecord {

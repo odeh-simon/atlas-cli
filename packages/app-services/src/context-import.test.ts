@@ -3,14 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getStatus, importContextManifest, openAtlasRuntime, startManualTask } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { getStatus, importContextManifest, openSigilRuntime, startManualTask } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-context-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-context-"));
   tempRoots.push(root);
   return root;
 }
@@ -25,7 +25,7 @@ describe("importContextManifest", () => {
   it("imports a minimal context manifest and advances to context_ready", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(join(cwd, "README.md"), "# Fixture\n");
     await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
@@ -51,13 +51,13 @@ describe("importContextManifest", () => {
     expect(result.state).toBe("context_ready");
     expect(status.session?.primaryState).toBe("context_ready");
     expect(status.artifactCount).toBe(3);
-    expect(status.nextCommands).toEqual(["atlas context build"]);
+    expect(status.nextCommands).toEqual(["sigil context build"]);
   });
 
   it("rejects invalid JSON without advancing state", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
     const manifestPath = join(root, "context.json");
@@ -75,7 +75,7 @@ describe("importContextManifest", () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
     const outside = join(root, "outside");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     mkdirSync(outside, { recursive: true });
     writeFileSync(join(outside, "escape.md"), "outside repository\n");
@@ -98,7 +98,7 @@ describe("importContextManifest", () => {
   it("replaces a spoofed imported manifest envelope with trusted session identity", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(join(cwd, "README.md"), "# Fixture\n");
     await startManualTask({ cwd, env, title: "Envelope", objective: "Normalize envelope", taskKey: "manual-envelope" });
@@ -122,7 +122,7 @@ describe("importContextManifest", () => {
     }));
 
     const result = await importContextManifest({ cwd, env, filePath: manifestPath });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     try {
       const record = listArtifactsForSession(runtime.db, result.sessionId).find((artifact) => artifact.artifactId === result.contextArtifactId);
       const manifest = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, record?.storageUri ?? ""), "utf8")) as Record<string, any>;
@@ -138,7 +138,7 @@ describe("importContextManifest", () => {
       });
       expect(manifest.artifact_id).not.toBe("art_foreign");
     } finally {
-      closeAtlasRuntime(runtime, false);
+      closeSigilRuntime(runtime, false);
     }
   });
 
@@ -148,7 +148,7 @@ describe("importContextManifest", () => {
   ] as const)("rejects %s imported context sources", async (_label, sourceName, content, message) => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(join(cwd, sourceName), content);
     await startManualTask({ cwd, env, title: "Unsafe", objective: "Reject unsafe source", taskKey: `manual-${_label}` });

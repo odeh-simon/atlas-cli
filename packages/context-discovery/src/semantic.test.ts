@@ -7,7 +7,7 @@ import { ContextConfigurationError, discoverContextSources, readContextDiscovery
 
 const tempRoots: string[] = [];
 
-function tempRoot(prefix = "atlas-semantic-"): string {
+function tempRoot(prefix = "sigil-semantic-"): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   tempRoots.push(root);
   return root;
@@ -231,7 +231,7 @@ describe("semantic context discovery", () => {
 
   it("does not traverse a symlink or junction escape", (context) => {
     const root = tempRoot();
-    const outside = tempRoot("atlas-outside-");
+    const outside = tempRoot("sigil-outside-");
     fixture(outside, "secret.ts", "export const secret = 'outside';\n");
     try {
       symlinkSync(outside, join(root, "linked"), process.platform === "win32" ? "junction" : "dir");
@@ -266,7 +266,7 @@ describe("semantic context discovery", () => {
 
   it("fails closed on malformed or unknown project context configuration", () => {
     const root = tempRoot();
-    fixture(root, "atlas.config.json", JSON.stringify({ context: { unknownSetting: true } }));
+    fixture(root, "sigil.config.json", JSON.stringify({ context: { unknownSetting: true } }));
     expect(() => readContextDiscoveryConfig(root)).toThrow(ContextConfigurationError);
   });
 });
