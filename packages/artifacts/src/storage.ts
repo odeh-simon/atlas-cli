@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, extname, resolve, sep } from "node:path";
 
-import { ArtifactIntegrityError } from "@atlas/domain";
+import { ArtifactIntegrityError } from "@sigil/domain";
 
 export interface ArtifactFilesystem {
   readonly exists: (path: string) => boolean;

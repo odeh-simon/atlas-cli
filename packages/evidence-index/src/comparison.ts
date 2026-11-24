@@ -1,5 +1,5 @@
-import { PersistenceError } from "@atlas/domain";
-import type { EvidenceIndexPayload } from "@atlas/schemas";
+import { PersistenceError } from "@sigil/domain";
+import type { EvidenceIndexPayload } from "@sigil/schemas";
 
 export interface IndexComparisonEntry {
   readonly added: string[];

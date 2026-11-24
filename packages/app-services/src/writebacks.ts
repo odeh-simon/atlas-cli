@@ -1,14 +1,14 @@
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { StateTransitionError } from "@sigil/domain";
 import {
   appendEvent,
   createArtifactRecord,
   listArtifactsForSession,
   listSessionsForRepository
-} from "@atlas/persistence";
-import { adapterWritebackSchema } from "@atlas/schemas";
+} from "@sigil/persistence";
+import { adapterWritebackSchema } from "@sigil/schemas";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface RecordAdapterWritebackInput extends RuntimeOptions {
   readonly provider: "linear" | "github" | "figma";
@@ -31,7 +31,7 @@ export interface RecordAdapterWritebackResult {
 export async function recordAdapterWriteback(
   input: RecordAdapterWritebackInput
 ): Promise<RecordAdapterWritebackResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
     if (session === undefined) {
@@ -48,7 +48,7 @@ export async function recordAdapterWriteback(
       schema_version: 1,
       content_version: artifacts.filter((artifact) => artifact.type === "adapter_writeback").length + 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "internal",
       parents: artifacts
         .filter((artifact) => artifact.type === "completion_report" || artifact.type === "orchestration_run")
@@ -86,14 +86,14 @@ export async function recordAdapterWriteback(
       mediaType: "application/json",
       sensitivity: "internal",
       status: input.status === "written" || input.status === "prepared" ? "valid" : "rejected",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     appendEvent(runtime.db, {
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "adapter.writeback_recorded",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: `Adapter writeback ${input.status}`,
       metadata: { writebackArtifactId: artifactId, provider: input.provider, mode: input.mode, target: input.target }
@@ -106,6 +106,6 @@ export async function recordAdapterWriteback(
       status: input.status
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }

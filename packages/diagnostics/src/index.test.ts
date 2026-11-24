@@ -19,7 +19,7 @@ describe("diagnostics telemetry", () => {
 
     expect(event).toMatchObject({
       schema_version: 1,
-      product: "atlas-cli",
+      product: "sigil-cli",
       event_name: "adapter.inspect.completed",
       adapter: "figma"
     });

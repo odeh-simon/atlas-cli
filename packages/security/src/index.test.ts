@@ -8,7 +8,7 @@ import { getCredentialToken, listCredentials, redactSecretText, removeCredential
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-security-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-security-"));
   tempRoots.push(root);
   return root;
 }
@@ -21,7 +21,7 @@ afterEach(() => {
 
 describe("credential aliases", () => {
   it("stores, lists, reads, and removes credentials by alias without listing raw tokens", () => {
-    const env = { ATLAS_HOME: tempRoot() };
+    const env = { SIGIL_HOME: tempRoot() };
     const token = "figd_example_secret_token";
 
     const stored = storeCredential({ env, alias: "figma.default", provider: "figma", token });
@@ -36,7 +36,7 @@ describe("credential aliases", () => {
   });
 
   it("stores AI provider credentials", () => {
-    const env = { ATLAS_HOME: tempRoot() };
+    const env = { SIGIL_HOME: tempRoot() };
     const token = "sk_example_secret_token";
 
     const stored = storeCredential({ env, alias: "openrouter.default", provider: "ai", token });

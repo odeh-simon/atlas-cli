@@ -1,4 +1,4 @@
-import { ApprovalRequiredError, StateTransitionError } from "@atlas/domain";
+import { ApprovalRequiredError, StateTransitionError } from "@sigil/domain";
 import {
   appendEvent,
   createApproval,
@@ -6,10 +6,10 @@ import {
   listSessionsForRepository,
   updateArtifactStatus,
   updateSessionState
-} from "@atlas/persistence";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { transition } from "@sigil/workflow-engine";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface ApproveContractInput extends RuntimeOptions {
   readonly actorId?: string | undefined;
@@ -25,7 +25,7 @@ export interface ApproveContractResult {
 }
 
 export async function approveContract(input: ApproveContractInput = {}): Promise<ApproveContractResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -76,9 +76,9 @@ export async function approveContract(input: ApproveContractInput = {}): Promise
       contractArtifactId: contract.artifactId,
       approvalId: approval.approvalId,
       state: next,
-      nextCommand: "atlas implement export --manual"
+      nextCommand: "sigil implement export --manual"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }

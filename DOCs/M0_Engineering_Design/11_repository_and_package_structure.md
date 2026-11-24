@@ -7,11 +7,11 @@ Use a `pnpm` workspace monorepo. Even if V1 ships as one CLI, package boundaries
 ## Proposed Directory Tree
 
 ```text
-atlas/
+sigil/
   package.json
   pnpm-workspace.yaml
   tsconfig.base.json
-  atlas.config.schema.json
+  sigil.config.schema.json
   docs/
   packages/
     cli/
@@ -183,7 +183,7 @@ flowchart LR
 
 Rules:
 
-- `domain` imports no Atlas package except tiny shared type utilities if needed.
+- `domain` imports no Sigil package except tiny shared type utilities if needed.
 - `workflow-engine` cannot import concrete adapters.
 - `adapters-*` cannot import `workflow-engine`, `persistence`, or `cli`.
 - `cli` does not directly import concrete provider SDKs.

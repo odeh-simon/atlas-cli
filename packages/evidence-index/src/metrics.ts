@@ -1,4 +1,4 @@
-import type { EvidenceInvalidationReason } from "@atlas/schemas";
+import type { EvidenceInvalidationReason } from "@sigil/schemas";
 
 import type { EvidenceIndexMetrics, EvidenceInvalidationReasonCounts, UpdateOutcome } from "./types.js";
 

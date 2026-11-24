@@ -1,15 +1,15 @@
-import { GateFailedError } from "@atlas/domain";
-import type { ArtifactRecord, SessionRecord } from "@atlas/persistence";
-import { agentImplementationPackageSchema, contextContentPackSchema } from "@atlas/schemas";
+import { GateFailedError } from "@sigil/domain";
+import type { ArtifactRecord, SessionRecord } from "@sigil/persistence";
+import { agentImplementationPackageSchema, contextContentPackSchema } from "@sigil/schemas";
 
 import { readVerifiedArtifactText } from "./evidence.js";
 import type { WorkflowGitSnapshot } from "./git-safeguards.js";
-import type { AtlasRuntime } from "./runtime.js";
+import type { SigilRuntime } from "./runtime.js";
 
 export type ParsedImplementationPackage = ReturnType<typeof agentImplementationPackageSchema.parse>;
 
 export function readAndValidateImplementationPackage(input: {
-  readonly runtime: AtlasRuntime;
+  readonly runtime: SigilRuntime;
   readonly session: SessionRecord;
   readonly artifacts: readonly ArtifactRecord[];
   readonly implementationPackage: ArtifactRecord;

@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { getArtifactRecord, listArtifactsForSession, listSessionsForRepository } from "@atlas/persistence";
-import { contextManifestSchema, type ContextSourceRecord } from "@atlas/schemas";
+import { getArtifactRecord, listArtifactsForSession, listSessionsForRepository } from "@sigil/persistence";
+import { contextManifestSchema, type ContextSourceRecord } from "@sigil/schemas";
 
-import { closeAtlasRuntime, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface ContextManifestInspection {
   readonly artifactId: string;
@@ -50,7 +50,7 @@ export interface ContextManifestInspection {
 export async function inspectContextManifest(
   input: RuntimeOptions & { readonly artifactId?: string | undefined } = {}
 ): Promise<ContextManifestInspection | undefined> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const record =
       input.artifactId === undefined
@@ -95,7 +95,7 @@ export async function inspectContextManifest(
       budgets: manifest.budgets
     };
   } finally {
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
   }
 }
 

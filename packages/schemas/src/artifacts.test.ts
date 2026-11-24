@@ -123,7 +123,7 @@ describe("walking skeleton artifact schemas", () => {
       freshness: "fresh",
       semantic_complete: true,
       repository_snapshot: { task_brief_sha256: "c".repeat(64), discovery_config_sha256: "d".repeat(64) },
-      discovery_algorithm: { name: "atlas-semantic-context", version: "3.0.0" },
+      discovery_algorithm: { name: "sigil-semantic-context", version: "3.0.0" },
       effective_context_config_sha256: "e".repeat(64),
       task_terms: ["index"],
       seeds: [{ uri: "src/index.ts", score: 12, reasons: ["Path matches index"] }],

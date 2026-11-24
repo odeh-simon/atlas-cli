@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { readGitRepositoryFacts, summarizeGitDiffSafeguards, type GitRepositoryFacts } from "@atlas/git";
+import { readGitRepositoryFacts, summarizeGitDiffSafeguards, type GitRepositoryFacts } from "@sigil/git";
 
 export interface WorkflowGitChangedFile {
   readonly path: string;

@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/evidence-index",
+  "name": "@sigil/evidence-index",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -10,13 +10,13 @@
     "check": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@atlas/domain": "workspace:*",
-    "@atlas/git": "workspace:*",
-    "@atlas/persistence": "workspace:*",
-    "@atlas/schemas": "workspace:*",
+    "@sigil/domain": "workspace:*",
+    "@sigil/git": "workspace:*",
+    "@sigil/persistence": "workspace:*",
+    "@sigil/schemas": "workspace:*",
     "typescript": "^5.7.0"
   },
   "devDependencies": {
-    "@atlas/test-utils": "workspace:*"
+    "@sigil/test-utils": "workspace:*"
   }
 }

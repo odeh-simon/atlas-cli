@@ -1,24 +1,24 @@
 {
-  "name": "atlas-workspace",
+  "name": "sigil-workspace",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Atlas local-first CLI workflow orchestrator",
+  "description": "Sigil local-first CLI workflow orchestrator",
   "license": "MIT",
   "author": "Simon Odeh",
   "repository": {
     "type": "git",
-    "url": "https://github.com/odeh-simon/atlas-cli.git"
+    "url": "https://github.com/odeh-simon/sigil.git"
   },
   "bin": {
-    "atlas": "./packages/cli/dist/index.js"
+    "sigil": "./packages/cli/dist/index.js"
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
-    "atlas": "node packages/cli/dist/index.js",
+    "sigil": "node packages/cli/dist/index.js",
     "build": "tsc -b",
     "check": "tsc -b --pretty false",
     "release:bundle": "node scripts/build-release.mjs",

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { GateFailedError, StateTransitionError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { GateFailedError, StateTransitionError } from "@sigil/domain";
 import {
   addArtifactDependency,
   appendEvent,
@@ -11,12 +11,12 @@ import {
   listFindingsForSession,
   listSessionsForRepository,
   updateSessionState
-} from "@atlas/persistence";
-import { executionReportSchema, implementationDiffSchema, reviewPackageSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { executionReportSchema, implementationDiffSchema, reviewPackageSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import { readVerifiedArtifactText } from "./evidence.js";
 import { readAndValidateImplementationPackage } from "./implementation-bindings.js";
 
@@ -28,7 +28,7 @@ export interface PrepareReviewResult {
 }
 
 export async function prepareReviewPackage(options: RuntimeOptions = {}): Promise<PrepareReviewResult> {
-  const runtime = await openAtlasRuntime(options);
+  const runtime = await openSigilRuntime(options);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -130,7 +130,7 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       schema_version: 2,
       content_version: contentVersion,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [
         contract.artifactId,
@@ -195,7 +195,7 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       mediaType: "application/json",
       sensitivity: "confidential",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     for (const parentId of reviewPackage.parents) {
@@ -210,7 +210,7 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "review_package.prepared",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "Review package prepared",
       metadata: { reviewPackageArtifactId: artifactId, gitFingerprint: git?.fingerprint }
@@ -220,10 +220,10 @@ export async function prepareReviewPackage(options: RuntimeOptions = {}): Promis
       sessionId: session.sessionId,
       reviewPackageArtifactId: artifactId,
       state: next,
-      nextCommand: "atlas review import <file> --actor <trusted-reviewer-id>"
+      nextCommand: "sigil review import <file> --actor <trusted-reviewer-id>"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

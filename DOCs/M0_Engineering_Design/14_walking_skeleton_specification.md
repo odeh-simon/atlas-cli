@@ -2,7 +2,7 @@
 
 ## Scope
 
-The walking skeleton proves the Atlas architecture end to end without production integrations.
+The walking skeleton proves the Sigil architecture end to end without production integrations.
 
 Included:
 
@@ -28,43 +28,43 @@ Excluded: Linear, GitHub remote operations, Figma API access, direct Claude Code
 ## User Journey
 
 ```text
-atlas init --yes
-atlas start --manual --title "Usage details" --objective "Show usage rows for admins"
-atlas context import examples/context-manifest.json
-atlas plan
-atlas contract import examples/contract.md
-atlas approve contract 1 --yes
-atlas implement export --manual
-atlas execution import examples/execution-result.json
-atlas checks run
-atlas review prepare
-atlas review import examples/review-report.md
-atlas findings disposition REV-001 --resolve --evidence "check:basic passed"
-atlas complete --check
-atlas approve completion --yes
-atlas status
-atlas resume
+sigil init --yes
+sigil start --manual --title "Usage details" --objective "Show usage rows for admins"
+sigil context import examples/context-manifest.json
+sigil plan
+sigil contract import examples/contract.md
+sigil approve contract 1 --yes
+sigil implement export --manual
+sigil execution import examples/execution-result.json
+sigil checks run
+sigil review prepare
+sigil review import examples/review-report.md
+sigil findings disposition REV-001 --resolve --evidence "check:basic passed"
+sigil complete --check
+sigil approve completion --yes
+sigil status
+sigil resume
 ```
 
 ## CLI Commands
 
 | Command | Primary transition |
 | --- | --- |
-| `atlas init` | project config created |
-| `atlas start --manual` | `draft -> intake_ready` |
-| `atlas context import <file>` | `intake_ready -> context_ready` |
-| `atlas plan` | `context_ready -> planning_ready` |
-| `atlas contract import <file>` | `planning_ready -> contract_draft` |
-| `atlas approve contract <version>` | `contract_draft -> contract_approved` |
-| `atlas implement export --manual` | `contract_approved -> implementation_ready` |
-| `atlas execution import <file>` | `implementation_ready -> implementation_reconciled` |
-| `atlas checks run` | `implementation_reconciled -> checks_completed` |
-| `atlas review prepare` | `checks_completed -> review_ready` |
-| `atlas review import <file>` | `review_ready -> review_imported` |
-| `atlas findings disposition ...` | `review_imported -> findings_dispositioned` |
-| `atlas complete --check` | `findings_dispositioned/checks_completed -> completion_ready` |
-| `atlas approve completion` | `completion_ready -> completed` |
-| `atlas status/resume` | read/reconcile state |
+| `sigil init` | project config created |
+| `sigil start --manual` | `draft -> intake_ready` |
+| `sigil context import <file>` | `intake_ready -> context_ready` |
+| `sigil plan` | `context_ready -> planning_ready` |
+| `sigil contract import <file>` | `planning_ready -> contract_draft` |
+| `sigil approve contract <version>` | `contract_draft -> contract_approved` |
+| `sigil implement export --manual` | `contract_approved -> implementation_ready` |
+| `sigil execution import <file>` | `implementation_ready -> implementation_reconciled` |
+| `sigil checks run` | `implementation_reconciled -> checks_completed` |
+| `sigil review prepare` | `checks_completed -> review_ready` |
+| `sigil review import <file>` | `review_ready -> review_imported` |
+| `sigil findings disposition ...` | `review_imported -> findings_dispositioned` |
+| `sigil complete --check` | `findings_dispositioned/checks_completed -> completion_ready` |
+| `sigil approve completion` | `completion_ready -> completed` |
+| `sigil status/resume` | read/reconcile state |
 
 ## Required Data and Artifacts
 
@@ -114,7 +114,7 @@ Fails otherwise. This avoids requiring a real project build before Git/process i
 ## Demo Script
 
 ```text
-1. Initialize a temp Git repository and run atlas init.
+1. Initialize a temp Git repository and run sigil init.
 2. Start a manual task with title/objective.
 3. Import a two-source context manifest.
 4. Generate and inspect planning package.
@@ -127,7 +127,7 @@ Fails otherwise. This avoids requiring a real project build before Git/process i
 11. Show completion blocked.
 12. Resolve the finding with evidence.
 13. Approve completion.
-14. Close terminal, run atlas resume, show completed state and evidence.
+14. Close terminal, run sigil resume, show completed state and evidence.
 ```
 
 ## Failure Scenarios
@@ -169,8 +169,8 @@ Fails otherwise. This avoids requiring a real project build before Git/process i
 
 - Node 22 LTS and supported OS matrix.
 - Exact user data directory and optional project mirror behavior.
-- Root `atlas.config.json` plus ignored `atlas.local.json`.
-- Markdown contract format with `atlas-metadata` block.
+- Root `sigil.config.json` plus ignored `sigil.local.json`.
+- Markdown contract format with `sigil-metadata` block.
 - Supported Claude Code and Codex version matrix.
 - V1 product telemetry and analysis with strict privacy/content-exclusion controls.
 - Default material-change categories.

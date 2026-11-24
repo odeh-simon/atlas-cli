@@ -1,19 +1,19 @@
-# Atlas Implementation Context and Production-Orchestration Plan
+# Sigil Implementation Context and Production-Orchestration Plan
 
 | Field | Value |
 |---|---|
 | Status | Governing delivery baseline |
 | Applies from | Commit `c6df706` (`Build semantic context manifest v3`) |
 | Supersedes | Informal batch descriptions and chat-only implementation instructions |
-| Owners | Product owner approves intent and final release; Atlas orchestrator/reviewer approves each implementation batch |
+| Owners | Product owner approves intent and final release; Sigil orchestrator/reviewer approves each implementation batch |
 | Delivery rule | A batch may start only when every dependency is approved and checkpointed |
-| Product proving ground | Trail Safe, after Atlas production-readiness certification |
+| Product proving ground | Trail Safe, after Sigil production-readiness certification |
 
 ## 1. Purpose and authority
 
-This document governs the remaining work required to make Atlas a production-grade, local-first workflow orchestrator and evidence-based work validator. It records what Atlas can prove today, the target operating model, and the dependency-ordered batch contracts used to create implementation work.
+This document governs the remaining work required to make Sigil a production-grade, local-first workflow orchestrator and evidence-based work validator. It records what Sigil can prove today, the target operating model, and the dependency-ordered batch contracts used to create implementation work.
 
-The approved product requirements in `DOCs/Atlas_V1_Product_Requirements_Document.md` remain authoritative for product behavior. The designs in `DOCs/M0_Engineering_Design/` remain authoritative for implemented subsystem details. This document is authoritative for delivery order, batch boundaries, cross-batch invariants, and promotion gates. If sources conflict, implementation must stop and surface the conflict; an agent must not silently choose one.
+The approved product requirements in `DOCs/Sigil_V1_Product_Requirements_Document.md` remain authoritative for product behavior. The designs in `DOCs/M0_Engineering_Design/` remain authoritative for implemented subsystem details. This document is authoritative for delivery order, batch boundaries, cross-batch invariants, and promotion gates. If sources conflict, implementation must stop and surface the conflict; an agent must not silently choose one.
 
 Linear issues derived from this document are execution views. They may add operational detail but may not weaken this document. Changes to scope, dependency order, safety policy, or acceptance criteria require an approved document update before issue changes or implementation.
 
@@ -31,11 +31,11 @@ The current capability assessment is grounded in:
 - the Batch 2 design `DOCs/M0_Engineering_Design/16_context_manifest_v3_semantic_discovery.md`;
 - independent Batch 2 validation: 247 tests, repository checks, release bundle, installed-binary smoke test, and diff-integrity check all passed before commit `c6df706`.
 
-## 3. Atlas capability at the approved baseline
+## 3. Sigil capability at the approved baseline
 
 ### 3.1 Capabilities that exist now
 
-Atlas currently provides:
+Sigil currently provides:
 
 1. A deterministic, table-driven task lifecycle from intake through context, planning, contract approval, implementation, checks, independent review, fixes, completion, and recovery.
 2. A local SQL.js system of record with sessions, events, locks, artifact dependencies, immutable files, approvals, findings, and SHA-256 lineage.
@@ -59,7 +59,7 @@ Atlas currently provides:
 
 ### 3.2 Known limits at this baseline
 
-Atlas does not yet provide:
+Sigil does not yet provide:
 
 - a persistent incremental or historical code-evidence index;
 - semantic analyzers beyond the current TypeScript/JavaScript graph, or deep framework/API/schema/data-flow analysis;
@@ -77,9 +77,9 @@ Atlas does not yet provide:
 
 ## 4. Target capability after all batches
 
-At the end of this plan, Atlas will orchestrate a task from a normalized architecture/work-package source through dependency-correct Linear work, evidence-backed planning, isolated implementation, deterministic and independent validation, bounded repair, PR/CI review, human approval, merge reconciliation, and closure.
+At the end of this plan, Sigil will orchestrate a task from a normalized architecture/work-package source through dependency-correct Linear work, evidence-backed planning, isolated implementation, deterministic and independent validation, bounded repair, PR/CI review, human approval, merge reconciliation, and closure.
 
-Atlas will be able to prove:
+Sigil will be able to prove:
 
 - which versioned sources authorized every requirement and decision;
 - which repository evidence was discovered, synthesized, used, omitted, contradicted, or invalidated;
@@ -107,7 +107,7 @@ Every batch must preserve these rules:
 9. **Safe external writes.** Mutations are previewable, explicitly authorized by policy, idempotent, attributable, and reconcilable.
 10. **Local-first degradation.** Remote failures do not corrupt local state or fabricate success; supported local work continues where valid.
 11. **Backward-safe evolution.** Schema and storage changes have migrations, compatibility behavior, fixtures, rollback/repair guidance, and fail-closed handling for unsupported versions.
-12. **No Trail Safe compromise.** Atlas experiments run behind explicit capability flags or shadow mode and cannot weaken Trail Safe architecture, tests, review, or approval gates.
+12. **No Trail Safe compromise.** Sigil experiments run behind explicit capability flags or shadow mode and cannot weaken Trail Safe architecture, tests, review, or approval gates.
 
 ## 6. Roles and separation of responsibility
 
@@ -119,7 +119,7 @@ Every batch must preserve these rules:
 | Implementing agent | Change files within the approved contract and report deviations/blockers | Approve contract changes, validate its own work as sufficient, merge, or close work |
 | Deterministic validators | Run declared checks and produce machine evidence | Convert skipped/unavailable checks into passes |
 | Independent review agents | Review exact contract/diff/evidence in declared lanes and cite findings | Share implementing-actor identity where independence is required, or close unrelated findings |
-| Atlas orchestrator | Enforce state, lineage, budgets, separation, reconciliation, and handoffs | Make product decisions or infer approvals |
+| Sigil orchestrator | Enforce state, lineage, budgets, separation, reconciliation, and handoffs | Make product decisions or infer approvals |
 | Human approver | Resolve ambiguity, approve contracts/deviations/completion/merge | N/A; decisions must still be explicit and recorded |
 
 ## 7. Batch promotion protocol
@@ -133,7 +133,7 @@ For every batch:
 5. Produce a review packet resolving the contract, changed files, exact diff, test/check evidence, migrations, documentation, and known limitations.
 6. An independent reviewer assesses correctness, security, compatibility, failure modes, and scope.
 7. Blocking findings enter bounded, finding-specific repair/re-review cycles.
-8. The Atlas orchestrator/reviewer explicitly approves and checkpoints the batch.
+8. The Sigil orchestrator/reviewer explicitly approves and checkpoints the batch.
 9. Only then may the next dependent batch start.
 
 Default repair limit: two implementation repair attempts per finding and three total review cycles per batch. Exceeding either limit, encountering an architecture conflict, requiring destructive migration, or being unable to produce required evidence stops the batch for human decision.
@@ -191,7 +191,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 **Depends on:** Batch 3.
 
-**Outcome:** Atlas can distinguish normative authority from descriptive evidence, surface conflicts, and extract reusable architectural patterns and invariants before planning.
+**Outcome:** Sigil can distinguish normative authority from descriptive evidence, surface conflicts, and extract reusable architectural patterns and invariants before planning.
 
 **In scope:**
 
@@ -212,7 +212,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 **Depends on:** Batch 4.
 
-**Outcome:** Atlas creates compact, provenance-preserving context and validates a draft plan through a bounded second discovery pass.
+**Outcome:** Sigil creates compact, provenance-preserving context and validates a draft plan through a bounded second discovery pass.
 
 **In scope:**
 
@@ -238,7 +238,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 - a work-package schema containing objective, rationale, evidence references, deliverables, acceptance criteria, non-goals, file/architecture boundaries, dependencies, risks, tests, validation expectations, and estimated change surface;
 - deterministic decomposition/sizing rules and dependency graph validation;
-- Linear creation/update for projects, parent/sub-issues, relations, labels, states, comments, attachments/references, and Atlas session linkage;
+- Linear creation/update for projects, parent/sub-issues, relations, labels, states, comments, attachments/references, and Sigil session linkage;
 - preservation of Linear descriptions and comments in normalized task briefs; acceptance criteria derived only from explicit sources;
 - preview/approval, idempotency keys, dry run, partial-failure recovery, and reconciliation.
 
@@ -252,7 +252,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 **Depends on:** Batch 6.
 
-**Outcome:** Atlas executes approved work in isolated branches/worktrees with enforceable scope and bounded agent repair.
+**Outcome:** Sigil executes approved work in isolated branches/worktrees with enforceable scope and bounded agent repair.
 
 **In scope:**
 
@@ -292,7 +292,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 **Depends on:** Batch 8.
 
-**Outcome:** Atlas safely coordinates remote workflow state, PRs, CI, reviews, merge detection, and issue closure without losing local authority or idempotency.
+**Outcome:** Sigil safely coordinates remote workflow state, PRs, CI, reviews, merge detection, and issue closure without losing local authority or idempotency.
 
 **In scope:**
 
@@ -303,7 +303,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 - signed webhook verification where supported, event inbox/outbox, deduplication, replay, ordering, retry/backoff, dead-letter inspection, and manual repair;
 - remote/local drift detection and explicit conflict resolution.
 
-**Non-goals:** automatic merge or issue closure without approved policy and evidence; storing raw credentials in Atlas artifacts; assuming remote state is authoritative for local approvals.
+**Non-goals:** automatic merge or issue closure without approved policy and evidence; storing raw credentials in Sigil artifacts; assuming remote state is authoritative for local approvals.
 
 **Acceptance:** duplicate/out-of-order/missing events converge; stale CI cannot pass a new head; PR/issue writes are idempotent; credential migration never logs secrets; revoked/insufficient credentials fail locally and safely; merge/close requires exact approved evidence; offline recovery reconciles on return.
 
@@ -313,7 +313,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 **Depends on:** Batch 9.
 
-**Outcome:** Atlas improves context selection from audited outcomes without allowing self-modifying heuristics to become unreviewed authority.
+**Outcome:** Sigil improves context selection from audited outcomes without allowing self-modifying heuristics to become unreviewed authority.
 
 **In scope:**
 
@@ -333,7 +333,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 **Depends on:** Batch 10.
 
-**Outcome:** Atlas is durable, observable, supportable, and safe under production-scale failures and concurrency.
+**Outcome:** Sigil is durable, observable, supportable, and safe under production-scale failures and concurrency.
 
 **In scope:**
 
@@ -344,7 +344,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 - cross-platform packaging, upgrade/downgrade compatibility policy, dependency/security/license review, and release provenance;
 - user/admin documentation, threat model, data map, and failure-recovery playbooks.
 
-**Non-goals:** Atlas cloud service or multi-tenant collaboration unless separately approved.
+**Non-goals:** Sigil cloud service or multi-tenant collaboration unless separately approved.
 
 **Acceptance:** backup/restore and migration matrices pass; kill/restart and concurrent-process tests preserve invariants; no P0/P1 data-loss, secret-exposure, false-approval, or destructive-action defect remains; performance budgets pass on representative repositories; release artifact provenance and smoke tests pass.
 
@@ -354,7 +354,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 **Depends on:** Batch 11.
 
-**Outcome:** The complete workflow is proven before Trail Safe implementation is allowed to depend on Atlas.
+**Outcome:** The complete workflow is proven before Trail Safe implementation is allowed to depend on Sigil.
 
 **In scope:**
 
@@ -365,7 +365,7 @@ Default repair limit: two implementation repair attempts per finding and three t
 
 **Non-goals:** beginning Trail Safe feature implementation; waiving failed gates to meet a date.
 
-**Acceptance:** all required journeys pass from released binaries; every failure scenario stops or recovers as designed; no unresolved release-blocking finding exists; evidence is reproducible; the product owner explicitly approves Atlas for the Trail Safe proving phase.
+**Acceptance:** all required journeys pass from released binaries; every failure scenario stops or recovers as designed; no unresolved release-blocking finding exists; evidence is reproducible; the product owner explicitly approves Sigil for the Trail Safe proving phase.
 
 ## 9. Linear issue contract
 
@@ -400,12 +400,12 @@ Sub-deliverables remain within one batch and use dependency order: schemas/contr
 
 Trail Safe begins only after Batch 12 certification and human approval. During proving:
 
-- the approved Trail Safe architecture baseline and ADRs outrank Atlas suggestions;
-- Atlas experimental context/ranking features run in shadow mode until separately promoted;
+- the approved Trail Safe architecture baseline and ADRs outrank Sigil suggestions;
+- Sigil experimental context/ranking features run in shadow mode until separately promoted;
 - deterministic Trail Safe tests, architecture checks, independent review, and human merge remain mandatory;
-- Atlas failures pause or fall back to an approved manual workflow; they do not relax product gates;
-- Atlas defects and product defects are tracked separately with explicit causal evidence;
-- no Atlas experiment may rewrite Trail Safe history, merge code, accept an architecture deviation, or close a task autonomously.
+- Sigil failures pause or fall back to an approved manual workflow; they do not relax product gates;
+- Sigil defects and product defects are tracked separately with explicit causal evidence;
+- no Sigil experiment may rewrite Trail Safe history, merge code, accept an architecture deviation, or close a task autonomously.
 
 ## 12. Definition of program completion
 

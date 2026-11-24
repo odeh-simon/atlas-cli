@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { sha256Bytes, writeImmutableArtifactContent } from "@atlas/artifacts";
-import { StateTransitionError, ValidationError } from "@atlas/domain";
+import { sha256Bytes, writeImmutableArtifactContent } from "@sigil/artifacts";
+import { StateTransitionError, ValidationError } from "@sigil/domain";
 import {
   assertAiDataConsent,
   createAiCompletion,
@@ -10,7 +10,7 @@ import {
   supportsAiCapability,
   type AiCompletionResponse,
   type AiProviderConfig
-} from "@atlas/llm";
+} from "@sigil/llm";
 import {
   addArtifactDependency,
   appendEvent,
@@ -19,11 +19,11 @@ import {
   listArtifactsForSession,
   listSessionsForRepository,
   type ArtifactRecord
-} from "@atlas/persistence";
-import { aiVisualReviewSchema, visualComparisonSchema } from "@atlas/schemas";
+} from "@sigil/persistence";
+import { aiVisualReviewSchema, visualComparisonSchema } from "@sigil/schemas";
 import { z } from "zod";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 const promptVersion = "visual-review-v1";
 
@@ -75,10 +75,10 @@ export async function runAiVisualReview(input: RunAiVisualReviewInput): Promise<
   }
   assertAiDataConsent(input.provider, "image", input.cloudImageConsent);
 
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
-    if (session === undefined) throw new StateTransitionError("AI visual review requires an active Atlas session");
+    if (session === undefined) throw new StateTransitionError("AI visual review requires an active Sigil session");
     const comparisonRecord = requireArtifact(runtime.db, session.sessionId, input.comparisonArtifactId, "visual_comparison");
     const comparisonBytes = readVerifiedArtifact(runtime.paths.artifactRoot, comparisonRecord);
     const comparison = visualComparisonSchema.parse(JSON.parse(Buffer.from(comparisonBytes).toString("utf8")) as unknown);
@@ -161,7 +161,7 @@ export async function runAiVisualReview(input: RunAiVisualReviewInput): Promise<
       schema_version: 1,
       content_version: artifacts.filter((artifact) => artifact.type === "ai_visual_review").length + 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [comparison.artifact_id, ...evidenceRecords.map((record) => record.artifactId)],
       content_sha256: "0".repeat(64),
@@ -206,7 +206,7 @@ export async function runAiVisualReview(input: RunAiVisualReviewInput): Promise<
       mediaType: "application/json",
       sensitivity: "confidential",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     for (const parentId of review.parents) {
@@ -220,7 +220,7 @@ export async function runAiVisualReview(input: RunAiVisualReviewInput): Promise<
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "ai.visual_reviewed",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: `AI visual review ${normalizedStatus}`,
       metadata: {
@@ -246,7 +246,7 @@ export async function runAiVisualReview(input: RunAiVisualReviewInput): Promise<
       }
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

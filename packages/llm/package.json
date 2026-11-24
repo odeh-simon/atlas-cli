@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/llm",
+  "name": "@sigil/llm",
   "version": "0.0.0",
   "type": "module",
   "private": true,

@@ -1,6 +1,6 @@
-import { GitSafetyError } from "@atlas/domain";
-import { readGitRepositoryFacts } from "@atlas/git";
-import { stableHash } from "@atlas/domain";
+import { GitSafetyError } from "@sigil/domain";
+import { readGitRepositoryFacts } from "@sigil/git";
+import { stableHash } from "@sigil/domain";
 
 export interface EvidenceGitChangedFile {
   readonly path: string;

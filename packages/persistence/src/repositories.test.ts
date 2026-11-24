@@ -27,13 +27,13 @@ const tempRoots: string[] = [];
 const now = "2026-07-12T12:00:00.000Z";
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-core-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-core-"));
   tempRoots.push(root);
   return root;
 }
 
 async function openMigratedDb(root: string) {
-  const dbPath = join(root, "atlas.db");
+  const dbPath = join(root, "sigil.db");
   await applyMigrations({
     dbPath,
     backupDirectory: join(root, "backups"),
@@ -129,7 +129,7 @@ describe("core session repositories", () => {
       eventId: "evt_1",
       sessionId: "ses_1",
       eventType: "session.state_changed",
-      actorType: "atlas",
+      actorType: "sigil",
       commandId: "cmd_1",
       occurredAt: now,
       summary: "Context became ready",

@@ -1,1 +1,1 @@
-export const configPackage = "@atlas/config";
+export const configPackage = "@sigil/config";

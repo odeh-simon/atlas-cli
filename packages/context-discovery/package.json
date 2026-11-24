@@ -1,12 +1,12 @@
 {
-  "name": "@atlas/context-discovery",
+  "name": "@sigil/context-discovery",
   "version": "0.0.0",
   "type": "module",
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@atlas/security": "workspace:*",
+    "@sigil/security": "workspace:*",
     "typescript": "^5.7.0"
   },
   "scripts": {

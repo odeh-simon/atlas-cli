@@ -9,7 +9,7 @@ import {
   deriveId,
   type DerivedEvidenceRepositoryIdentity,
   type EvidenceRepositoryIdentityInput
-} from "@atlas/domain";
+} from "@sigil/domain";
 import type initSqlJs from "sql.js";
 import {
   EVIDENCE_INDEX_SCHEMA_VERSION,
@@ -25,7 +25,7 @@ import {
   type EvidenceEntryCounts,
   type EvidenceIndexPayload,
   type EvidenceIndexSnapshot
-} from "@atlas/schemas";
+} from "@sigil/schemas";
 
 import { coreMigrations } from "./core-schema.js";
 import { type SqlDatabase, optionalString, queryAll, queryOne, requiredNumber, requiredString } from "./sql.js";
@@ -776,7 +776,7 @@ export function assertSupportedIndexSchema(db: SqlDatabase): void {
   }
 
   if (appliedMaxVersion > MAX_KNOWN_CORE_MIGRATION_VERSION) {
-    throw new MigrationError("Database was migrated by a newer Atlas version; evidence index access is refused", {
+    throw new MigrationError("Database was migrated by a newer Sigil version; evidence index access is refused", {
       appliedMaxVersion,
       maxKnownVersion: MAX_KNOWN_CORE_MIGRATION_VERSION
     });
@@ -791,7 +791,7 @@ export function assertSupportedIndexSchema(db: SqlDatabase): void {
   }
 
   if (snapshotMaxVersion > EVIDENCE_INDEX_SCHEMA_VERSION) {
-    throw new MigrationError("Evidence index snapshot schema version is newer than this Atlas version supports", {
+    throw new MigrationError("Evidence index snapshot schema version is newer than this Sigil version supports", {
       snapshotMaxVersion,
       supportedSchemaVersion: EVIDENCE_INDEX_SCHEMA_VERSION
     });

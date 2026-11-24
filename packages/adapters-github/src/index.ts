@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-export const adaptersGithubPackage = "@atlas/adapters-github";
+export const adaptersGithubPackage = "@sigil/adapters-github";
 
 export interface GitHubAdapterHealth {
   readonly provider: "github";

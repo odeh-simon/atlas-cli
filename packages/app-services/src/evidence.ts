@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 
-import { sha256Bytes } from "@atlas/artifacts";
-import { GateFailedError, ValidationError } from "@atlas/domain";
-import type { ArtifactRecord } from "@atlas/persistence";
-import { redactSecretText } from "@atlas/security";
+import { sha256Bytes } from "@sigil/artifacts";
+import { GateFailedError, ValidationError } from "@sigil/domain";
+import type { ArtifactRecord } from "@sigil/persistence";
+import { redactSecretText } from "@sigil/security";
 
 export function readVerifiedArtifactText(artifactRoot: string, record: ArtifactRecord): string {
   const bytes = readFileSync(resolve(artifactRoot, record.storageUri));

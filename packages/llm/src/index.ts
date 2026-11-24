@@ -1,4 +1,4 @@
-export const llmPackage = "@atlas/llm";
+export const llmPackage = "@sigil/llm";
 
 export type AiProviderKind = "ollama" | "openai-compatible";
 export type AiProviderPreset = "hetzner-inference";

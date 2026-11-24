@@ -15,7 +15,7 @@ import {
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-figma-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-figma-"));
   tempRoots.push(root);
   return root;
 }

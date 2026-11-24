@@ -1,6 +1,6 @@
-import { runProcess, type ProcessRunResult } from "@atlas/process-runner";
+import { runProcess, type ProcessRunResult } from "@sigil/process-runner";
 
-export const adaptersCodexPackage = "@atlas/adapters-codex";
+export const adaptersCodexPackage = "@sigil/adapters-codex";
 
 export interface CodexAdapterHealth {
   readonly provider: "codex";
@@ -40,7 +40,7 @@ export function getCodexAdapterHealth(input: { readonly command?: string | undef
 
 export function formatCodexPackage(input: CodexInvocationPackage): string {
   return [
-    "# Atlas Codex Handoff",
+    "# Sigil Codex Handoff",
     "",
     `Mode: ${input.mode}`,
     `Artifacts: ${input.artifactIds.join(", ") || "(none)"}`,

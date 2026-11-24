@@ -3,9 +3,9 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
-import { applyMigrations, coreMigrations, openDatabase, saveDatabase, type SqlDatabase } from "@atlas/persistence";
+import { applyMigrations, coreMigrations, openDatabase, saveDatabase, type SqlDatabase } from "@sigil/persistence";
 
-export interface AtlasPaths {
+export interface SigilPaths {
   readonly cwd: string;
   readonly dataRoot: string;
   readonly dbPath: string;
@@ -13,8 +13,8 @@ export interface AtlasPaths {
   readonly artifactRoot: string;
 }
 
-export interface AtlasRuntime {
-  readonly paths: AtlasPaths;
+export interface SigilRuntime {
+  readonly paths: SigilPaths;
   readonly db: SqlDatabase;
 }
 
@@ -23,22 +23,22 @@ export interface RuntimeOptions {
   readonly env?: NodeJS.ProcessEnv | undefined;
 }
 
-export function resolveAtlasPaths(options: RuntimeOptions = {}): AtlasPaths {
+export function resolveSigilPaths(options: RuntimeOptions = {}): SigilPaths {
   const cwd = resolve(options.cwd ?? process.cwd());
   const env = options.env ?? process.env;
-  const dataRoot = resolve(env.ATLAS_HOME ?? defaultDataRoot());
+  const dataRoot = resolve(env.SIGIL_HOME ?? defaultDataRoot());
 
   return {
     cwd,
     dataRoot,
-    dbPath: join(dataRoot, "atlas.db"),
+    dbPath: join(dataRoot, "sigil.db"),
     backupDirectory: join(dataRoot, "backups"),
     artifactRoot: join(dataRoot, "artifacts")
   };
 }
 
-export async function openAtlasRuntime(options: RuntimeOptions = {}): Promise<AtlasRuntime> {
-  const paths = resolveAtlasPaths(options);
+export async function openSigilRuntime(options: RuntimeOptions = {}): Promise<SigilRuntime> {
+  const paths = resolveSigilPaths(options);
   mkdirSync(paths.dataRoot, { recursive: true });
   await applyMigrations({
     dbPath: paths.dbPath,
@@ -52,7 +52,7 @@ export async function openAtlasRuntime(options: RuntimeOptions = {}): Promise<At
   };
 }
 
-export function closeAtlasRuntime(runtime: AtlasRuntime, save = true): void {
+export function closeSigilRuntime(runtime: SigilRuntime, save = true): void {
   if (save) {
     saveDatabase(runtime.paths.dbPath, runtime.db);
   }
@@ -73,12 +73,12 @@ export function newId(prefix: string): string {
 
 function defaultDataRoot(): string {
   if (process.platform === "win32") {
-    return join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "Atlas");
+    return join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "Sigil");
   }
 
   if (process.platform === "darwin") {
-    return join(homedir(), "Library", "Application Support", "Atlas");
+    return join(homedir(), "Library", "Application Support", "Sigil");
   }
 
-  return join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "atlas");
+  return join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "sigil");
 }

@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ArtifactIntegrityError, MigrationError, PersistenceError } from "@atlas/domain";
-import { evidenceSourceClassificationSchema } from "@atlas/schemas";
+import { ArtifactIntegrityError, MigrationError, PersistenceError } from "@sigil/domain";
+import { evidenceSourceClassificationSchema } from "@sigil/schemas";
 import {
   DEFAULT_FIXTURE_FILES,
   FIXTURE_NOW_ISO,
   sampleEvidenceIndexInput
-} from "@atlas/test-utils";
+} from "@sigil/test-utils";
 
 import {
   assertSupportedIndexSchema,
@@ -50,9 +50,9 @@ function tempRoot(prefix: string): string {
   return root;
 }
 
-async function openedFixtureDb(prefix = "atlas-evidence-index-"): Promise<OpenedFixtureDb> {
+async function openedFixtureDb(prefix = "sigil-evidence-index-"): Promise<OpenedFixtureDb> {
   const root = tempRoot(prefix);
-  const dbPath = join(root, "atlas.db");
+  const dbPath = join(root, "sigil.db");
   await applyMigrations({
     dbPath,
     backupDirectory: join(root, "backups"),
@@ -118,9 +118,9 @@ describe("deterministic evidence index commits", () => {
     expect(reread.snapshot.snapshot_id).toBe(header.snapshot.snapshot_id);
     expect(reread.payload.files.map((file) => file.uri)).toEqual([
       "AGENTS.md",
-      "atlas.config.json",
       "dist/generated.js",
       "secrets/example.env",
+      "sigil.config.json",
       "src/index.ts",
       "src/util.ts",
       "tests/util.test.ts",
@@ -141,7 +141,7 @@ describe("fail-closed schema policy", () => {
     expect(() => readCurrentIndexSnapshot(opened.db, header.snapshot.repository_id)).toThrow(MigrationError);
   });
 
-  it("refuses index access when the database was migrated by a newer Atlas version", async () => {
+  it("refuses index access when the database was migrated by a newer Sigil version", async () => {
     const opened = await openedFixtureDb();
 
     opened.db.run(
@@ -153,8 +153,8 @@ describe("fail-closed schema policy", () => {
   });
 
   it("keeps legacy sessions and artifacts readable while applying v7 on top of a v6 database", async () => {
-    const root = tempRoot("atlas-evidence-legacy-");
-    const dbPath = join(root, "atlas.db");
+    const root = tempRoot("sigil-evidence-legacy-");
+    const dbPath = join(root, "sigil.db");
 
     await applyMigrations({
       dbPath,

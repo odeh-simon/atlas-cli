@@ -3,16 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PersistenceError } from "@atlas/domain";
+import { PersistenceError } from "@sigil/domain";
 import { compareIndexSnapshots } from "./comparison.js";
 import { updateEvidenceIndex } from "./engine.js";
-import { getEvidenceIndexSnapshotPayload, listEvidenceIndexSnapshots } from "@atlas/persistence";
+import { getEvidenceIndexSnapshotPayload, listEvidenceIndexSnapshots } from "@sigil/persistence";
 import { type OpenedEngineDb, createCommittedRepo, openEngineDb } from "./test-helpers.js";
 
 const tempRoots: string[] = [];
 const NOW = () => new Date("2026-08-04T07:00:00.000Z");
 
-function tempRoot(prefix = "atlas-evidence-compare-"): string {
+function tempRoot(prefix = "sigil-evidence-compare-"): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   tempRoots.push(root);
   return root;

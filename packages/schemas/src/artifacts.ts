@@ -41,7 +41,7 @@ export const artifactTypeSchema = z.enum([
 ]);
 
 export const sensitivitySchema = z.enum(["public", "internal", "confidential", "secret-redacted"]);
-export const producerTypeSchema = z.enum(["atlas", "user", "adapter", "agent", "import"]);
+export const producerTypeSchema = z.enum(["sigil", "user", "adapter", "agent", "import"]);
 
 export const artifactEnvelopeSchema = z.object({
   artifact_id: idSchema,

@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { deriveEvidenceRepositoryIdentity, deriveId, stableHash } from "@atlas/domain";
+import { deriveEvidenceRepositoryIdentity, deriveId, stableHash } from "@sigil/domain";
 
-export const testUtilsPackage = "@atlas/test-utils";
+export const testUtilsPackage = "@sigil/test-utils";
 
 export const FIXTURE_NOW_ISO = "2026-07-12T12:00:00.000Z";
-export const FIXTURE_ROOT_PATH = "/repos/atlas-sample";
+export const FIXTURE_ROOT_PATH = "/repos/sigil-sample";
 
 export interface FixtureFileSpec {
   readonly path: string;
@@ -156,9 +156,9 @@ export interface SampleEvidenceIndexInput {
 
 export const DEFAULT_FIXTURE_FILES: readonly FixtureFileSpec[] = [
   { path: "AGENTS.md", content: "# Fixture Instructions\n\nFollow the deterministic fixture rules.\n" },
-  { path: "atlas.config.json", content: "{\n  \"schemaVersion\": 1\n}\n" },
   { path: "dist/generated.js", content: "// generated output\nmodule.exports = {};\n" },
   { path: "secrets/example.env", content: "FIXTURE_TOKEN=redacted\n" },
+  { path: "sigil.config.json", content: "{\n  \"schemaVersion\": 1\n}\n" },
   { path: "src/index.ts", content: "import { fixtureUtility } from \"./util.js\";\n\nexport const value = fixtureUtility(2);\n" },
   { path: "src/util.ts", content: "export function fixtureUtility(input: number): number {\n  return input * 2;\n}\n" },
   { path: "tests/util.test.ts", content: "import { fixtureUtility } from \"../src/util.js\";\n\nfixtureUtility(2);\n" },
@@ -170,14 +170,14 @@ export function sha256Text(text: string): string {
 }
 
 export function sampleEvidenceIndexInput(options: SampleEvidenceIndexOptions = {}): SampleEvidenceIndexInput {
-  const seed = options.seed ?? "atlas-fixture";
+  const seed = options.seed ?? "sigil-fixture";
   const files = [...(options.files ?? DEFAULT_FIXTURE_FILES)].sort((a, b) => a.path.localeCompare(b.path));
   const rootPath = options.rootPath ?? FIXTURE_ROOT_PATH;
 
   const identity = deriveEvidenceRepositoryIdentity({
     displayName: `Fixture Repo (${seed})`,
     rootPath,
-    remoteUrl: `https://example.com/atlas/${seed}.git`
+    remoteUrl: `https://example.com/sigil/${seed}.git`
   });
 
   const createdAt = FIXTURE_NOW_ISO;
@@ -241,7 +241,7 @@ export function sampleEvidenceIndexInput(options: SampleEvidenceIndexOptions = {
     repository: {
       displayName: identity.displayName,
       rootPath,
-      remoteUrl: `https://example.com/atlas/${seed}.git`
+      remoteUrl: `https://example.com/sigil/${seed}.git`
     },
     gitSnapshot: {
       repositoryId: identity.repositoryId,
@@ -319,11 +319,11 @@ export function sampleEvidenceIndexInput(options: SampleEvidenceIndexOptions = {
     ],
     configEvidence: [
       {
-        configEvidenceId: deriveId("evcfg", [identity.repositoryId, "atlas.config.json"]),
+        configEvidenceId: deriveId("evcfg", [identity.repositoryId, "sigil.config.json"]),
         repositoryId: identity.repositoryId,
-        uri: "atlas.config.json",
-        sourceSha256: sha256Text(contentOf(files, "atlas.config.json")),
-        byteLength: Buffer.byteLength(contentOf(files, "atlas.config.json"), "utf8"),
+        uri: "sigil.config.json",
+        sourceSha256: sha256Text(contentOf(files, "sigil.config.json")),
+        byteLength: Buffer.byteLength(contentOf(files, "sigil.config.json"), "utf8"),
         format: "json",
         secretRedacted: false
       }
@@ -388,7 +388,7 @@ function classifyFixtureFile(uri: string): FixtureClassificationProfile {
   if (uri === "AGENTS.md") {
     return { category: "instruction", sensitivity: "internal", secret: false, binary: false, excluded: false };
   }
-  if (uri === "atlas.config.json") {
+  if (uri === "sigil.config.json") {
     return { category: "config", sensitivity: "internal", secret: false, binary: false, excluded: false };
   }
   if (uri.startsWith("tests/") || uri.endsWith(".test.ts")) {

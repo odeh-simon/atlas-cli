@@ -3,14 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildContextManifest, getStatus, openAtlasRuntime, runAiContextScout, startManualTask } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { buildContextManifest, getStatus, openSigilRuntime, runAiContextScout, startManualTask } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-context-build-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-context-build-"));
   tempRoots.push(root);
   return root;
 }
@@ -25,7 +25,7 @@ describe("buildContextManifest", () => {
   it("builds a context manifest from repository files and advances the session", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(join(cwd, "src"), { recursive: true });
     writeFileSync(join(cwd, "package.json"), '{"name":"fixture"}\n');
     writeFileSync(join(cwd, "README.md"), "# Fixture\n");
@@ -34,7 +34,7 @@ describe("buildContextManifest", () => {
 
     const result = await buildContextManifest({ cwd, env, maxFiles: 10 });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const contextArtifacts = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "context_manifest"
     );
@@ -44,12 +44,12 @@ describe("buildContextManifest", () => {
     const packs = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "context_content_pack"
     );
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result.state).toBe("context_ready");
     expect(result.contextReadiness).toBe("weak");
     expect(result.includedSourceCount).toBe(3);
-    expect(status.nextCommands[0]).toBe("atlas plan");
+    expect(status.nextCommands[0]).toBe("sigil plan");
     expect(contextArtifacts).toHaveLength(1);
     expect(contextArtifacts[0]?.status).toBe("valid");
     expect(qualityArtifacts).toHaveLength(1);
@@ -61,7 +61,7 @@ describe("buildContextManifest", () => {
   it("propagates scout gaps and blocks context readiness", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(cwd, { recursive: true });
     writeFileSync(join(cwd, "README.md"), "# Fixture\n");
     await startManualTask({ cwd, env, title: "Auth", objective: "Change auth", taskKey: "manual-auth" });
@@ -81,7 +81,7 @@ describe("buildContextManifest", () => {
     ).rejects.toThrow("Context readiness gate failed");
     const status = await getStatus({ cwd, env });
     expect(status.session?.primaryState).toBe("intake_ready");
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     try {
       const artifacts = listArtifactsForSession(runtime.db, status.session?.sessionId ?? "");
       const manifestRecord = artifacts.find((artifact) => artifact.type === "context_manifest");
@@ -92,14 +92,14 @@ describe("buildContextManifest", () => {
       expect(manifest.gaps.every((gap) => gap.severity === "blocking")).toBe(true);
       expect(artifacts.find((artifact) => artifact.type === "context_content_pack")?.status).toBe("rejected");
     } finally {
-      closeAtlasRuntime(runtime, false);
+      closeSigilRuntime(runtime, false);
     }
   });
 
   it("builds a hybrid manifest from AI recommendations", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(join(cwd, "src"), { recursive: true });
     writeFileSync(join(cwd, "package.json"), '{"name":"fixture"}\n');
     writeFileSync(join(cwd, "README.md"), "# Fixture\n");
@@ -132,7 +132,7 @@ describe("buildContextManifest", () => {
       maxBytes: 1_000,
       aiRecommendationArtifactId: scout.recommendationArtifactId
     });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     try {
       const contextArtifact = listArtifactsForSession(runtime.db, result.sessionId).find(
         (artifact) => artifact.artifactId === result.contextArtifactId
@@ -153,17 +153,17 @@ describe("buildContextManifest", () => {
       expect(manifest.excluded_candidates).toHaveLength(1);
       expect(result.contextReadiness).toBe("weak");
     } finally {
-      closeAtlasRuntime(runtime, false);
+      closeSigilRuntime(runtime, false);
     }
   });
 
   it("blocks when pinned evidence cannot fit the hard content-pack budget", async () => {
     const root = tempRoot();
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     mkdirSync(join(cwd, "src"), { recursive: true });
     writeFileSync(join(cwd, "src", "required.ts"), `export const evidence = ${JSON.stringify("x".repeat(210_000))};\n`);
-    writeFileSync(join(cwd, "atlas.config.json"), JSON.stringify({ context: { maxBytes: 300_000, pinnedSources: ["src/required.ts"] } }));
+    writeFileSync(join(cwd, "sigil.config.json"), JSON.stringify({ context: { maxBytes: 300_000, pinnedSources: ["src/required.ts"] } }));
     await startManualTask({ cwd, env, title: "Evidence", objective: "Use required evidence", taskKey: "manual-pack-budget" });
 
     await expect(buildContextManifest({ cwd, env })).rejects.toThrow("Required context evidence cannot fit the content-pack budget");

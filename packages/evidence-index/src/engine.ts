@@ -10,8 +10,8 @@ import {
   deriveEvidenceRepositoryIdentity,
   deriveId,
   stableHash
-} from "@atlas/domain";
-import type { SqlDatabase } from "@atlas/persistence";
+} from "@sigil/domain";
+import type { SqlDatabase } from "@sigil/persistence";
 import {
   abandonForeignRunningBuilds,
   assertSupportedIndexSchema,
@@ -30,7 +30,7 @@ import {
   type EvidenceEdgeRow,
   type EvidenceSymbolRow,
   type EvidenceTestAssociationRow
-} from "@atlas/persistence";
+} from "@sigil/persistence";
 import {
   EVIDENCE_INDEX_SCHEMA_VERSION,
   TYPESCRIPT_ANALYZER_NAME,
@@ -50,7 +50,7 @@ import {
   type EvidenceInvalidationReason,
   type EvidenceSymbol,
   type EvidenceTestAssociation
-} from "@atlas/schemas";
+} from "@sigil/schemas";
 
 import { tryReadEvidenceGitFacts, type EvidenceGitFacts } from "./git-evidence.js";
 import { buildIncrementalPayload } from "./invalidation.js";

@@ -5,15 +5,15 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { PNG } from "pngjs";
 
-import { getStatus, openAtlasRuntime, runBasicCheck } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { getStatus, openSigilRuntime, runBasicCheck } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 import { prepareApprovedContract, prepareExecution } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-checks-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-checks-"));
   tempRoots.push(root);
   return root;
 }
@@ -31,20 +31,20 @@ describe("runBasicCheck", () => {
 
     const result = await runBasicCheck({ cwd, env });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const checkArtifacts = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "check_result"
     );
     const runLogArtifacts = listArtifactsForSession(runtime.db, result.sessionId).filter(
       (artifact) => artifact.type === "check_run_log"
     );
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result.status).toBe("passed");
     expect(result.checkCount).toBe(1);
     expect(result.state).toBe("checks_completed");
     expect(status.session?.primaryState).toBe("checks_completed");
-    expect(status.nextCommands[0]).toBe("atlas review prepare");
+    expect(status.nextCommands[0]).toBe("sigil review prepare");
     expect(checkArtifacts).toHaveLength(1);
     expect(runLogArtifacts).toHaveLength(1);
   }, 15_000);
@@ -60,7 +60,7 @@ describe("runBasicCheck", () => {
     const root = tempRoot();
     const { cwd, env } = await prepareExecution(root);
     writeFileSync(
-      join(cwd, "atlas.config.json"),
+      join(cwd, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -88,7 +88,7 @@ describe("runBasicCheck", () => {
     git(cwd, "init");
     writeFileSync(join(cwd, "README.md"), "Initial docs\n");
     git(cwd, "add", "README.md");
-    git(cwd, "-c", "user.email=atlas@example.test", "-c", "user.name=Atlas", "commit", "-m", "Initial");
+    git(cwd, "-c", "user.email=sigil@example.test", "-c", "user.name=Sigil", "commit", "-m", "Initial");
 
     const result = await runBasicCheck({ cwd, env });
     const check = readLatestJsonArtifact(root, result.sessionId, "check_result") as {
@@ -105,7 +105,7 @@ describe("runBasicCheck", () => {
     const { cwd, env } = await prepareExecution(root);
     writeFileSync(join(cwd, "view.tsx"), '<div className="bg-[#123456]" />\n');
     writeFileSync(
-      join(cwd, "atlas.config.json"),
+      join(cwd, "sigil.config.json"),
       JSON.stringify({
         schemaVersion: 1,
         project: { name: "fixture", baseBranch: "main" },
@@ -115,11 +115,11 @@ describe("runBasicCheck", () => {
 
     await expect(runBasicCheck({ cwd, env })).rejects.toThrow("Required check failed");
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const runLogs = listArtifactsForSession(runtime.db, status.session?.sessionId ?? "").filter(
       (artifact) => artifact.type === "check_run_log"
     );
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(runLogs.at(-1)?.status).toBe("rejected");
   });
@@ -248,7 +248,7 @@ describe("runBasicCheck", () => {
     const { cwd, env } = await prepareExecution(root);
     writeFileSync(join(cwd, "dashboard-baseline.png"), pngFixture([255, 255, 255, 255]));
     writeVisualConfig(cwd);
-    const configPath = join(cwd, "atlas.config.json");
+    const configPath = join(cwd, "sigil.config.json");
     const config = JSON.parse(readFileSync(configPath, "utf8")) as { checks: Array<Record<string, unknown>> };
     config.checks[0]!.allowedDiffRatio = 2;
     writeFileSync(configPath, JSON.stringify(config));
@@ -261,7 +261,7 @@ describe("runBasicCheck", () => {
   it("fails when every configured substantive required check is skipped", async () => {
     const root = tempRoot();
     const { cwd, env } = await prepareExecution(root);
-    writeFileSync(join(cwd, "atlas.config.json"), JSON.stringify({
+    writeFileSync(join(cwd, "sigil.config.json"), JSON.stringify({
       schemaVersion: 1,
       project: { name: "fixture", baseBranch: "main" },
       checks: [{
@@ -280,7 +280,7 @@ describe("runBasicCheck", () => {
       failed_required: string[];
       results: Array<{ name: string; status: string }>;
     };
-    expect(runLog.failed_required).toContain("atlas/configured-required-validation-executed");
+    expect(runLog.failed_required).toContain("sigil/configured-required-validation-executed");
     expect(runLog.results).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: "basic-session-integrity", status: "passed" }),
       expect.objectContaining({ name: "required-source-tests", status: "skipped" })
@@ -293,7 +293,7 @@ function writeVisualConfig(
   options: { readonly ai?: unknown; readonly aiReview?: unknown; readonly required?: boolean } = {}
 ): void {
   writeFileSync(
-    join(cwd, "atlas.config.json"),
+    join(cwd, "sigil.config.json"),
     JSON.stringify({
       schemaVersion: 1,
       project: { name: "fixture", baseBranch: "main" },

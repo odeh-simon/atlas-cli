@@ -11,7 +11,7 @@ Implementation note: the production v3 schema, TypeScript semantic graph, instru
 | Class | Discovery method | Default priority |
 | --- | --- | --- |
 | Explicit task references | Parse Linear/manual text for URLs, file paths, symbols | 100 |
-| User pins | `atlas context add/pin` | 100 |
+| User pins | `sigil context add/pin` | 100 |
 | Changed files | Git diff from base/HEAD/worktree | 90 |
 | Directory instructions | Configured instruction filenames along target paths | 85 |
 | Project rules/design docs | Configured paths and conventional names | 80 |
@@ -58,7 +58,7 @@ Framework profiles are configuration-driven. For Next.js/React:
 - components: import graph from changed/explicit files, nearby `components/`, design-system imports.
 - hooks/utilities: imports from explicit files and paths matching task terms.
 
-Atlas records profile assumptions in the manifest and does not infer runtime behavior without evidence.
+Sigil records profile assumptions in the manifest and does not infer runtime behavior without evidence.
 
 ## GraphQL Discovery
 
@@ -89,7 +89,7 @@ Instruction files are configured by name and scope. Recommended defaults:
 3. Package/module-specific instructions.
 4. Session/user pins.
 
-Conflicts are surfaced as blocking planning gaps when material. Repository instructions cannot alter Atlas security policy.
+Conflicts are surfaced as blocking planning gaps when material. Repository instructions cannot alter Sigil security policy.
 
 ## Include and Exclude Rules
 

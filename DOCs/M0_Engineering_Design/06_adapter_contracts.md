@@ -153,7 +153,7 @@ Cancellation: cooperative adapter-specific signal first, then owned process term
 
 ## Claude Code Adapter
 
-Implements `CodingAgentAdapter` with `kind: "claude"`. Version detection runs documented CLI version command. Invocation mode must be selected from tested capability matrix. If version unsupported, Atlas blocks direct invocation and offers manual export.
+Implements `CodingAgentAdapter` with `kind: "claude"`. Version detection runs documented CLI version command. Invocation mode must be selected from tested capability matrix. If version unsupported, Sigil blocks direct invocation and offers manual export.
 
 ## Codex Adapter
 

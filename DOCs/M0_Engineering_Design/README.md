@@ -1,12 +1,12 @@
-# Atlas M0 Engineering Design Package
+# Sigil M0 Engineering Design Package
 
 | Field | Value |
 | --- | --- |
-| Product | Atlas |
+| Product | Sigil |
 | Milestone | M0 - Engineering Design and Architecture Definition |
 | Status | Approved for walking skeleton |
 | Date | 12 July 2026 |
-| Source of truth | `DOCs/Atlas_V1_Product_Requirements_Document.md` |
+| Source of truth | `DOCs/Sigil_V1_Product_Requirements_Document.md` |
 | Scope | Technical design only; no production implementation |
 
 ## Package Map

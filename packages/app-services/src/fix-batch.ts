@@ -1,5 +1,5 @@
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { ApprovalRequiredError, StateTransitionError } from "@atlas/domain";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { ApprovalRequiredError, StateTransitionError } from "@sigil/domain";
 import {
   appendEvent,
   createArtifactRecord,
@@ -8,11 +8,11 @@ import {
   listFindingsForSession,
   listSessionsForRepository,
   updateSessionState
-} from "@atlas/persistence";
-import { fixBatchSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { fixBatchSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface PrepareFixBatchResult {
   readonly sessionId: string;
@@ -23,7 +23,7 @@ export interface PrepareFixBatchResult {
 }
 
 export async function prepareFixBatch(options: RuntimeOptions = {}): Promise<PrepareFixBatchResult> {
-  const runtime = await openAtlasRuntime(options);
+  const runtime = await openSigilRuntime(options);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -50,7 +50,7 @@ export async function prepareFixBatch(options: RuntimeOptions = {}): Promise<Pre
     const contentVersion = listArtifactsForSession(runtime.db, session.sessionId).filter(
       (artifact) => artifact.type === "fix_batch"
     ).length + 1;
-    const instructions = `# Atlas Fix Batch
+    const instructions = `# Sigil Fix Batch
 
 Session: ${session.sessionId}
 Contract: ${contract.artifactId} (${contract.sha256})
@@ -76,7 +76,7 @@ Only address the findings listed in this batch. Preserve finding IDs in the exec
       schema_version: 1,
       content_version: contentVersion,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [contract.artifactId, ...new Set(actionable.map((finding) => finding.reviewReportArtifactId))],
       content_sha256: "0".repeat(64),
@@ -107,7 +107,7 @@ Only address the findings listed in this batch. Preserve finding IDs in the exec
       mediaType: "application/json",
       sensitivity: "confidential",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
 
@@ -121,7 +121,7 @@ Only address the findings listed in this batch. Preserve finding IDs in the exec
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "fix_batch.prepared",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "Fix batch prepared",
       metadata: { fixBatchArtifactId: artifactId, findingIds: actionable.map((finding) => finding.findingId) }
@@ -132,9 +132,9 @@ Only address the findings listed in this batch. Preserve finding IDs in the exec
       fixBatchArtifactId: artifactId,
       findingIds: actionable.map((finding) => finding.findingId),
       state: next,
-      nextCommand: "atlas implement export --manual"
+      nextCommand: "sigil implement export --manual"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }

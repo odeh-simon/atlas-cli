@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ImplementationContract } from "@atlas/schemas";
+import type { ImplementationContract } from "@sigil/schemas";
 import { diffImplementationContracts } from "./index.js";
 
 describe("diffImplementationContracts", () => {
@@ -67,7 +67,7 @@ function contract(overrides: Partial<ImplementationContract> = {}): Implementati
     content_sha256: "0".repeat(64),
     metadata: {},
     status: "valid",
-    objective: { heading: "Objective", body_markdown: "Ship Atlas." },
+    objective: { heading: "Objective", body_markdown: "Ship Sigil." },
     scope: { in_scope: ["Manual flow"], out_of_scope: [] },
     approved_decisions: [{ id: "decision_1", decision: "Use CLI", rationale: "M1 scope" }],
     technical_approach: { heading: "Technical Approach", body_markdown: "Use services." },

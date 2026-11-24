@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { canonicalJson, stableHash } from "@atlas/domain";
+import { canonicalJson, stableHash } from "@sigil/domain";
 
 import {
   DEFAULT_FIXTURE_FILES,
@@ -17,7 +17,7 @@ import {
 
 const tempRoots: string[] = [];
 
-function tempRoot(prefix = "atlas-test-utils-"): string {
+function tempRoot(prefix = "sigil-test-utils-"): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   tempRoots.push(root);
   return root;
@@ -44,8 +44,8 @@ function readTree(dir: string, relative = ""): FixtureFileSpec[] {
 
 describe("evidence index fixtures", () => {
   it("produces identical normalized inputs for identical trees written to different temp dirs", () => {
-    const dirA = tempRoot("atlas-fixture-tree-a-");
-    const dirB = tempRoot("atlas-fixture-tree-b-");
+    const dirA = tempRoot("sigil-fixture-tree-a-");
+    const dirB = tempRoot("sigil-fixture-tree-b-");
 
     fixtureRepoTree(dirA, DEFAULT_FIXTURE_FILES);
     fixtureRepoTree(dirB, DEFAULT_FIXTURE_FILES);

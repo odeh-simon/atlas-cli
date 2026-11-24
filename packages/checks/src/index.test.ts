@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-design-scan-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-design-scan-"));
   tempRoots.push(root);
   return root;
 }
@@ -76,7 +76,7 @@ describe("runCheckSet", () => {
     expect(result.status).toBe("failed");
     expect(result.results[0]?.status).toBe("skipped");
     expect(result.results[0]?.skippedReason).toContain("affected patterns");
-    expect(result.failedRequired).toContain("atlas/required-validation-executed");
+    expect(result.failedRequired).toContain("sigil/required-validation-executed");
   });
 
   it("runs design scan as a configured check", async () => {
@@ -116,8 +116,8 @@ describe("runCheckSet", () => {
     expect(result.status).toBe("failed");
     expect(result.scannedFiles).toBe(1);
     expect(result.violations.map((violation) => violation.ruleId)).toEqual([
-      "atlas/no-tailwind-arbitrary-colors",
-      "atlas/no-negative-letter-spacing"
+      "sigil/no-tailwind-arbitrary-colors",
+      "sigil/no-negative-letter-spacing"
     ]);
   });
 });

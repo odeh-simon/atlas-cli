@@ -41,7 +41,7 @@ describe("error taxonomy", () => {
   it("maps approval-required errors to the stable exit code", () => {
     const error = new ApprovalRequiredError("Contract approval is required", { state: "contract_draft" });
 
-    expect(error.code).toBe("ATLAS_APPROVAL_REQUIRED");
+    expect(error.code).toBe("SIGIL_APPROVAL_REQUIRED");
     expect(error.exitCode).toBe(ExitCode.InvalidTransitionOrApprovalRequired);
     expect(error.details).toEqual({ state: "contract_draft" });
   });

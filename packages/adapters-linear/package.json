@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/adapters-linear",
+  "name": "@sigil/adapters-linear",
   "version": "0.0.0",
   "type": "module",
   "private": true,

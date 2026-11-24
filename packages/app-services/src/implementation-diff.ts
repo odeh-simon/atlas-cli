@@ -3,20 +3,20 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { GateFailedError } from "@atlas/domain";
-import { addArtifactDependency, createArtifactRecord, type ArtifactRecord } from "@atlas/persistence";
-import { redactSecretText } from "@atlas/security";
-import { implementationDiffSchema } from "@atlas/schemas";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { GateFailedError } from "@sigil/domain";
+import { addArtifactDependency, createArtifactRecord, type ArtifactRecord } from "@sigil/persistence";
+import { redactSecretText } from "@sigil/security";
+import { implementationDiffSchema } from "@sigil/schemas";
 
 import { isSecretRiskPath } from "./evidence.js";
 import type { WorkflowGitSnapshot } from "./git-safeguards.js";
-import { newId, type AtlasRuntime } from "./runtime.js";
+import { newId, type SigilRuntime } from "./runtime.js";
 
 const MAX_PATCH_BYTES = 500_000;
 
 export function captureImplementationDiff(input: {
-  readonly runtime: AtlasRuntime;
+  readonly runtime: SigilRuntime;
   readonly sessionId: string;
   readonly runId: string;
   readonly before: WorkflowGitSnapshot | undefined;
@@ -46,14 +46,14 @@ export function captureImplementationDiff(input: {
     .filter((path) => !secretPaths.includes(path) && fileLooksBinary(input.runtime.paths.cwd, path));
   const hasSecretRisk = secretPaths.length > 0 || input.after.diff_summary?.has_secret_risk === true;
   const hasBinary = binaryPaths.length > 0 || input.after.diff_summary?.has_binary === true;
-  let patch = hasSecretRisk ? "[ATLAS PATCH OMITTED: secret-sensitive path detected]\n" : readTrackedPatch(input.runtime.paths.cwd);
+  let patch = hasSecretRisk ? "[SIGIL PATCH OMITTED: secret-sensitive path detected]\n" : readTrackedPatch(input.runtime.paths.cwd);
   if (!hasSecretRisk) {
     patch += readUntrackedPatches(input.runtime.paths.cwd, input.after.changed_files.map((entry) => entry.path), binaryPaths);
     patch = redactSecretText(patch);
   }
   const patchBytes = Buffer.from(patch, "utf8");
   const truncated = patchBytes.byteLength > MAX_PATCH_BYTES;
-  if (truncated) patch = `${patchBytes.subarray(0, MAX_PATCH_BYTES).toString("utf8")}\n[ATLAS PATCH TRUNCATED]\n`;
+  if (truncated) patch = `${patchBytes.subarray(0, MAX_PATCH_BYTES).toString("utf8")}\n[SIGIL PATCH TRUNCATED]\n`;
   const finalBytes = Buffer.from(patch, "utf8");
   const patchSha256 = createHash("sha256").update(finalBytes).digest("hex");
   const artifactId = newId("art");
@@ -64,7 +64,7 @@ export function captureImplementationDiff(input: {
     schema_version: 1,
     content_version: input.contentVersion,
     created_at: input.now,
-    producer: { type: "atlas" },
+    producer: { type: "sigil" },
     sensitivity: hasSecretRisk ? "secret-redacted" : "confidential",
     parents: [...input.parentArtifactIds],
     content_sha256: "0".repeat(64),
@@ -105,7 +105,7 @@ export function captureImplementationDiff(input: {
     mediaType: "application/json",
     sensitivity: hasSecretRisk ? "secret-redacted" : "confidential",
     status: artifact.reviewable ? "valid" : "rejected",
-    producerType: "atlas",
+    producerType: "sigil",
     createdAt: input.now
   });
   for (const dependsOnArtifactId of input.parentArtifactIds) {

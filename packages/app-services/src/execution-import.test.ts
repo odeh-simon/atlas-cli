@@ -4,15 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { exportManualAgentPackage, getStatus, importExecutionResult, openAtlasRuntime } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession, listEvents } from "@atlas/persistence";
+import { exportManualAgentPackage, getStatus, importExecutionResult, openSigilRuntime } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession, listEvents } from "@sigil/persistence";
 import { prepareApprovedContract } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-execution-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-execution-"));
   tempRoots.push(root);
   return root;
 }
@@ -41,15 +41,15 @@ describe("importExecutionResult", () => {
 
     const result = await importExecutionResult({ cwd, env, filePath: resultPath });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const artifacts = listArtifactsForSession(runtime.db, result.sessionId);
     const event = listEvents(runtime.db, result.sessionId).find((candidate) => candidate.eventType === "execution.imported");
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result.state).toBe("implementation_reconciled");
     expect(result.processStatus).toBe("succeeded");
     expect(status.session?.primaryState).toBe("implementation_reconciled");
-    expect(status.nextCommands[0]).toBe("atlas checks run");
+    expect(status.nextCommands[0]).toBe("sigil checks run");
     expect(artifacts.some((artifact) => artifact.type === "execution_report")).toBe(true);
     const execution = artifacts.find((artifact) => artifact.artifactId === result.executionReportArtifactId);
     const report = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, execution?.storageUri ?? ""), "utf8")) as Record<string, any>;

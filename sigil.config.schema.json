@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Atlas Project Configuration",
+  "title": "Sigil Project Configuration",
   "type": "object",
   "required": ["schemaVersion", "project"],
   "properties": {

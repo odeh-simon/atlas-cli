@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { GateFailedError, StateTransitionError } from "@atlas/domain";
-import { ContextConfigurationError, discoverContextSources, readContextDiscoveryConfig } from "@atlas/context-discovery";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { GateFailedError, StateTransitionError } from "@sigil/domain";
+import { ContextConfigurationError, discoverContextSources, readContextDiscoveryConfig } from "@sigil/context-discovery";
 import {
   addArtifactDependency,
   appendEvent,
@@ -13,13 +13,13 @@ import {
   listArtifactsForSession,
   listSessionsForRepository,
   updateSessionContextArtifact
-} from "@atlas/persistence";
-import { aiContextRecommendationSchema, contextManifestSchema, contextQualityReportSchema, taskBriefSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { aiContextRecommendationSchema, contextManifestSchema, contextQualityReportSchema, taskBriefSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
 import { createContextContentPack } from "./context-pack.js";
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface BuildContextInput extends RuntimeOptions {
   readonly maxFiles?: number | undefined;
@@ -43,7 +43,7 @@ export interface BuildContextResult {
 }
 
 export async function buildContextManifest(input: BuildContextInput = {}): Promise<BuildContextResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -67,7 +67,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       configured = readContextDiscoveryConfig(runtime.paths.cwd);
     } catch (error) {
       if (error instanceof ContextConfigurationError) {
-        throw new GateFailedError("Context configuration is invalid; fix atlas.config.json before discovery", { error: error.message }, error);
+        throw new GateFailedError("Context configuration is invalid; fix sigil.config.json before discovery", { error: error.message }, error);
       }
       throw error;
     }
@@ -106,7 +106,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       schema_version: 3,
       content_version: nextContextVersion(runtime.db, session.sessionId),
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "confidential",
       parents: [
         ...(taskBrief === undefined ? [] : [taskBrief.artifactId]),
@@ -210,7 +210,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       mediaType: "application/json",
       sensitivity: "confidential",
       status: "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
 
@@ -222,7 +222,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       schema_version: 1,
       content_version: artifacts.filter((artifact) => artifact.type === "context_quality_report").length + 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "internal",
       parents: [artifactId],
       content_sha256: "0".repeat(64),
@@ -260,7 +260,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       mediaType: "application/json",
       sensitivity: "internal",
       status: qualityReport.readiness === "blocked" ? "rejected" : "valid",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     addArtifactDependency(runtime.db, {
@@ -303,14 +303,14 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
         eventId: newId("evt"),
         sessionId: session.sessionId,
         eventType: "context.blocked",
-        actorType: "atlas",
+        actorType: "sigil",
         occurredAt: now,
         summary: "Context evidence is incomplete; session remains at intake",
         metadata: { contextArtifactId: artifactId, contextContentPackArtifactId: contextPackRecord.artifactId, gaps }
       });
       throw new GateFailedError("Context readiness gate failed; resolve missing context/questions and rebuild", {
         gaps: gaps.map((gap) => gap.description),
-        repair: "Rerun atlas context scout/build after resolving the listed gaps"
+        repair: "Rerun sigil context scout/build after resolving the listed gaps"
       });
     }
 
@@ -319,7 +319,7 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "context.built",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "Context manifest built from repository sources",
       metadata: {
@@ -347,10 +347,10 @@ export async function buildContextManifest(input: BuildContextInput = {}): Promi
       scannedFileCount: discovery.scannedFileCount,
       candidateSourceCount: discovery.sources.length,
       excludedCandidateCount: discovery.excludedCandidates.length,
-      nextCommand: "atlas plan"
+      nextCommand: "sigil plan"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
@@ -398,7 +398,7 @@ function evaluateContextQuality(input: {
       : "ready";
   const recommended_next_actions =
     readiness === "ready"
-      ? ["Proceed to atlas plan."]
+      ? ["Proceed to sigil plan."]
       : issues.map((issue) => `Review ${issue.code}: ${issue.summary}`);
   return { readiness, issues, recommended_next_actions };
 }

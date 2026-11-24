@@ -17,16 +17,16 @@ import {
 
 export async function prepareApprovedContract(
   root: string,
-  beforeStart?: (prepared: { cwd: string; env: { ATLAS_HOME: string } }) => void | Promise<void>
+  beforeStart?: (prepared: { cwd: string; env: { SIGIL_HOME: string } }) => void | Promise<void>
 ) {
   const cwd = join(root, "repo");
-  const env = { ATLAS_HOME: join(root, "home") };
+  const env = { SIGIL_HOME: join(root, "home") };
   mkdirSync(cwd, { recursive: true });
-  writeFileSync(join(cwd, "README.md"), "# Atlas test fixture\n");
+  writeFileSync(join(cwd, "README.md"), "# Sigil test fixture\n");
   await beforeStart?.({ cwd, env });
   execFileSync("git", ["init", "-b", "main"], { cwd, stdio: "ignore" });
-  execFileSync("git", ["config", "user.email", "atlas-tests@example.invalid"], { cwd, stdio: "ignore" });
-  execFileSync("git", ["config", "user.name", "Atlas Tests"], { cwd, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "sigil-tests@example.invalid"], { cwd, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "Sigil Tests"], { cwd, stdio: "ignore" });
   execFileSync("git", ["add", "."], { cwd, stdio: "ignore" });
   execFileSync("git", ["commit", "-m", "fixture"], { cwd, stdio: "ignore" });
   await startManualTask({ cwd, env, title: "Usage", objective: "Show usage", taskKey: "manual-usage" });
@@ -61,7 +61,7 @@ export async function prepareApprovedContract(
 
 export async function prepareExecution(
   root: string,
-  beforeExecution?: (prepared: { cwd: string; env: { ATLAS_HOME: string } }) => void | Promise<void>
+  beforeExecution?: (prepared: { cwd: string; env: { SIGIL_HOME: string } }) => void | Promise<void>
 ) {
   const prepared = await prepareApprovedContract(root, beforeExecution);
   await exportManualAgentPackage(prepared);

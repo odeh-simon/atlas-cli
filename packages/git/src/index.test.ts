@@ -16,7 +16,7 @@ const tempRoots: string[] = [];
 const gitAvailable = commandSucceeds(["--version"]);
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-git-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-git-"));
   tempRoots.push(root);
   return root;
 }
@@ -36,7 +36,7 @@ describe.skipIf(!gitAvailable)("git repository facts", () => {
     const after = git(repo, ["rev-parse", "HEAD"]).trim();
 
     expect(facts.rootPath).toBe(normalize(realpathSync(repo)));
-    expect(facts.branch).toBe("atlas-test");
+    expect(facts.branch).toBe("sigil-test");
     expect(facts.headSha).toBe(before);
     expect(facts.detachedHead).toBe(false);
     expect(facts.status.isDirty).toBe(false);
@@ -74,7 +74,7 @@ describe.skipIf(!gitAvailable)("git repository facts", () => {
   it("passes branch preflight for clean base branch with an available target branch", () => {
     const repo = createRepo();
 
-    const result = preflightGitBranch({ cwd: repo, baseBranch: "atlas-test", targetBranch: "atlas-work" });
+    const result = preflightGitBranch({ cwd: repo, baseBranch: "sigil-test", targetBranch: "sigil-work" });
 
     expect(result.passed).toBe(true);
     expect(result.failures).toHaveLength(0);
@@ -83,10 +83,10 @@ describe.skipIf(!gitAvailable)("git repository facts", () => {
 
   it("fails branch preflight for dirty trees, wrong base branches, and branch collisions", () => {
     const repo = createRepo();
-    git(repo, ["branch", "atlas-work"]);
+    git(repo, ["branch", "sigil-work"]);
     writeFileSync(join(repo, "notes.txt"), "scratch\n");
 
-    const result = preflightGitBranch({ cwd: repo, baseBranch: "main", targetBranch: "atlas-work" });
+    const result = preflightGitBranch({ cwd: repo, baseBranch: "main", targetBranch: "sigil-work" });
 
     expect(result.passed).toBe(false);
     expect(result.failures.map((failure) => failure.name).sort()).toEqual([
@@ -100,7 +100,7 @@ describe.skipIf(!gitAvailable)("git repository facts", () => {
     const repo = createRepo();
     writeFileSync(join(repo, "notes.txt"), "scratch\n");
 
-    const result = preflightGitBranch({ cwd: repo, baseBranch: "atlas-test", requireClean: false });
+    const result = preflightGitBranch({ cwd: repo, baseBranch: "sigil-test", requireClean: false });
 
     expect(result.passed).toBe(true);
     expect(result.checks.find((check) => check.name === "working_tree")).toMatchObject({ status: "pass" });
@@ -155,9 +155,9 @@ function createRepo(): string {
   const repo = tempRoot();
   mkdirSync(join(repo, "src"), { recursive: true });
   git(repo, ["init"]);
-  git(repo, ["checkout", "-b", "atlas-test"]);
-  git(repo, ["config", "user.name", "Atlas Test"]);
-  git(repo, ["config", "user.email", "atlas@example.test"]);
+  git(repo, ["checkout", "-b", "sigil-test"]);
+  git(repo, ["config", "user.name", "Sigil Test"]);
+  git(repo, ["config", "user.email", "sigil@example.test"]);
   writeFileSync(join(repo, "README.md"), "hello\n");
   git(repo, ["add", "README.md"]);
   git(repo, ["commit", "-m", "initial"]);

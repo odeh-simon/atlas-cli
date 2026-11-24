@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { sha256Bytes, writeImmutableArtifactContent } from "@atlas/artifacts";
-import { runCheckSet, type CheckDefinition, type CheckExecutionResult } from "@atlas/checks";
-import { GateFailedError, StateTransitionError } from "@atlas/domain";
+import { sha256Bytes, writeImmutableArtifactContent } from "@sigil/artifacts";
+import { runCheckSet, type CheckDefinition, type CheckExecutionResult } from "@sigil/checks";
+import { GateFailedError, StateTransitionError } from "@sigil/domain";
 import {
   addArtifactDependency,
   appendEvent,
@@ -11,12 +11,12 @@ import {
   listArtifactsForSession,
   listSessionsForRepository,
   updateSessionState
-} from "@atlas/persistence";
-import { checkResultSchema, checkRunLogSchema } from "@atlas/schemas";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { checkResultSchema, checkRunLogSchema } from "@sigil/schemas";
+import { transition } from "@sigil/workflow-engine";
 
 import { readWorkflowGitSnapshot } from "./git-safeguards.js";
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 import {
   readVisualCheckDefinitions,
   runConfiguredVisualCheck,
@@ -39,7 +39,7 @@ export interface RunBasicCheckOptions extends RuntimeOptions {
 }
 
 export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise<RunBasicCheckResult> {
-  const initialRuntime = await openAtlasRuntime(options);
+  const initialRuntime = await openSigilRuntime(options);
   let sessionId: string;
   let initialArtifacts: ReturnType<typeof listArtifactsForSession>;
   let git: ReturnType<typeof readWorkflowGitSnapshot>;
@@ -53,7 +53,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
     initialArtifacts = listArtifactsForSession(initialRuntime.db, session.sessionId);
     git = readWorkflowGitSnapshot(initialRuntime.paths.cwd);
   } finally {
-    closeAtlasRuntime(initialRuntime, false);
+    closeSigilRuntime(initialRuntime, false);
   }
 
   const cwd = initialRuntime.paths.cwd;
@@ -97,11 +97,11 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
     ? {
         ...initialCheckSet,
         status: "failed" as const,
-        failedRequired: [...initialCheckSet.failedRequired, "atlas/configured-required-validation-executed"]
+        failedRequired: [...initialCheckSet.failedRequired, "sigil/configured-required-validation-executed"]
       }
     : initialCheckSet;
 
-  const runtime = await openAtlasRuntime(options);
+  const runtime = await openSigilRuntime(options);
   try {
     const session = listSessionsForRepository(runtime.db, repoIdForPath(runtime.paths.cwd))[0];
     if (session === undefined || session.sessionId !== sessionId) {
@@ -127,7 +127,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
       schema_version: 1,
       content_version: artifacts.filter((artifact) => artifact.type === "check_run_log").length + 1,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "internal",
       parents: evidenceArtifactIds,
       content_sha256: "0".repeat(64),
@@ -189,7 +189,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
       mediaType: "application/json",
       sensitivity: "internal",
       status: status === "passed" ? "valid" : "rejected",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     for (const evidenceId of evidenceArtifactIds) {
@@ -209,7 +209,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
       schema_version: 1,
       content_version: checkResultContentVersion,
       created_at: now,
-      producer: { type: "atlas" },
+      producer: { type: "sigil" },
       sensitivity: "internal",
       parents: [runLogArtifactId, ...evidenceArtifactIds],
       content_sha256: "0".repeat(64),
@@ -278,7 +278,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
       mediaType: "application/json",
       sensitivity: "internal",
       status: status === "passed" ? "valid" : "rejected",
-      producerType: "atlas",
+      producerType: "sigil",
       createdAt: now
     });
     addArtifactDependency(runtime.db, {
@@ -299,7 +299,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
         eventId: newId("evt"),
         sessionId: session.sessionId,
         eventType: "checks.failed",
-        actorType: "atlas",
+        actorType: "sigil",
         occurredAt: now,
         summary: "Required checks failed",
         metadata: {
@@ -322,7 +322,7 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
       eventId: newId("evt"),
       sessionId: session.sessionId,
       eventType: "checks.passed",
-      actorType: "atlas",
+      actorType: "sigil",
       occurredAt: now,
       summary: "Required checks passed",
       metadata: {
@@ -341,10 +341,10 @@ export async function runBasicCheck(options: RunBasicCheckOptions = {}): Promise
       checkCount: checkSet.results.length,
       evidenceCount: evidenceArtifactIds.length,
       state: next,
-      nextCommand: "atlas review prepare"
+      nextCommand: "sigil review prepare"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 
@@ -374,7 +374,7 @@ function runBasicSessionIntegrityCheck(artifactRoot: string, artifacts: ReturnTy
 
 function readConfiguredChecks(cwd: string): CheckDefinition[] {
   try {
-    const raw = JSON.parse(readFileSync(join(cwd, "atlas.config.json"), "utf8")) as { checks?: unknown };
+    const raw = JSON.parse(readFileSync(join(cwd, "sigil.config.json"), "utf8")) as { checks?: unknown };
     if (!Array.isArray(raw.checks)) return [];
     return raw.checks.map((value): CheckDefinition => {
       if (typeof value !== "object" || value === null) {

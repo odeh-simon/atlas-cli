@@ -6,7 +6,7 @@ import {
   deriveEvidenceRepositoryIdentity,
   deriveId,
   stableHash
-} from "@atlas/domain";
+} from "@sigil/domain";
 
 import {
   EVIDENCE_INDEX_SCHEMA_VERSION,
@@ -115,7 +115,7 @@ const validTestAssociation = {
 
 const validConfigEvidence = {
   config_evidence_id: "evcfg_aaaaaaaaaaaaaaaaaaaa",
-  uri: "atlas.config.json",
+  uri: "sigil.config.json",
   source_sha256: CONTENT_SHA,
   byte_length: 24,
   format: "json",
@@ -212,17 +212,17 @@ describe("canonical hashing primitives", () => {
   });
 
   it("canonicalizes root path spelling before deriving repository identity", () => {
-    const backslash = deriveEvidenceRepositoryIdentity({ displayName: "Probe", rootPath: "C:\\work\\atlas" });
-    const forward = deriveEvidenceRepositoryIdentity({ displayName: "Probe", rootPath: "C:/work/atlas" });
-    const trailing = deriveEvidenceRepositoryIdentity({ displayName: "Probe", rootPath: "c:/work/atlas/" });
+    const backslash = deriveEvidenceRepositoryIdentity({ displayName: "Probe", rootPath: "C:\\work\\sigil" });
+    const forward = deriveEvidenceRepositoryIdentity({ displayName: "Probe", rootPath: "C:/work/sigil" });
+    const trailing = deriveEvidenceRepositoryIdentity({ displayName: "Probe", rootPath: "c:/work/sigil/" });
 
     expect(backslash.repositoryId).toBe(forward.repositoryId);
     expect(trailing.repositoryId).toBe(forward.repositoryId);
     expect(backslash.rootPathHash).toBe(forward.rootPathHash);
 
     const BS = String.fromCharCode(92);
-    expect(canonicalizeRepositoryRootPath(["C:", "Work", "Atlas", ""].join(BS))).toBe("c:/Work/Atlas");
-    expect(canonicalizeRepositoryRootPath("/repos/atlas/")).toBe("/repos/atlas");
+    expect(canonicalizeRepositoryRootPath(["C:", "Work", "Sigil", ""].join(BS))).toBe("c:/Work/Sigil");
+    expect(canonicalizeRepositoryRootPath("/repos/sigil/")).toBe("/repos/sigil");
     expect(canonicalizeRepositoryRootPath("//server/share/")).toBe("//server/share");
     expect(canonicalizeRepositoryRootPath("/")).toBe("/");
 
@@ -334,10 +334,10 @@ describe("evidence index schemas", () => {
   });
 
   it("rejects repository identities carrying raw paths instead of hashes", () => {
-    expect(evidenceRepositoryIdentitySchema.safeParse({ ...validRepository, root_path_hash: "/repos/atlas" }).success).toBe(
+    expect(evidenceRepositoryIdentitySchema.safeParse({ ...validRepository, root_path_hash: "/repos/sigil" }).success).toBe(
       false
     );
-    expect(evidenceGitSnapshotSchema.safeParse({ ...validGitSnapshot, root_path_hash: "C:/repos/atlas" }).success).toBe(
+    expect(evidenceGitSnapshotSchema.safeParse({ ...validGitSnapshot, root_path_hash: "C:/repos/sigil" }).success).toBe(
       false
     );
   });
@@ -345,7 +345,7 @@ describe("evidence index schemas", () => {
   it("strips unknown fields so raw paths and secrets have no persistence channel", () => {
     const parsed = evidenceRepositoryIdentitySchema.parse({
       ...validRepository,
-      root_path: "/repos/atlas",
+      root_path: "/repos/sigil",
       secret_note: "token"
     });
     expect(parsed).toEqual(validRepository);

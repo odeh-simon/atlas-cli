@@ -2,11 +2,11 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
-import { fetchFigmaNodeImage, parseFigmaReference } from "@atlas/adapters-figma";
-import { type CheckExecutionResult } from "@atlas/checks";
-import { type AiCompletionResponse, type AiProviderConfig } from "@atlas/llm";
-import { getCredentialToken, redactSecretText } from "@atlas/security";
-import { type VisualCaptureAdapter, type VisualBrowserChannel, type VisualViewport } from "@atlas/visual-qa";
+import { fetchFigmaNodeImage, parseFigmaReference } from "@sigil/adapters-figma";
+import { type CheckExecutionResult } from "@sigil/checks";
+import { type AiCompletionResponse, type AiProviderConfig } from "@sigil/llm";
+import { getCredentialToken, redactSecretText } from "@sigil/security";
+import { type VisualCaptureAdapter, type VisualBrowserChannel, type VisualViewport } from "@sigil/visual-qa";
 
 import { captureVisualPage, compareVisualEvidence, importFigmaVisualEvidence } from "./visual-qa.js";
 import { runAiVisualReview } from "./visual-review.js";
@@ -49,7 +49,7 @@ export interface VisualGateRuntimeOptions extends RuntimeOptions {
     | undefined;
 }
 
-interface AtlasVisualConfig {
+interface SigilVisualConfig {
   readonly checks: readonly VisualCheckDefinition[];
   readonly providers: readonly AiProviderConfig[];
   readonly defaultProviderAlias?: string | undefined;
@@ -130,7 +130,7 @@ export async function runConfiguredVisualCheck(
 
 async function resolveReference(
   definition: VisualCheckDefinition,
-  config: AtlasVisualConfig,
+  config: SigilVisualConfig,
   options: VisualGateRuntimeOptions,
   evidenceArtifactIds: string[]
 ): Promise<string | undefined> {
@@ -165,7 +165,7 @@ async function resolveReference(
 
 async function runOptionalAiReview(
   definition: VisualCheckDefinition,
-  config: AtlasVisualConfig,
+  config: SigilVisualConfig,
   options: VisualGateRuntimeOptions,
   comparisonArtifactId: string
 ): Promise<{ readonly reviewArtifactId?: string; readonly failure?: string; readonly note?: string }> {
@@ -213,8 +213,8 @@ async function runOptionalAiReview(
   }
 }
 
-function readVisualConfig(cwd: string): AtlasVisualConfig {
-  const path = join(cwd, "atlas.config.json");
+function readVisualConfig(cwd: string): SigilVisualConfig {
+  const path = join(cwd, "sigil.config.json");
   if (!existsSync(path)) return { checks: [], providers: [], figmaTokenAlias: "figma.default" };
   const raw = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
   const visualQa = asOptionalRecord(raw.visualQa);

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { resolve, sep } from "node:path";
 
-export const processRunnerPackage = "@atlas/process-runner";
+export const processRunnerPackage = "@sigil/process-runner";
 
 export type ProcessRunStatus = "succeeded" | "failed" | "timeout" | "cancelled";
 

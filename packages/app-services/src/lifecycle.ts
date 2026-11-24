@@ -1,4 +1,4 @@
-import { StateTransitionError } from "@atlas/domain";
+import { StateTransitionError } from "@sigil/domain";
 import {
   appendEvent,
   listSessionsForRepository,
@@ -6,15 +6,15 @@ import {
   updateSessionDisposition,
   updateSessionPaused,
   type SessionRecord
-} from "@atlas/persistence";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { transition } from "@sigil/workflow-engine";
 
 import {
-  closeAtlasRuntime,
+  closeSigilRuntime,
   newId,
-  openAtlasRuntime,
+  openSigilRuntime,
   repoIdForPath,
-  type AtlasRuntime,
+  type SigilRuntime,
   type RuntimeOptions
 } from "./runtime.js";
 
@@ -35,7 +35,7 @@ export async function pauseSession(input: LifecycleCommandInput = {}): Promise<L
     summary: "Session paused",
     update: (session, now, runtime) =>
       updateSessionPaused(runtime.db, { sessionId: session.sessionId, paused: true, now }),
-    nextCommand: "atlas resume"
+    nextCommand: "sigil resume"
   });
 }
 
@@ -57,7 +57,7 @@ export async function archiveSession(input: LifecycleCommandInput = {}): Promise
     summary: "Session archived",
     update: (session, now, runtime) =>
       updateSessionArchived(runtime.db, { sessionId: session.sessionId, archived: true, now }),
-    nextCommand: "atlas unarchive"
+    nextCommand: "sigil unarchive"
   });
 }
 
@@ -94,11 +94,11 @@ async function lifecycleCommand(
     readonly command: "pause" | "resume_pause" | "archive" | "unarchive" | "cancel";
     readonly eventType: string;
     readonly summary: string;
-    readonly update: (session: SessionRecord, now: string, runtime: AtlasRuntime) => SessionRecord;
+    readonly update: (session: SessionRecord, now: string, runtime: SigilRuntime) => SessionRecord;
     readonly nextCommand: string | undefined;
   }
 ): Promise<LifecycleCommandResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -126,6 +126,6 @@ async function lifecycleCommand(
 
     return { session: updated, nextCommand: definition.nextCommand };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/visual-qa",
+  "name": "@sigil/visual-qa",
   "version": "0.0.0",
   "type": "module",
   "private": true,

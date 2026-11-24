@@ -1,9 +1,9 @@
-import { runProcess, type ProcessRunResult } from "@atlas/process-runner";
+import { runProcess, type ProcessRunResult } from "@sigil/process-runner";
 import { randomUUID } from "node:crypto";
 import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-export const checksPackage = "@atlas/checks";
+export const checksPackage = "@sigil/checks";
 
 export type CheckStatus = "passed" | "failed" | "skipped" | "blocked" | "cancelled" | "timeout";
 
@@ -87,13 +87,13 @@ export interface DesignPolicyScanResult {
 
 const defaultDesignPolicyRules: readonly DesignPolicyRule[] = [
   {
-    id: "atlas/no-tailwind-arbitrary-colors",
+    id: "sigil/no-tailwind-arbitrary-colors",
     description: "Avoid arbitrary Tailwind color literals; use design tokens or named palette entries.",
     pattern: /\b(?:bg|text|border|ring|from|via|to)-\[#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})\]/g,
     fileExtensions: [".ts", ".tsx", ".js", ".jsx", ".html"]
   },
   {
-    id: "atlas/no-negative-letter-spacing",
+    id: "sigil/no-negative-letter-spacing",
     description: "Letter spacing must not be negative.",
     pattern: /(?:letter-spacing\s*:\s*-[0-9.]+|tracking-\[-)/g,
     fileExtensions: [".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".html"]
@@ -164,7 +164,7 @@ export async function runCheckSet(input: RunCheckSetInput): Promise<CheckSetResu
     .map((result) => result.name);
   const executedRequired = results.filter((result) => result.required && result.status !== "skipped");
   if (results.some((result) => result.required) && executedRequired.length === 0) {
-    failedRequired.push("atlas/required-validation-executed");
+    failedRequired.push("sigil/required-validation-executed");
   }
   return {
     runId,
@@ -323,7 +323,7 @@ function escapeRegex(value: string): string {
 
 function listScannableFiles(rootDir: string, maxFiles: number): string[] {
   const results: string[] = [];
-  const ignored = new Set([".git", "node_modules", "dist", "coverage", ".atlas"]);
+  const ignored = new Set([".git", "node_modules", "dist", "coverage", ".sigil"]);
   const visit = (relativeDir: string): void => {
     if (results.length >= maxFiles) return;
     const absoluteDir = join(rootDir, relativeDir);

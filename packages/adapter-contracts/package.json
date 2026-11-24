@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/adapter-contracts",
+  "name": "@sigil/adapter-contracts",
   "version": "0.0.0",
   "type": "module",
   "private": true,

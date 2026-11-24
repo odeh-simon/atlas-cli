@@ -1,16 +1,16 @@
-# Atlas V1 Product Requirements Document
+# Sigil V1 Product Requirements Document
 
 ## 1. Document control
 
 | Field | Value |
 | --- | --- |
-| Product | Atlas |
+| Product | Sigil |
 | Document | V1 Product Requirements Document |
 | Version | 2.0 |
 | Status | Approved product baseline aligned to the production-orchestration plan |
 | Date | 23 August 2026 |
 | Product owner | Human product owner; approves intent, material product decisions, and final release |
-| Technical owner | Atlas orchestrator/reviewer; approves and checkpoints implementation batches |
+| Technical owner | Sigil orchestrator/reviewer; approves and checkpoints implementation batches |
 | Reviewers | Product, Staff Engineering, Developer Experience, Security, Design Systems |
 | Intended audience | Product managers, engineers, security reviewers, developer-experience engineers, and implementation agents |
 
@@ -24,34 +24,34 @@
 ### Authority and delivery relationship
 
 - This PRD is authoritative for product behavior, safety boundaries, user outcomes, and release requirements.
-- The implementation context and production-orchestration plan, maintained at `DOCs/Atlas_Implementation_Context.md`, is authoritative for delivery order, batch boundaries, implementation invariants, promotion gates, and current approved progress.
+- The implementation context and production-orchestration plan, maintained at `DOCs/Sigil_Implementation_Context.md`, is authoritative for delivery order, batch boundaries, implementation invariants, promotion gates, and current approved progress.
 - `DOCs/M0_Engineering_Design/` is authoritative for approved subsystem designs and implemented technical contracts.
 - ATL Linear issues are executable views of the governing plan. A Done state is valid progress evidence only when the required implementation, tests, review packet, independent approval, and checkpoint are traceable.
 - If these sources conflict, implementation stops and the conflict is resolved through an approved document update; an agent must not silently choose one.
 
 ## 2. Executive summary
 
-Atlas is a local-first command-line workflow orchestrator for AI-assisted software development. It coordinates context, decisions, artifacts, state, and handoffs across Linear, a local Git repository, GitHub, Figma, ChatGPT, Claude Code, and Codex. Atlas is not a coding agent, issue tracker, design tool, or autonomous project manager.
+Sigil is a local-first command-line workflow orchestrator for AI-assisted software development. It coordinates context, decisions, artifacts, state, and handoffs across Linear, a local Git repository, GitHub, Figma, ChatGPT, Claude Code, and Codex. Sigil is not a coding agent, issue tracker, design tool, or autonomous project manager.
 
-The product replaces a fragile copy-and-paste workflow with a durable, task-centric session. Given an approved architecture/work source, Linear issue, or manually created task, Atlas builds versioned repository evidence, resolves authority and conflicts, synthesizes bounded context, validates a draft plan through a second discovery pass, captures an approved implementation contract, decomposes approved work into dependency-correct packages, coordinates isolated coding-agent execution, runs deterministic and independent validation, and reconciles approved work with Linear, GitHub, CI, review, merge, and closure state.
+The product replaces a fragile copy-and-paste workflow with a durable, task-centric session. Given an approved architecture/work source, Linear issue, or manually created task, Sigil builds versioned repository evidence, resolves authority and conflicts, synthesizes bounded context, validates a draft plan through a second discovery pass, captures an approved implementation contract, decomposes approved work into dependency-correct packages, coordinates isolated coding-agent execution, runs deterministic and independent validation, and reconciles approved work with Linear, GitHub, CI, review, merge, and closure state.
 
-Atlas is deliberately human-in-the-loop. Planning, context interpretation, and visual review may use manual handoffs or explicitly configured provider-neutral local/cloud model APIs, but deterministic evidence and gates remain authoritative. Atlas does not control a consumer ChatGPT browser session. Product decisions, material architecture choices, contract approval, accepted deviations, destructive Git actions, final completion, and merge remain explicit human decisions.
+Sigil is deliberately human-in-the-loop. Planning, context interpretation, and visual review may use manual handoffs or explicitly configured provider-neutral local/cloud model APIs, but deterministic evidence and gates remain authoritative. Sigil does not control a consumer ChatGPT browser session. Product decisions, material architecture choices, contract approval, accepted deviations, destructive Git actions, final completion, and merge remain explicit human decisions.
 
-Production-hardening amendment: artifact identifiers alone are never sufficient handoff evidence. Atlas creates a bounded, hash-verified context content pack for planning and implementation, captures an immutable reviewable Git diff for each execution, supplies substantive contract/diff/check evidence to an independently identified reviewer, and requires that fresh review plus the current contract, diff, checks, and Git state before completion. A later generic clean review never resolves an earlier finding; resolution requires explicit human evidence or finding-specific evidence from a fresh independent review. See `DOCs/M0_Engineering_Design/15_evidence_and_independent_review_gates.md`.
+Production-hardening amendment: artifact identifiers alone are never sufficient handoff evidence. Sigil creates a bounded, hash-verified context content pack for planning and implementation, captures an immutable reviewable Git diff for each execution, supplies substantive contract/diff/check evidence to an independently identified reviewer, and requires that fresh review plus the current contract, diff, checks, and Git state before completion. A later generic clean review never resolves an earlier finding; resolution requires explicit human evidence or finding-specific evidence from a fresh independent review. See `DOCs/M0_Engineering_Design/15_evidence_and_independent_review_gates.md`.
 
-Context-semantic amendment: production planning and implementation require a fresh manifest/content-pack v3 generated from deterministic repository evidence. Atlas records TypeScript symbols and local-module relationships, applicable root-to-scope repository instructions, test associations, verified line-range fragments, explainable selection scores, explicit gaps, effective budgets/configuration, and input hashes. AI may rerank real candidates but cannot create repository facts. Legacy manifests remain inspectable and require refresh. See `DOCs/M0_Engineering_Design/16_context_manifest_v3_semantic_discovery.md`.
+Context-semantic amendment: production planning and implementation require a fresh manifest/content-pack v3 generated from deterministic repository evidence. Sigil records TypeScript symbols and local-module relationships, applicable root-to-scope repository instructions, test associations, verified line-range fragments, explainable selection scores, explicit gaps, effective budgets/configuration, and input hashes. AI may rerank real candidates but cannot create repository facts. Legacy manifests remain inspectable and require refresh. See `DOCs/M0_Engineering_Design/16_context_manifest_v3_semantic_discovery.md`.
 
-Production-orchestration amendment: the production target is delivered through twelve dependency-ordered batches. It adds a persistent evidence index and semantic graph v2; typed authority, conflicts, patterns, and invariants; provenance-preserving synthesis and plan-aware rediscovery; architecture-to-Linear work decomposition; isolated worktrees and bounded agent execution; specialized independent review and evidence-use attribution; secure Linear/GitHub reconciliation; a privacy-bounded context-quality learning loop; production hardening; and released-binary adversarial certification. Trail Safe may depend on Atlas only after Batch 12 certification and explicit product-owner approval.
+Production-orchestration amendment: the production target is delivered through twelve dependency-ordered batches. It adds a persistent evidence index and semantic graph v2; typed authority, conflicts, patterns, and invariants; provenance-preserving synthesis and plan-aware rediscovery; architecture-to-Linear work decomposition; isolated worktrees and bounded agent execution; specialized independent review and evidence-use attribution; secure Linear/GitHub reconciliation; a privacy-bounded context-quality learning loop; production hardening; and released-binary adversarial certification. Trail Safe may depend on Sigil only after Batch 12 certification and explicit product-owner approval.
 
 The V1 outcome is successful when an engineer can stop and resume a complex task without reconstructing context, can see exactly which contract and code state are under review, and spends materially less time moving information between tools without weakening quality or control.
 
 ## 3. Product vision
 
-Atlas gives a developer one local, durable interface for coordinating an engineering task from intake to final approval.
+Sigil gives a developer one local, durable interface for coordinating an engineering task from intake to final approval.
 
-The developer owns judgment. Atlas owns coordination.
+The developer owns judgment. Sigil owns coordination.
 
-Atlas should make the approved intent, implementation state, evidence, and remaining work inspectable at any point. Handoffs should use versioned artifacts rather than ephemeral chat messages. Integrations should be replaceable adapters so that the workflow is not coupled to one AI provider or SaaS product.
+Sigil should make the approved intent, implementation state, evidence, and remaining work inspectable at any point. Handoffs should use versioned artifacts rather than ephemeral chat messages. Integrations should be replaceable adapters so that the workflow is not coupled to one AI provider or SaaS product.
 
 ## 4. Background and current workflow
 
@@ -90,9 +90,9 @@ The result is:
 
 ## 6. Product opportunity
 
-Atlas can create a reliable coordination layer without requiring a new model, IDE, cloud service, or paid model API for its core workflow. A deterministic local state machine, structured artifacts, supported CLIs, official SaaS APIs, and explicit human gates remove repeated work while preserving developer control. Optional local or cloud models may improve context discovery, planning, and visual review only within deterministic evidence, privacy, consent, cost, and capability boundaries.
+Sigil can create a reliable coordination layer without requiring a new model, IDE, cloud service, or paid model API for its core workflow. A deterministic local state machine, structured artifacts, supported CLIs, official SaaS APIs, and explicit human gates remove repeated work while preserving developer control. Optional local or cloud models may improve context discovery, planning, and visual review only within deterministic evidence, privacy, consent, cost, and capability boundaries.
 
-The initial wedge is a single experienced engineer working in one large SaaS repository. The production program includes richer Linear/GitHub orchestration, optional model APIs, deterministic and AI-assisted visual evidence, and outcome-based context evaluation while remaining local-first and single-user. Team collaboration, an Atlas cloud service, and a rich graphical interface remain future opportunities.
+The initial wedge is a single experienced engineer working in one large SaaS repository. The production program includes richer Linear/GitHub orchestration, optional model APIs, deterministic and AI-assisted visual evidence, and outcome-based context evaluation while remaining local-first and single-user. Team collaboration, a Sigil cloud service, and a rich graphical interface remain future opportunities.
 
 ## 7. Personas and primary user profile
 
@@ -104,7 +104,7 @@ They are comfortable with terminals and Git, expect to inspect and override auto
 
 ### Secondary persona: staff or lead reviewer
 
-A senior reviewer may inspect an Atlas session, approved contract, diff summary, evidence, deviations, and unresolved findings. V1 does not support multi-user collaboration, but artifacts should be readable and portable enough for review.
+A senior reviewer may inspect a Sigil session, approved contract, diff summary, evidence, deviations, and unresolved findings. V1 does not support multi-user collaboration, but artifacts should be readable and portable enough for review.
 
 ## 8. Jobs to be done
 
@@ -134,14 +134,14 @@ A senior reviewer may inspect an Atlas session, approved contract, diff summary,
 
 1. **Local-first:** Sessions, metadata, and artifacts are local by default. Remote access occurs only for configured integrations or explicit user actions.
 2. **Task-centric:** One Linear issue or manual task maps to one durable session.
-3. **Human-controlled:** Atlas does not make irreversible product, architecture, Git, merge, or completion decisions without explicit policy and approval.
+3. **Human-controlled:** Sigil does not make irreversible product, architecture, Git, merge, or completion decisions without explicit policy and approval.
 4. **Deterministic:** The core is a workflow engine and state machine; AI inference is not required for V1 correctness.
 5. **Vendor-neutral:** External tools are replaceable adapters with capability checks and normalized results.
 6. **Artifact-driven:** Durable, versioned artifacts are the source of truth for handoffs.
 7. **Resumable:** A terminated process must not corrupt the task or make the next action ambiguous.
 8. **Auditable:** Sources, actors, timestamps, versions, commands, commits, approvals, overrides, and findings are traceable.
 9. **Efficient:** The common path is concise; detail is available on demand.
-10. **Reuse-first:** Atlas should reinforce existing project and design-system conventions instead of encouraging generic implementation.
+10. **Reuse-first:** Sigil should reinforce existing project and design-system conventions instead of encouraging generic implementation.
 
 ## 11. Goals
 
@@ -198,7 +198,7 @@ V1 does not include:
 - The repository is available locally and uses Git.
 - The user can authenticate to enabled SaaS integrations with credentials permitted by their organization.
 - Linear is the initial task source, but manual task creation remains available.
-- Git is the source of truth for code changes; Atlas metadata does not replace Git history.
+- Git is the source of truth for code changes; Sigil metadata does not replace Git history.
 - Planning and review support manual handoffs and explicitly configured provider-neutral model APIs; neither path may bypass deterministic gates or approval authority.
 - Project commands and conventions differ and must be configured or discovered with user confirmation.
 - Figma metadata availability depends on credentials, permissions, API support, and referenced node accessibility.
@@ -207,8 +207,8 @@ V1 does not include:
 ## 14. Constraints
 
 - Core V1 must function without paid model API calls.
-- Atlas cannot assume consumer subscriptions grant API access.
-- Atlas must not claim or attempt hidden browser/session access.
+- Sigil cannot assume consumer subscriptions grant API access.
+- Sigil must not claim or attempt hidden browser/session access.
 - Cloud code context and image transfer require separate explicit consent and provider capability declaration.
 - Model output is advisory evidence interpretation, never repository fact, approval, check success, or completion proof.
 - Local secrets must not be stored in session artifacts or committed project files.
@@ -239,11 +239,11 @@ V1 does not include:
 | Authority claim | Provenance-bound assertion classified by authority, scope, version, confidence, and supersession state |
 | Work package | Dependency-aware, PR-sized executable unit derived only from approved source requirements and evidence |
 | Evidence-use ledger | Mapping from discovered evidence to plans, changes, tests, findings, deviations, omissions, and outcomes |
-| Orchestration run | Bounded sequence of Atlas workflow actions with explicit steps, budgets, blockers, and resulting artifacts |
+| Orchestration run | Bounded sequence of Sigil workflow actions with explicit steps, budgets, blockers, and resulting artifacts |
 
 ## 16. Existing workflow versus target workflow
 
-| Concern | Existing workflow | Atlas-assisted V1 |
+| Concern | Existing workflow | Sigil-assisted V1 |
 | --- | --- | --- |
 | Intake | Open and interpret issue manually | Fetch or enter task; persist normalized snapshot |
 | Context | Recollect for each tool | Build once, fingerprint, reuse, and refresh selectively |
@@ -258,12 +258,12 @@ V1 does not include:
 
 ```mermaid
 flowchart TD
-    A["Start task"] --> B["Atlas gathers bounded context"]
+    A["Start task"] --> B["Sigil gathers bounded context"]
     B --> C["Developer plans in ChatGPT"]
     C --> D{"Approve contract?"}
     D -- Revise --> C
-    D -- Yes --> E["Atlas hands off to coding CLI"]
-    E --> F["Atlas tracks and checks work"]
+    D -- Yes --> E["Sigil hands off to coding CLI"]
+    E --> F["Sigil tracks and checks work"]
     F --> G["Developer reviews prepared package"]
     G --> H{"Accept implementation?"}
     H -- Fix --> E
@@ -272,19 +272,19 @@ flowchart TD
 
 ## 17. End-to-end V1 user journey
 
-1. The developer runs `atlas start ENG-247` from a configured repository.
-2. Atlas verifies the project, fetches the issue, detects references, creates the session, and reports missing or stale context.
-3. The developer runs `atlas context` to inspect or refresh the selected sources.
-4. `atlas plan` writes a planning package, copies it if configured, and optionally opens the configured ChatGPT URL or application.
-5. The developer conducts the planning conversation and imports the final contract with `atlas contract import`.
-6. Atlas validates the contract and displays blocking questions. The developer explicitly approves a valid version.
-7. `atlas implement` verifies Git safety, creates or selects a task branch with confirmation when necessary, and invokes the chosen installed coding-agent CLI.
-8. Atlas captures normalized execution results and reconciles them with Git and command evidence.
-9. `atlas checks` runs configured deterministic checks. Failed required checks block review-ready status unless explicitly overridden with a recorded reason.
-10. `atlas review` creates a review package for human-mediated ChatGPT review. The developer imports the resulting report.
-11. The developer accepts, rejects, or reclassifies findings. `atlas fix` sends only approved actionable findings and relevant contract context to the agent.
+1. The developer runs `sigil start ENG-247` from a configured repository.
+2. Sigil verifies the project, fetches the issue, detects references, creates the session, and reports missing or stale context.
+3. The developer runs `sigil context` to inspect or refresh the selected sources.
+4. `sigil plan` writes a planning package, copies it if configured, and optionally opens the configured ChatGPT URL or application.
+5. The developer conducts the planning conversation and imports the final contract with `sigil contract import`.
+6. Sigil validates the contract and displays blocking questions. The developer explicitly approves a valid version.
+7. `sigil implement` verifies Git safety, creates or selects a task branch with confirmation when necessary, and invokes the chosen installed coding-agent CLI.
+8. Sigil captures normalized execution results and reconciles them with Git and command evidence.
+9. `sigil checks` runs configured deterministic checks. Failed required checks block review-ready status unless explicitly overridden with a recorded reason.
+10. `sigil review` creates a review package for human-mediated ChatGPT review. The developer imports the resulting report.
+11. The developer accepts, rejects, or reclassifies findings. `sigil fix` sends only approved actionable findings and relevant contract context to the agent.
 12. Checks and review repeat against a new iteration.
-13. `atlas complete` evaluates gates and presents evidence, overrides, and unresolved items. The developer approves completion or chooses another action.
+13. `sigil complete` evaluates gates and presents evidence, overrides, and unresolved items. The developer approves completion or chooses another action.
 
 For a production-orchestrated run, the journey additionally begins from an approved architecture/work source, creates dependency-correct Linear work packages, resolves each task against the persistent evidence index and authority model, performs plan-aware rediscovery before approval, executes in an isolated owned worktree, invokes independent review lanes, and reconciles the exact approved head with GitHub PR/CI/review/merge and Linear closure state. Remote failure pauses or degrades to an explicitly supported local/manual path; it never weakens approval or evidence gates.
 
@@ -295,22 +295,22 @@ For a production-orchestrated run, the journey additionally begins from an appro
 ```mermaid
 sequenceDiagram
     actor Dev as Developer
-    participant Atlas
+    participant Sigil
     participant SaaS as Linear/Figma/GitHub
     participant Chat as ChatGPT
     participant Agent as Claude Code/Codex
-    Dev->>Atlas: Start task
-    Atlas->>SaaS: Fetch permitted context
-    Atlas-->>Dev: Context and planning package
+    Dev->>Sigil: Start task
+    Sigil->>SaaS: Fetch permitted context
+    Sigil-->>Dev: Context and planning package
     Dev->>Chat: Plan with package
     Chat-->>Dev: Implementation contract
-    Dev->>Atlas: Import and approve contract
-    Atlas->>Agent: Invoke with approved package
-    Agent-->>Atlas: Changes and completion report
-    Atlas-->>Dev: Checks and review package
+    Dev->>Sigil: Import and approve contract
+    Sigil->>Agent: Invoke with approved package
+    Agent-->>Sigil: Changes and completion report
+    Sigil-->>Dev: Checks and review package
     Dev->>Chat: Review package
     Chat-->>Dev: Review report
-    Dev->>Atlas: Approve findings or completion
+    Dev->>Sigil: Approve findings or completion
 ```
 
 ### Automation boundary
@@ -356,10 +356,10 @@ The following requirements are the V1 product baseline. “V1 status” indicate
 
 | ID | Requirement and user value | Priority | Preconditions and trigger | Main behavior and outputs | Failure behavior | Acceptance criteria | V1 status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| AT-SET-001 | **Installable CLI.** The user can install and invoke Atlas consistently. | P0 | Supported Node/runtime; user runs install and `atlas --version`. | Provide versioned executable, help, and shell-safe exit codes. | Explain unsupported runtime or path conflicts without mutation. | Clean install succeeds on supported OS matrix; `--version` and `--help` exit 0 within 1 second initial target. | Committed |
-| AT-SET-002 | **Project initialization.** Create explicit project configuration without overwriting files. | P0 | Git repository; `atlas init`. | Discover safe defaults, preview configuration, write only after confirmation, and support non-interactive flags. | Invalid repo or collision leaves existing files unchanged and shows recovery. | Re-running is idempotent; existing configuration is preserved unless an explicit update is accepted. | Committed |
-| AT-SET-003 | **Configuration validation.** Prevent invalid commands and unsafe assumptions. | P0 | Config exists; any state-changing command. | Validate schema, paths, commands, adapters, branch rules, and secret references; output actionable diagnostics. | Block the affected action; do not partially mutate session or repo. | Every invalid field names its source, expected form, and correction; `atlas doctor` detects missing dependencies. | Committed |
-| AT-SET-004 | **Layered configuration.** Separate project rules from user preferences and secrets. | P0 | Initialization or config change. | Merge documented defaults, user config, project config, and command flags with visible precedence. | Reject ambiguous or unknown security-sensitive fields. | `atlas config explain <key>` reports value and source; secrets never appear in project config. | Committed |
+| AT-SET-001 | **Installable CLI.** The user can install and invoke Sigil consistently. | P0 | Supported Node/runtime; user runs install and `sigil --version`. | Provide versioned executable, help, and shell-safe exit codes. | Explain unsupported runtime or path conflicts without mutation. | Clean install succeeds on supported OS matrix; `--version` and `--help` exit 0 within 1 second initial target. | Committed |
+| AT-SET-002 | **Project initialization.** Create explicit project configuration without overwriting files. | P0 | Git repository; `sigil init`. | Discover safe defaults, preview configuration, write only after confirmation, and support non-interactive flags. | Invalid repo or collision leaves existing files unchanged and shows recovery. | Re-running is idempotent; existing configuration is preserved unless an explicit update is accepted. | Committed |
+| AT-SET-003 | **Configuration validation.** Prevent invalid commands and unsafe assumptions. | P0 | Config exists; any state-changing command. | Validate schema, paths, commands, adapters, branch rules, and secret references; output actionable diagnostics. | Block the affected action; do not partially mutate session or repo. | Every invalid field names its source, expected form, and correction; `sigil doctor` detects missing dependencies. | Committed |
+| AT-SET-004 | **Layered configuration.** Separate project rules from user preferences and secrets. | P0 | Initialization or config change. | Merge documented defaults, user config, project config, and command flags with visible precedence. | Reject ambiguous or unknown security-sensitive fields. | `sigil config explain <key>` reports value and source; secrets never appear in project config. | Committed |
 
 ### 19.2 Authentication and credentials
 
@@ -367,7 +367,7 @@ The following requirements are the V1 product baseline. “V1 status” indicate
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | AT-AUTH-001 | **Safe credential storage.** Enable integrations without exposing tokens. | P0 | User enables an authenticated adapter. | Store token in OS keychain where available; allow environment-variable reference for automation; store only a credential alias in config. | If secure storage is unavailable, require an explicit documented alternative; never silently write plaintext. | Token values are redacted in all output, logs, artifacts, crash reports, and JSON. | Committed |
 | AT-AUTH-002 | **Least-privilege verification.** Show what each credential can do. | P0 | Credential added or `doctor` runs. | Perform non-destructive auth/capability check and report identity, scopes where exposed, and missing permissions. | A failed adapter is isolated; local-only features remain usable. | Invalid/expired credentials produce provider-specific recovery instructions without exposing secrets. | Committed |
-| AT-AUTH-003 | **Credential removal.** Let the user revoke Atlas's local reference. | P1 | Credential exists; user requests removal. | Remove keychain entry/reference after confirmation and mark dependent adapter unavailable. | Failure reports whether the reference or secure entry remains. | Removed credentials are not recoverable through Atlas output or artifacts. | Committed |
+| AT-AUTH-003 | **Credential removal.** Let the user revoke Sigil's local reference. | P1 | Credential exists; user requests removal. | Remove keychain entry/reference after confirmation and mark dependent adapter unavailable. | Failure reports whether the reference or secure entry remains. | Removed credentials are not recoverable through Sigil output or artifacts. | Committed |
 
 ### 19.3 Task intake and integrations
 
@@ -377,7 +377,7 @@ The following requirements are the V1 product baseline. “V1 status” indicate
 | AT-INT-002 | **Manual task intake.** Keep core workflow usable without Linear. | P0 | `start --manual` or Linear unavailable. | Prompt for or accept title, objective, references, repository, and optional acceptance criteria. | Validate required minimum fields and preserve draft input. | A manual task reaches context-discovery state without remote credentials. | Committed |
 | AT-INT-003 | **Reference detection.** Reduce missed design and code links. | P0 | Task content imported. | Detect and normalize Figma and GitHub URLs and retain original text and source location. | Malformed or inaccessible links are flagged, not discarded. | Repeated links deduplicate by canonical target while preserving all source occurrences. | Committed |
 | AT-INT-004 | **GitHub metadata.** Add PR/repository context when configured and relevant. | P1 | GitHub adapter authenticated; linked PR/repo exists. | Read permitted metadata such as default branch, PR status, commit identifiers, and links; local Git remains code source of truth. | Remote failure does not corrupt local Git facts. | Package labels remote facts with fetch time and distinguishes them from local state. | Committed |
-| AT-INT-005 | **Figma reference handling.** Preserve design truth without overstating fidelity. | P0 | Figma URL detected or added. | Parse file/node identifiers, fetch official metadata when allowed, and support user-supplied exports/screenshots as evidence. | Inaccessible metadata remains a reference with clear limitation. | Atlas never labels an implementation pixel-perfect solely because a Figma URL exists. | Committed |
+| AT-INT-005 | **Figma reference handling.** Preserve design truth without overstating fidelity. | P0 | Figma URL detected or added. | Parse file/node identifiers, fetch official metadata when allowed, and support user-supplied exports/screenshots as evidence. | Inaccessible metadata remains a reference with clear limitation. | Sigil never labels an implementation pixel-perfect solely because a Figma URL exists. | Committed |
 
 ### 19.4 Repository and context collection
 
@@ -416,7 +416,7 @@ The following requirements are the V1 product baseline. “V1 status” indicate
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | AT-AGT-001 | **Replaceable agent selection.** Switch workers without changing task state. | P0 | At least one adapter available; `implement --agent`. | Resolve configured/default Claude Code or Codex adapter, verify capabilities/version, and use normalized request/result schemas. | Unsupported version/capability blocks invocation and suggests another adapter or manual export. | The same approved package can be exported for both adapters without changing contract identity. | Committed |
 | AT-AGT-002 | **Relevant implementation package.** Give agents approved, bounded instructions. | P0 | Approved contract and safe Git state. | Include contract, repo/base/target refs, applicable rules, component mappings, tests, prohibitions, and completion-report schema. | Oversize packages produce referenced artifacts or ask for scope narrowing; never silently truncate critical constraints. | Package records exactly which contract and source versions it contains. | Committed |
-| AT-AGT-003 | **Supported CLI invocation.** Use installed tools through documented interfaces. | P0 | Adapter health check passes; user invokes implementation/fix. | Run in repository context, stream concise progress, capture exit code, timestamps, sanitized output references, and normalized completion report. | Timeout, cancellation, crash, or non-zero exit creates a failed/interrupted run that can be safely retried. | Atlas never claims success based only on agent prose; Git/check evidence is reconciled independently. | Committed |
+| AT-AGT-003 | **Supported CLI invocation.** Use installed tools through documented interfaces. | P0 | Adapter health check passes; user invokes implementation/fix. | Run in repository context, stream concise progress, capture exit code, timestamps, sanitized output references, and normalized completion report. | Timeout, cancellation, crash, or non-zero exit creates a failed/interrupted run that can be safely retried. | Sigil never claims success based only on agent prose; Git/check evidence is reconciled independently. | Committed |
 | AT-EXE-001 | **Safe local command runner.** Run configured checks predictably. | P0 | Command is declared or explicitly approved. | Display command/scope, set working directory and timeout, capture stdout/stderr with redaction, and record result. | Refuse destructive or shell-unsafe commands outside policy; cancellation terminates child process where supported. | Commands are not interpolated through an unsafe shell by default; exit codes and duration are recorded. | Committed |
 | AT-EXE-002 | **Execution report.** Summarize work without raw-log dependence. | P0 | Run ends. | Report agent, contract, branch/HEAD before and after, changed files, commands, tests, limitations, deviations, questions, and status. | Missing agent report fields are marked unknown and derived facts are labeled. | Summary is human-readable and has a stable JSON representation. | Committed |
 
@@ -424,8 +424,8 @@ The following requirements are the V1 product baseline. “V1 status” indicate
 
 | ID | Requirement and user value | Priority | Preconditions and trigger | Main behavior and outputs | Failure behavior | Acceptance criteria | V1 status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| AT-GIT-001 | **Safe task branch workflow.** Isolate work without losing changes. | P0 | Approved contract; implementation requested. | Validate base ref, worktree cleanliness/policy, branch naming, and collisions; create branch only with allowed policy or confirmation. | Dirty worktree, missing base, divergence, or collision blocks and offers non-destructive choices. | Atlas does not reset, force checkout, force push, discard, delete, or merge in V1. | Committed |
-| AT-GIT-002 | **Authoritative change tracking.** Tie evidence to exact Git state. | P0 | During/after execution and review. | Record base commit, branch, HEAD, commits, working-tree changes, rename/binary summary, and diff range. | If HEAD changes outside Atlas, reconcile and invalidate stale packages as needed. | Review package identifies exact base and head SHAs and whether uncommitted changes are included. | Committed |
+| AT-GIT-001 | **Safe task branch workflow.** Isolate work without losing changes. | P0 | Approved contract; implementation requested. | Validate base ref, worktree cleanliness/policy, branch naming, and collisions; create branch only with allowed policy or confirmation. | Dirty worktree, missing base, divergence, or collision blocks and offers non-destructive choices. | Sigil does not reset, force checkout, force push, discard, delete, or merge in V1. | Committed |
+| AT-GIT-002 | **Authoritative change tracking.** Tie evidence to exact Git state. | P0 | During/after execution and review. | Record base commit, branch, HEAD, commits, working-tree changes, rename/binary summary, and diff range. | If HEAD changes outside Sigil, reconcile and invalidate stale packages as needed. | Review package identifies exact base and head SHAs and whether uncommitted changes are included. | Committed |
 | AT-GIT-003 | **Diff generation with safeguards.** Provide useful review context. | P0 | Review requested. | Generate changed-file summary and bounded patch; detect secrets/binaries/oversize content; reference omitted files. | Secret-like content is redacted or excluded with warning; oversized diff never silently disappears. | Package accounts for every changed path even when full content is excluded. | Committed |
 | AT-CHK-001 | **Configurable deterministic checks.** Validate implementation before review. | P0 | Work exists; `checks` or review preflight. | Run configured typecheck, lint, unit/integration tests, build, Git checks, token scans, and contract-specific commands with dependency/parallel rules. | Required failure blocks review-ready state; rerun can target failed or affected checks. | Each result records command version, commit/worktree fingerprint, exit status, duration, and log reference. | Committed |
 | AT-CHK-002 | **UI/design-system policy checks.** Detect common fidelity violations. | P0 for configured UI projects | Project policy configured. | Scan changed files for arbitrary Tailwind values, prohibited imports/components, missing token usage, and contract-specific mappings. | Findings identify file/rule and allow approved exception with rationale. | Known fixture violations are detected; clean fixtures pass; scanner limitations are documented. | Committed |
@@ -448,7 +448,7 @@ These requirements extend the local V1 foundation into the production target. De
 | AT-ORC-008 | **Independent review and evidence-use attribution.** Prove coverage through specialized reviewers independent from implementation. | Batch 8 | Review lanes/quorum, reviewer identity and capability, evidence-use ledger, requirement-to-diff-to-test coverage, finding sufficiency, bounded repair, and affected-lane re-review. | Actor collision, stale evidence, uncited blockers, blanket finding closure, and retry exhaustion block or escalate. | Every blocker cites current evidence; affected changes invalidate review lanes; coverage gaps remain visible. | Committed |
 | AT-ORC-009 | **Secure Linear/GitHub orchestration and reconciliation.** Make local and remote workflow state converge safely. | Batch 9 | Protected credential storage, capability checks, durable inbox/outbox, signed webhooks, branch/push/PR/CI/review orchestration, Linear lifecycle reconciliation, drift handling, and dead letters. | Duplicate, delayed, reordered, missing, stale, unauthorized, or offline remote events cannot fabricate success. | Writes are idempotent; stale CI cannot pass a new head; merge/closure requires exact approved evidence. | Committed |
 | AT-ORC-010 | **Privacy-bounded context-quality learning.** Improve evidence selection from audited outcomes under human governance. | Batch 10 | Outcome dataset, quality metrics, versioned ranking profiles, replay, benchmark corpora, shadow evaluation, promotion/rollback, drift detection, retention, and deletion. | Shadow candidates cannot mutate workflow; privacy violations or regressions block promotion. | Active profiles are explainable, reproducible, approved, rollbackable, and privacy-compliant. | Committed |
-| AT-ORC-011 | **Production hardening and release readiness.** Make Atlas durable, observable, secure, supportable, and cross-platform. | Batch 11 | Backup/restore, migration and corruption repair, multiprocess locks/leases, resource limits, diagnostics, performance budgets, packaging provenance, runbooks, and security review. | Unsupported upgrade, corruption, concurrency, resource exhaustion, or diagnostic privacy failure stops safely. | Recovery and platform matrices pass with no release-blocking data-loss, secret-exposure, false-approval, or destructive-action defect. | Committed |
+| AT-ORC-011 | **Production hardening and release readiness.** Make Sigil durable, observable, secure, supportable, and cross-platform. | Batch 11 | Backup/restore, migration and corruption repair, multiprocess locks/leases, resource limits, diagnostics, performance budgets, packaging provenance, runbooks, and security review. | Unsupported upgrade, corruption, concurrency, resource exhaustion, or diagnostic privacy failure stops safely. | Recovery and platform matrices pass with no release-blocking data-loss, secret-exposure, false-approval, or destructive-action defect. | Committed |
 | AT-ORC-012 | **Released-binary production certification.** Prove the complete system before downstream products depend on it. | Batch 12 | Golden and adversarial scenario harness, two representative repositories, remote/offline/failure scenarios, evidence matrix, Trail Safe rehearsal, rollback criteria, and human sign-off. | Failed required scenario or unresolved release blocker prevents certification. | Every required journey passes from released binaries and the product owner explicitly authorizes Trail Safe proving. | Committed |
 
 ## 20. CLI product specification
@@ -470,28 +470,28 @@ Command names are provisional but the capability groups and behavioral contracts
 
 | Command | User goal | Preconditions / inputs | Behavior and output | Errors and recovery | State change / approval |
 | --- | --- | --- | --- | --- | --- |
-| `atlas init` | Configure a repository | Git repo; optional flags | Discover, preview, validate, and write project config | Collision, invalid command, unsupported repo; rerun after correction | Project config changes; confirmation required |
-| `atlas start <issue-id>` | Begin tracked work | Configured project and optional Linear auth | Fetch or enter task, detect links, create session | Auth/network/duplicate issue; retry, manual mode, or resume | Creates session; confirms ambiguous repo/task |
-| `atlas intake` | Inspect or refresh task source | Session | Show normalized task and refresh remote snapshot | Stale/unavailable remote; retain prior labeled snapshot | New artifact version; no approval unless source materially changes approved intent |
-| `atlas context [build|show|add|exclude|refresh]` | Control task context | Session and repo | Build/inspect bounded manifest and freshness | Limits, conflicts, missing paths; narrow or override safely | Manifest/package versions change; no product approval |
-| `atlas plan` | Prepare planning conversation | Intake/context sufficient | Export planning package; optionally copy/open | Missing/stale context; correct or create labeled draft | Creates artifact; no approval |
-| `atlas contract import/show/diff` | Capture and inspect agreement | Input file/stdin/clipboard | Validate, version, display, and compare contract | Missing sections or blockers; edit and re-import | Creates draft version; no approval on import |
-| `atlas approve contract <version>` | Authorize implementation intent | Valid contract, no blocking questions | Show material changes and record approval | Stale/invalid version; refresh or choose correct version | Approval gate; explicit confirmation |
-| `atlas implement` | Run coding worker | Approved contract, agent, safe Git state | Build package, prepare branch, invoke adapter, reconcile report | Dirty tree, missing CLI, crash; resolve or retry | Execution state changes; command is explicit authorization; branch confirmation as needed |
-| `atlas status` | Understand current state | Optional session selector | Show stage, Git state, gates, blockers, next steps | Ambiguous session; choose one | Read-only |
-| `atlas checks [--failed|--affected]` | Validate work | Configured checks | Run and record deterministic checks | Timeout/failure; inspect logs and rerun | Check records change; override separate |
-| `atlas review [prepare|import|show]` | Prepare or capture review | Implementation and contract | Create package or validate report | Stale diff/checks/report; regenerate or import as draft | Artifact/findings change; readiness gate applies |
-| `atlas approve findings` | Decide review disposition | Imported review | Accept classifications/actions and record deviations | Ambiguous/stale finding; resolve first | Approval gate |
-| `atlas fix` | Address approved findings | Approved fix batch, safe Git | Invoke agent with focused package | Same execution/Git errors as implement | Fix iteration changes; explicit invocation |
-| `atlas resume` | Continue safely | Existing session | Reconcile state and present next valid action | External divergence; select recovery | May update reconciled facts, not approvals |
-| `atlas pause` | Stop active progression | Active session | Record pause reason and preserve state | Running process; cancel/wait choice | State change; confirmation only if process active |
-| `atlas history` | Audit events | Session | Show filtered timeline and artifact links | Corrupt record; doctor/recovery | Read-only |
-| `atlas artifacts` | Find/export evidence | Session | List versions, hashes, status, and paths | Missing file; recovery/mark missing | Read-only unless export requested |
-| `atlas open <target>` | Open local/remote reference | Configured app/URL | Open editor, repo, issue, design, or artifact | Unsupported opener; print target instead | Read-only external launch |
-| `atlas complete` | Approve task completion | Completion gates evaluated | Show evidence and record final approval | Failed gates; return to checks/review/fix | Approval gate |
-| `atlas archive` | Remove finished/abandoned task from active view | Session not actively running | Preserve data and archive status | Active child process; stop first | State change; confirmation |
-| `atlas doctor` | Diagnose setup/session | None or session | Validate runtime, tools, credentials, config, DB, artifact links | Provides scoped repair steps | Read-only unless `--repair` explicitly selected |
-| `atlas config` | Inspect/change settings | Relevant scope | Explain sources, validate updates, redact secrets | Invalid value; no partial write | Mutating subcommands require confirmation as appropriate |
+| `sigil init` | Configure a repository | Git repo; optional flags | Discover, preview, validate, and write project config | Collision, invalid command, unsupported repo; rerun after correction | Project config changes; confirmation required |
+| `sigil start <issue-id>` | Begin tracked work | Configured project and optional Linear auth | Fetch or enter task, detect links, create session | Auth/network/duplicate issue; retry, manual mode, or resume | Creates session; confirms ambiguous repo/task |
+| `sigil intake` | Inspect or refresh task source | Session | Show normalized task and refresh remote snapshot | Stale/unavailable remote; retain prior labeled snapshot | New artifact version; no approval unless source materially changes approved intent |
+| `sigil context [build|show|add|exclude|refresh]` | Control task context | Session and repo | Build/inspect bounded manifest and freshness | Limits, conflicts, missing paths; narrow or override safely | Manifest/package versions change; no product approval |
+| `sigil plan` | Prepare planning conversation | Intake/context sufficient | Export planning package; optionally copy/open | Missing/stale context; correct or create labeled draft | Creates artifact; no approval |
+| `sigil contract import/show/diff` | Capture and inspect agreement | Input file/stdin/clipboard | Validate, version, display, and compare contract | Missing sections or blockers; edit and re-import | Creates draft version; no approval on import |
+| `sigil approve contract <version>` | Authorize implementation intent | Valid contract, no blocking questions | Show material changes and record approval | Stale/invalid version; refresh or choose correct version | Approval gate; explicit confirmation |
+| `sigil implement` | Run coding worker | Approved contract, agent, safe Git state | Build package, prepare branch, invoke adapter, reconcile report | Dirty tree, missing CLI, crash; resolve or retry | Execution state changes; command is explicit authorization; branch confirmation as needed |
+| `sigil status` | Understand current state | Optional session selector | Show stage, Git state, gates, blockers, next steps | Ambiguous session; choose one | Read-only |
+| `sigil checks [--failed|--affected]` | Validate work | Configured checks | Run and record deterministic checks | Timeout/failure; inspect logs and rerun | Check records change; override separate |
+| `sigil review [prepare|import|show]` | Prepare or capture review | Implementation and contract | Create package or validate report | Stale diff/checks/report; regenerate or import as draft | Artifact/findings change; readiness gate applies |
+| `sigil approve findings` | Decide review disposition | Imported review | Accept classifications/actions and record deviations | Ambiguous/stale finding; resolve first | Approval gate |
+| `sigil fix` | Address approved findings | Approved fix batch, safe Git | Invoke agent with focused package | Same execution/Git errors as implement | Fix iteration changes; explicit invocation |
+| `sigil resume` | Continue safely | Existing session | Reconcile state and present next valid action | External divergence; select recovery | May update reconciled facts, not approvals |
+| `sigil pause` | Stop active progression | Active session | Record pause reason and preserve state | Running process; cancel/wait choice | State change; confirmation only if process active |
+| `sigil history` | Audit events | Session | Show filtered timeline and artifact links | Corrupt record; doctor/recovery | Read-only |
+| `sigil artifacts` | Find/export evidence | Session | List versions, hashes, status, and paths | Missing file; recovery/mark missing | Read-only unless export requested |
+| `sigil open <target>` | Open local/remote reference | Configured app/URL | Open editor, repo, issue, design, or artifact | Unsupported opener; print target instead | Read-only external launch |
+| `sigil complete` | Approve task completion | Completion gates evaluated | Show evidence and record final approval | Failed gates; return to checks/review/fix | Approval gate |
+| `sigil archive` | Remove finished/abandoned task from active view | Session not actively running | Preserve data and archive status | Active child process; stop first | State change; confirmation |
+| `sigil doctor` | Diagnose setup/session | None or session | Validate runtime, tools, credentials, config, DB, artifact links | Provides scoped repair steps | Read-only unless `--repair` explicitly selected |
+| `sigil config` | Inspect/change settings | Relevant scope | Explain sources, validate updates, redact secrets | Invalid value; no partial write | Mutating subcommands require confirmation as appropriate |
 
 ## 21. Task-session and memory requirements
 
@@ -503,7 +503,7 @@ Command names are provisional but the capability groups and behavioral contracts
 | Project memory | Repo identity, base-branch policy, commands, scoped conventions, architecture/design docs, component registry, test rules, exclusions, default agent | Tokens, private issue content, task-specific decisions promoted without confirmation | User-confirmed changes are versioned; Git-tracked sources use content hashes; stale when file/ref/config changes |
 | User preferences | Preferred agent/editor, verbosity, open/copy defaults, strictness, approval preferences | Project secrets, sensitive content, implicit behavioral profiles | Explicit changes only; defaults can be reset and exported without secrets |
 
-Project memory promotion must be explicit. Atlas may suggest that a recurring task rule become project memory, but it must not silently generalize one task's decision. Staleness is detected using content hashes, Git refs, file metadata as an optimization, integration fetch timestamps, adapter versions, and configuration schema versions.
+Project memory promotion must be explicit. Sigil may suggest that a recurring task rule become project memory, but it must not silently generalize one task's decision. Staleness is detected using content hashes, Git refs, file metadata as an optimization, integration fetch timestamps, adapter versions, and configuration schema versions.
 
 ### Task-session state model
 
@@ -540,17 +540,17 @@ The actual implementation may use substates, but every externally visible transi
 
 | Artifact | Format | Producer | Required before | Key contents |
 | --- | --- | --- | --- | --- |
-| Task brief | Markdown + structured data | Atlas | Context discovery | Normalized task, sources, gaps |
-| Context manifest | Markdown + JSON | Atlas | Planning | Selected sources, hashes, freshness, limits, exclusions |
-| Planning package | Markdown | Atlas | Planning conversation | Goal, behavior, evidence, constraints, states, decisions |
-| Decision log | Markdown + JSON | Developer/Atlas | Ongoing | Decision, status, rationale, actor, affected contract |
+| Task brief | Markdown + structured data | Sigil | Context discovery | Normalized task, sources, gaps |
+| Context manifest | Markdown + JSON | Sigil | Planning | Selected sources, hashes, freshness, limits, exclusions |
+| Planning package | Markdown | Sigil | Planning conversation | Goal, behavior, evidence, constraints, states, decisions |
+| Decision log | Markdown + JSON | Developer/Sigil | Ongoing | Decision, status, rationale, actor, affected contract |
 | Implementation contract | Markdown + JSON metadata | ChatGPT/developer import | Implementation | Approved intent, constraints, tests, prohibitions |
-| Execution report | Markdown + JSON | Agent adapter/Atlas | Checks/review | Run facts, changes, commands, deviations, blockers |
-| Test/check report | Markdown + JSON | Atlas | Review/completion | Results tied to code fingerprint |
-| Review package | Markdown | Atlas | Review conversation | Contract, diff, evidence, rubric |
+| Execution report | Markdown + JSON | Agent adapter/Sigil | Checks/review | Run facts, changes, commands, deviations, blockers |
+| Test/check report | Markdown + JSON | Sigil | Review/completion | Results tied to code fingerprint |
+| Review package | Markdown | Sigil | Review conversation | Contract, diff, evidence, rubric |
 | Review report | Markdown + JSON metadata | ChatGPT/developer import | Finding disposition | Findings, severity, evidence, action |
-| Fix instructions | Markdown | Atlas | Fix run | Approved findings and bounded context |
-| Completion report | Markdown + JSON | Atlas | Archive/PR handoff | Final contract, code, gates, evidence, approvals |
+| Fix instructions | Markdown | Sigil | Fix run | Approved findings and bounded context |
+| Completion report | Markdown + JSON | Sigil | Archive/PR handoff | Final contract, code, gates, evidence, approvals |
 
 Every artifact has a stable artifact ID, session ID, type, schema version, content version, content hash, creation time, producer type, producer identifier where available, source/parent versions, approval state, and sensitivity classification. Markdown is optimized for humans and agent handoffs; structured metadata supports validation and automation.
 
@@ -588,9 +588,9 @@ flowchart TD
 - The local foundation supports work before a PR exists and exports PR-ready evidence.
 - Batch 7 adds isolated branch/worktree ownership and scope enforcement.
 - Batch 9 adds authorized branch push, PR create/update, CI/check aggregation, review/thread reconciliation, merge detection, and exact head/base binding.
-- Atlas never assumes `origin`, default branch, or branch protection without verification.
+- Sigil never assumes `origin`, default branch, or branch protection without verification.
 - Remote fetch is explicit/configurable and must not silently alter the worktree.
-- Atlas does not merge autonomously. Merge remains an explicit human or separately authorized external action and must reconcile to the exact approved evidence.
+- Sigil does not merge autonomously. Merge remains an explicit human or separately authorized external action and must reconcile to the exact approved evidence.
 
 ### Figma
 
@@ -607,27 +607,27 @@ flowchart TD
 - The developer is responsible for submitting the package and selecting/importing the final response.
 - Provider-neutral local or cloud model APIs may perform bounded context reranking, planning drafts, and visual review when separately configured with explicit code/image consent, cost/time/token limits, redaction, and capability checks.
 - Model responses are advisory and must cite deterministic evidence; they cannot approve contracts, checks, findings, completion, or merge.
-- Atlas must not automate login, scrape chats, inject browser scripts, or imply access to consumer chat history.
+- Sigil must not automate login, scrape chats, inject browser scripts, or imply access to consumer chat history.
 
 ### Claude Code and Codex
 
 - Each adapter declares executable discovery, supported versions/capabilities, invocation modes, cancellation behavior, output parsing, and completion-report support.
-- Atlas passes the same normalized implementation/fix contract through provider-specific formatting.
-- Provider-specific session IDs may be recorded, but Atlas session identity and workflow state remain provider-neutral.
-- If structured output is unavailable, Atlas captures exit state and reconciles Git facts; unverified agent claims are labeled as such.
+- Sigil passes the same normalized implementation/fix contract through provider-specific formatting.
+- Provider-specific session IDs may be recorded, but Sigil session identity and workflow state remain provider-neutral.
+- If structured output is unavailable, Sigil captures exit state and reconciles Git facts; unverified agent claims are labeled as such.
 
 ## 24. Git and branch workflow requirements
 
 1. The project defines a default base branch and optional branch naming template, for example `feat/{issue-id}-{slug}`.
-2. Before branch creation Atlas verifies repository identity, resolves the base commit, checks worktree status, and detects existing local/remote names.
+2. Before branch creation Sigil verifies repository identity, resolves the base commit, checks worktree status, and detects existing local/remote names.
 3. A pre-existing correct task branch may be adopted after showing its base, divergence, and worktree state.
-4. Uncommitted pre-existing work is never stashed, committed, moved, or discarded automatically. Atlas offers to pause, adopt with explicit acknowledgment, or let the user resolve it.
+4. Uncommitted pre-existing work is never stashed, committed, moved, or discarded automatically. Sigil offers to pause, adopt with explicit acknowledgment, or let the user resolve it.
 5. Branch creation and checkout use non-destructive Git operations. Failure leaves the original branch and worktree intact.
-6. Atlas records base commit at contract approval/implementation start. A later base update is a new explicit action and may invalidate checks or review packages.
+6. Sigil records base commit at contract approval/implementation start. A later base update is a new explicit action and may invalidate checks or review packages.
 7. Diff review can include committed-only or committed-plus-worktree state, but the package must state which.
-8. Atlas tracks commits but does not require agents to commit unless project policy says so. It never authors a commit without an explicit user command/policy and a visible message.
+8. Sigil tracks commits but does not require agents to commit unless project policy says so. It never authors a commit without an explicit user command/policy and a visible message.
 9. The local/manual core remains usable before a PR exists. Production completion modes that claim remote delivery require the current approved PR/CI/review/merge evidence defined by Batch 9 policy.
-10. Push, PR creation/update, and remote reconciliation are previewed, capability-checked, idempotent, and explicitly authorized. Atlas never force-pushes or merges autonomously.
+10. Push, PR creation/update, and remote reconciliation are previewed, capability-checked, idempotent, and explicitly authorized. Sigil never force-pushes or merges autonomously.
 
 ## 25. Planning and implementation-contract requirements
 
@@ -654,18 +654,18 @@ A contract cannot be approved with a missing required section or blocking unreso
 
 ## 26. Implementation execution requirements
 
-- Atlas verifies contract, adapter, repository, branch, and context freshness before invocation.
-- The agent package contains the minimum relevant artifacts and source references; it does not dump the entire Atlas session or repository.
-- Atlas displays the agent, repository, branch, contract version, and intended operation before launch.
+- Sigil verifies contract, adapter, repository, branch, and context freshness before invocation.
+- The agent package contains the minimum relevant artifacts and source references; it does not dump the entire Sigil session or repository.
+- Sigil displays the agent, repository, branch, contract version, and intended operation before launch.
 - A run has states `queued`, `running`, `succeeded`, `failed`, `cancelled`, `interrupted`, or `unknown`; “succeeded” means the process completed, not that the feature is accepted.
 - Cancellation is cooperative first and escalates only to terminating the owned child process. It never kills unrelated processes.
-- On restart, a formerly running process becomes `interrupted` or is reconciled through a supported adapter session; Atlas does not assume it continued.
+- On restart, a formerly running process becomes `interrupted` or is reconciled through a supported adapter session; Sigil does not assume it continued.
 - All derived summaries identify their evidence source. Git and check results supersede agent narrative where they conflict.
 - The developer can export an implementation package for manual use when direct CLI invocation is unavailable.
 
 ## 27. Local validation and quality-gate requirements
 
-Project configuration defines check name, command/argument array, working directory, trigger, required/optional status, timeout, dependencies, affected-path rules, and redaction rules. Atlas records the exact configuration version used.
+Project configuration defines check name, command/argument array, working directory, trigger, required/optional status, timeout, dependencies, affected-path rules, and redaction rules. Sigil records the exact configuration version used.
 
 Minimum recommended V1 checks for a TypeScript frontend project are type checking, linting, unit tests, relevant integration tests, production build where affordable, Git cleanliness, changed-file policy, design-token scan, prohibited import scan, and contract-specific validation.
 
@@ -679,7 +679,7 @@ UI fidelity requirements include:
 - visual evidence linked to exact code state when feasible; and
 - deviation reporting with rationale and approval.
 
-Atlas may say checks passed, but may not claim “pixel perfect” unless the project defines comparison evidence, tolerances, viewports, and tooling and the recorded comparison passes.
+Sigil may say checks passed, but may not claim “pixel perfect” unless the project defines comparison evidence, tolerances, viewports, and tooling and the recorded comparison passes.
 
 ## 28. Review and fix-loop requirements
 
@@ -698,7 +698,7 @@ flowchart TD
 
 Each finding includes an ID, review iteration, severity/category, title, description, evidence, affected file/requirement, proposed action, developer disposition, resolution evidence, and status. Severity does not alone decide action: the developer approves the disposition set.
 
-Fix packages exclude rejected suggestions and unresolved questions. After a fix run, Atlas never marks a finding resolved solely because the agent says it is fixed; it requires a developer disposition, linked diff/check evidence, or the next accepted review. Findings can be resolved, accepted as deviation, rejected, deferred, duplicate, cannot reproduce, or reopened.
+Fix packages exclude rejected suggestions and unresolved questions. After a fix run, Sigil never marks a finding resolved solely because the agent says it is fixed; it requires a developer disposition, linked diff/check evidence, or the next accepted review. Findings can be resolved, accepted as deviation, rejected, deferred, duplicate, cannot reproduce, or reopened.
 
 ## 29. Resume, retry, rollback, pause, and recovery requirements
 
@@ -706,7 +706,7 @@ Fix packages exclude rejected suggestions and unresolved questions. After a fix 
 
 ```mermaid
 flowchart TD
-    A["Atlas starts or resumes"] --> B["Load last committed session state"]
+    A["Sigil starts or resumes"] --> B["Load last committed session state"]
     B --> C["Validate DB, artifacts, repo, and child-run record"]
     C --> D{"Consistent?"}
     D -- Yes --> E["Show current state and next action"]
@@ -720,10 +720,10 @@ flowchart TD
 
 - **Retry:** Read-only network operations and idempotent artifact generation may retry automatically within bounded policy. State-changing external operations are not automatically retried unless the provider supplies an idempotency key and status can be verified.
 - **Resume:** Reconcile stored state with repository and artifact facts before suggesting a next action.
-- **Rollback:** V1 rollback means restoring Atlas's workflow pointer or superseding a draft artifact, not rewriting Git history or deleting code. Approved history remains auditable.
+- **Rollback:** V1 rollback means restoring Sigil's workflow pointer or superseding a draft artifact, not rewriting Git history or deleting code. Approved history remains auditable.
 - **Pause:** Stop new transitions, preserve work, and record any running process disposition.
 - **Recovery:** Maintain database transactions, write artifacts atomically, retain backups/migrations, and provide `doctor` checks. Repair must preview changes and never fabricate missing approvals.
-- **External changes:** If branch, HEAD, worktree, config, or referenced files change outside Atlas, record divergence and invalidate only dependent evidence.
+- **External changes:** If branch, HEAD, worktree, config, or referenced files change outside Sigil, record divergence and invalidate only dependent evidence.
 
 ## 30. Security and privacy requirements
 
@@ -732,11 +732,11 @@ flowchart TD
 3. Default local files to user-only permissions where supported.
 4. Make every remote transfer visible by integration, purpose, destination, data class, and consent. Cloud code context and cloud image transfer are separately controlled; manual handoffs remain developer-controlled actions.
 5. Support exclude patterns for sensitive paths and reject common secret files by default, including `.env*`, key material, and credential stores.
-6. Treat repository and imported content as untrusted data. It cannot silently redefine Atlas security policy, approve actions, or execute commands.
+6. Treat repository and imported content as untrusted data. It cannot silently redefine Sigil security policy, approve actions, or execute commands.
 7. Use argument arrays and direct process execution rather than shell interpolation by default.
 8. Require explicit confirmation for commands outside configured allowlists and block known destructive Git operations in V1.
 9. Record security-relevant overrides and configuration changes without recording secret values.
-10. Provide local data inventory and deletion/archive controls. Deletion, if later supported, must distinguish Atlas metadata from repository code.
+10. Provide local data inventory and deletion/archive controls. Deletion, if later supported, must distinguish Sigil metadata from repository code.
 11. Optional telemetry is off by default and contains no source code, task content, prompts, diffs, filenames, repository URLs, or credentials.
 12. Dependency and release processes should include lockfiles, provenance where available, vulnerability scanning, and signed/checksummed distribution artifacts.
 13. External events must be authenticated where supported, deduplicated, ordered/replayed safely, and retained in inspectable inbox/outbox/dead-letter records without secrets.
@@ -748,8 +748,8 @@ Targets below are initial V1 targets and must be validated with pilot repositori
 
 | ID | Quality | Initial V1 target |
 | --- | --- | --- |
-| NFR-001 | Local-first | All core session, artifact, Git, manual planning/review, and check workflows operate without an Atlas cloud service. |
-| NFR-002 | Startup | `atlas --help`, `--version`, and cached `status` show useful output within 1 second at p95 on pilot machines. |
+| NFR-001 | Local-first | All core session, artifact, Git, manual planning/review, and check workflows operate without a Sigil cloud service. |
+| NFR-002 | Startup | `sigil --help`, `--version`, and cached `status` show useful output within 1 second at p95 on pilot machines. |
 | NFR-003 | Responsiveness | Long operations emit useful progress within 2 seconds and at least every 10 seconds; all support cancellation where technically possible. |
 | NFR-004 | Reliability | No known P0 workflow can leave an unclassified intermediate state after process termination; transitions are transactional/recoverable. |
 | NFR-005 | Durability | Approved contracts, approvals, and completion records survive process termination; database/artifact writes use atomic patterns and versioned migrations. |
@@ -764,7 +764,7 @@ Targets below are initial V1 targets and must be validated with pilot repositori
 | NFR-014 | Context efficiency | No package silently exceeds configured limits; included sources have relevance rationale and critical omissions are reported. |
 | NFR-015 | Observability | Every command has a correlation/run ID, duration, outcome, and structured diagnostic event without source content by default. |
 | NFR-016 | Cross-platform | Core acceptance suite passes on current supported macOS, Ubuntu LTS, and Windows versions defined at release; path and process behavior is documented. |
-| NFR-017 | Migration | Atlas upgrades apply backward-compatible or explicitly migrated session schemas; migration is backed up and recoverable on failure. |
+| NFR-017 | Migration | Sigil upgrades apply backward-compatible or explicitly migrated session schemas; migration is backed up and recoverable on failure. |
 | NFR-018 | Human/machine readability | All primary artifacts have readable Markdown; command results and state have versioned JSON schemas. |
 | NFR-019 | Safe failure | Remote, adapter, check, or parse failure never triggers merge, force push, code deletion, or approval. |
 
@@ -775,15 +775,15 @@ Targets below are initial V1 targets and must be validated with pilot repositori
 - Show identifiers that matter—task, contract, branch, base, HEAD—without flooding every line.
 - Explain why an action is blocked and give a specific recovery command.
 - Distinguish facts, agent claims, developer decisions, warnings, and inferred suggestions.
-- Preserve user work. If Atlas is uncertain, stop before mutation and offer non-destructive choices.
+- Preserve user work. If Sigil is uncertain, stop before mutation and offer non-destructive choices.
 - Make approval prompts specific and reviewable; do not use consent-dark patterns.
-- Keep Markdown artifacts usable outside Atlas and JSON stable enough for scripts.
+- Keep Markdown artifacts usable outside Sigil and JSON stable enough for scripts.
 
 ## 33. Notifications and developer-attention model
 
-V1 is foreground-first and has no server-backed notification service. Atlas may use terminal output, terminal bell, and optional OS notification after a user-started long-running process.
+V1 is foreground-first and has no server-backed notification service. Sigil may use terminal output, terminal bell, and optional OS notification after a user-started long-running process.
 
-Notifications are appropriate for: agent run completion/failure, checks completion, an approval gate becoming ready, or a run requiring attention. They must not include issue content, code, secrets, or sensitive filenames by default. Notification failure does not fail the workflow. No background monitoring continues after the Atlas process exits unless a future explicitly installed local service is introduced.
+Notifications are appropriate for: agent run completion/failure, checks completion, an approval gate becoming ready, or a run requiring attention. They must not include issue content, code, secrets, or sensitive filenames by default. Notification failure does not fail the workflow. No background monitoring continues after the Sigil process exits unless a future explicitly installed local service is introduced.
 
 ## 34. Configuration model from the user's perspective
 
@@ -798,7 +798,7 @@ Notifications are appropriate for: agent run completion/failure, checks completi
 
 Configuration covers repository/base branch, branch naming, adapter selection, command definitions, context budgets, includes/excludes, instruction files, design-system rules, component mappings, quality gates, output behavior, application openers, credentials by alias, network timeouts, and retention preferences.
 
-Atlas validates configuration before use, shows effective values and sources, rejects unknown critical fields, supports schema migration, and provides a secret-free example. Project config cannot grant itself permission for prohibited V1 Git actions.
+Sigil validates configuration before use, shows effective values and sources, rejects unknown critical fields, supports schema migration, and provides a secret-free example. Project config cannot grant itself permission for prohibited V1 Git actions.
 
 ## 35. Success metrics
 
@@ -807,7 +807,7 @@ Atlas validates configuration before use, shows effective values and sources, re
 - Median active human minutes spent preparing repeated planning, implementation, review, and fix handoffs per task.
 - Percentage of active sessions resumed without manual context reconstruction.
 - Percentage of implementation runs tied to a currently approved contract.
-- Percentage of review packages generated without manual reconstruction outside Atlas.
+- Percentage of review packages generated without manual reconstruction outside Sigil.
 - Number of stale-package or wrong-contract review incidents.
 - Percentage of completion records with all required evidence and no unexplained override.
 - Design-system violations detected before review versus during/after review.
@@ -820,13 +820,13 @@ Atlas validates configuration before use, shows effective values and sources, re
 - False “ready” or “complete” states caused by stale evidence: target zero P0 defects.
 - Median added ceremony time for a simple task; target under 3 minutes excluding planning, coding, checks, and review.
 
-Pilot measurement should compare at least 10 representative tasks before and after Atlas usage. These are product-learning metrics, not hidden employee-performance metrics.
+Pilot measurement should compare at least 10 representative tasks before and after Sigil usage. These are product-learning metrics, not hidden employee-performance metrics.
 
 ## 36. Product analytics and diagnostic telemetry
 
 ### Required local diagnostics
 
-Atlas records locally: command name, version, timestamp, duration, outcome, stable error code, session/state transition, adapter version, check result, and non-sensitive performance counters. These records support `status`, `history`, `doctor`, and user-created diagnostic bundles.
+Sigil records locally: command name, version, timestamp, duration, outcome, stable error code, session/state transition, adapter version, check result, and non-sensitive performance counters. These records support `status`, `history`, `doctor`, and user-created diagnostic bundles.
 
 Local diagnostics may link to artifact IDs and hashes but should not duplicate code, prompt content, task descriptions, diffs, secrets, or full command output in the event log. Detailed logs remain local with retention controls and redaction.
 
@@ -838,7 +838,7 @@ Diagnostic export is a user-initiated action that previews included files/fields
 
 ## 37. Release criteria
 
-Atlas may be certified for production use when:
+Sigil may be certified for production use when:
 
 - all P0 functional requirements have passing acceptance tests or documented product-approved exclusions;
 - Batches 1 through 12 are independently approved and checkpointed with traceable migrations and acceptance evidence;
@@ -888,7 +888,7 @@ P1 items ship when they do not jeopardize P0 safety and workflow completeness. P
 - Autonomous product/architecture decisions, contract approval, deviation approval, final completion, merge, or issue closure without explicit approved human/external authority.
 - Destructive Git operations including force push, reset, unapproved rebase, discard, or branch/worktree deletion without explicit recoverable policy.
 - Organization-wide cloud repository indexing or training/fine-tuning on private repository content.
-- Atlas-hosted multi-tenant orchestration or distributed worker infrastructure.
+- Sigil-hosted multi-tenant orchestration or distributed worker infrastructure.
 - Starting Trail Safe feature implementation before Batch 12 certification and product-owner approval.
 
 ## 40. V2 and V3 opportunities
@@ -934,7 +934,7 @@ Licenses, maintenance health, security posture, and platform support of dependen
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Atlas adds ceremony | User bypasses it | Fast defaults, progressive disclosure, reusable project memory, measure added time |
+| Sigil adds ceremony | User bypasses it | Fast defaults, progressive disclosure, reusable project memory, measure added time |
 | Context selection omits critical facts | Poor plans or code | Traceable manifest, explicit gaps, freshness checks, manual pins, blocking required sources |
 | Packages become too large | Tool limits and noise | Budgets, summaries, referenced artifacts, scope filters, no silent truncation |
 | Agent CLI changes | Execution breaks | Capability/version checks, adapter isolation, supported-version matrix, manual export fallback |
@@ -950,12 +950,12 @@ Licenses, maintenance health, security posture, and platform support of dependen
 
 ## 43. Trade-offs
 
-1. **Manual/API handoffs over consumer-browser automation:** Provider APIs may be configured explicitly, but Atlas does not scrape or control consumer chat sessions.
+1. **Manual/API handoffs over consumer-browser automation:** Provider APIs may be configured explicitly, but Sigil does not scrape or control consumer chat sessions.
 2. **Deterministic authority and gates around orchestration:** Agents may automate bounded work, while state, evidence, approvals, and stop conditions remain deterministic.
 3. **Local SQLite plus files over a cloud service:** Limits collaboration and sync, but reduces cost, privacy risk, and infrastructure requirements.
 4. **Bounded context over maximal ingestion:** Risks omission, but prevents cost/noise explosions and makes sources auditable.
 5. **Strict approval/versioning over editable plans:** Adds a deliberate step, but prevents intent drift and makes review meaningful.
-6. **Policy-bounded Git/remote orchestration over autonomous mutation:** Atlas may prepare branches, worktrees, pushes, and PRs, but destructive actions and merge remain explicitly controlled.
+6. **Policy-bounded Git/remote orchestration over autonomous mutation:** Sigil may prepare branches, worktrees, pushes, and PRs, but destructive actions and merge remain explicitly controlled.
 7. **Provider-neutral adapters over deep single-agent coupling:** May limit provider-specific features initially, but protects workflow portability.
 8. **Layered visual evidence over subjective fidelity claims:** Deterministic capture/comparison establishes observable change; optional vision review interprets evidence but cannot prove unobserved behavior.
 
@@ -964,7 +964,7 @@ Licenses, maintenance health, security posture, and platform support of dependen
 | ID | Question / uncertainty | Recommended default | Impact if changed |
 | --- | --- | --- | --- |
 | OQ-001 | Which Node versions and OS versions are supported at launch? | Current Node LTS; latest macOS, Ubuntu LTS, and supported Windows versions validated in CI | Packaging and test matrix |
-| OQ-002 | Should project configuration be committed by default? | Commit only a secret-free `atlas` project config; keep local overrides separate | Team reuse versus repository noise |
+| OQ-002 | Should project configuration be committed by default? | Commit only a secret-free `sigil` project config; keep local overrides separate | Team reuse versus repository noise |
 | OQ-003 | What is the exact local data layout and retention default? | User data directory for DB/logs; project-local optional artifact links; retain until archive/delete | Portability, privacy, backups |
 | OQ-004 | How are Markdown contracts structured for robust import? | Required headings plus YAML/JSON metadata generated from a published template | Import tolerance and human editability |
 | OQ-005 | Which Claude Code and Codex versions/modes are supportable? | Publish a tested version matrix and manual-export fallback | Adapter reliability |
@@ -1006,21 +1006,21 @@ The program is complete only when Batch 12 is approved, all preceding checkpoint
 | AT-E2E-003 | Generate planning package twice with unchanged inputs | Output is equivalent and references identical input fingerprints; no irrelevant full-repo load occurs |
 | AT-E2E-004 | Import a contract missing error states and tests | Validation identifies missing sections and approval is blocked |
 | AT-E2E-005 | Approve a valid contract, then materially change scope | New version is created, previous version remains immutable, and renewed approval is required |
-| AT-E2E-006 | Run implementation with a dirty unrelated worktree | Atlas blocks branch/worktree mutation and offers non-destructive recovery choices |
-| AT-E2E-007 | Invoke both Codex and Claude Code adapters using the same contract | Each receives equivalent normalized intent; Atlas task state remains provider-neutral |
+| AT-E2E-006 | Run implementation with a dirty unrelated worktree | Sigil blocks branch/worktree mutation and offers non-destructive recovery choices |
+| AT-E2E-007 | Invoke both Codex and Claude Code adapters using the same contract | Each receives equivalent normalized intent; Sigil task state remains provider-neutral |
 | AT-E2E-008 | Agent exits successfully but required test fails | Run may be complete, but review-ready is blocked and status reports the failed gate |
 | AT-E2E-009 | Changed code introduces an arbitrary Tailwind value prohibited by policy | Deterministic check reports file/rule; exception requires rationale and approval |
-| AT-E2E-010 | Review is requested after HEAD changes since checks | Atlas labels checks/package stale and requires rerun or explicit permitted override |
+| AT-E2E-010 | Review is requested after HEAD changes since checks | Sigil labels checks/package stale and requires rerun or explicit permitted override |
 | AT-E2E-011 | Import review with blocking, suggestion, and question findings | Findings are preserved by class; developer disposition is required before fix/completion |
 | AT-E2E-012 | Fix agent claims resolution without evidence | Finding remains pending until linked diff/check/re-review or developer disposition supports resolution |
-| AT-E2E-013 | Kill Atlas during artifact/database transition | Resume restores the previous or completed valid transition and reports reconciliation |
+| AT-E2E-013 | Kill Sigil during artifact/database transition | Resume restores the previous or completed valid transition and reports reconciliation |
 | AT-E2E-014 | Kill coding-agent child process or terminal unexpectedly | Run becomes interrupted/unknown, worktree is preserved, and safe retry/inspect actions are shown |
-| AT-E2E-015 | Resume after external commit and config change | Atlas detects divergence, refreshes facts, and invalidates only dependent artifacts/checks |
-| AT-E2E-016 | Use Atlas offline after prior intake | Local status, artifacts, planning/review export, Git facts, and checks work; remote refresh fails clearly |
+| AT-E2E-015 | Resume after external commit and config change | Sigil detects divergence, refreshes facts, and invalidates only dependent artifacts/checks |
+| AT-E2E-016 | Use Sigil offline after prior intake | Local status, artifacts, planning/review export, Git facts, and checks work; remote refresh fails clearly |
 | AT-E2E-017 | Put a known secret fixture in a changed file | Review package/log output redacts or excludes secret content and explains the omission |
-| AT-E2E-018 | Attempt a force push/reset through Atlas | Operation is unsupported/blocked and no Git state changes |
+| AT-E2E-018 | Attempt a force push/reset through Sigil | Operation is unsupported/blocked and no Git state changes |
 | AT-E2E-019 | Complete with unresolved blocking finding | Completion is blocked and status links the finding and valid next actions |
-| AT-E2E-020 | Complete with all gates passing | Atlas shows exact contract, base/head, checks, findings, evidence, and records explicit final approval |
+| AT-E2E-020 | Complete with all gates passing | Sigil shows exact contract, base/head, checks, findings, evidence, and records explicit final approval |
 | AT-E2E-021 | Run `--json` in non-interactive mode with missing approval | Stable JSON error and exit code are returned immediately; no prompt or state mutation occurs |
 | AT-E2E-022 | Upgrade a session from the previous supported schema | Backup/migration succeeds without changing approved artifact hashes; failed migration restores prior usable state |
 | AT-E2E-023 | Rebuild context on an unchanged indexed repository, then change one file | Exact snapshot is reused first; only provably affected evidence invalidates after the change; no ghost evidence remains |
@@ -1144,35 +1144,35 @@ Suggested action: Rename if it improves clarity without expanding scope.
 ### D. Example CLI session
 
 ```text
-$ atlas start ENG-247
+$ sigil start ENG-247
 Created session ENG-247. Linear task and 2 design references recorded.
 Context needs attention: Figma node metadata unavailable; local screenshot may be attached.
-Next: atlas context build
+Next: sigil context build
 
-$ atlas plan
+$ sigil plan
 Planning package v1 created and copied to clipboard.
-Next: plan in ChatGPT, then run atlas contract import <file>
+Next: plan in ChatGPT, then run sigil contract import <file>
 
-$ atlas contract import implementation-contract.md
+$ sigil contract import implementation-contract.md
 Contract v1 is valid. No blocking questions.
-Next: atlas approve contract 1
+Next: sigil approve contract 1
 
-$ atlas approve contract 1
+$ sigil approve contract 1
 Approved contract v1 (<hash>).
-Next: atlas implement --agent codex
+Next: sigil implement --agent codex
 
-$ atlas checks
+$ sigil checks
 6 passed, 1 failed: design-token-policy.
 Review-ready: no.
-Next: inspect with atlas checks --failed --verbose
+Next: inspect with sigil checks --failed --verbose
 
-$ atlas review prepare
+$ sigil review prepare
 Review package v1 created as DRAFT because one required check failed.
 ```
 
 ### E. Glossary
 
-See Section 15 for normative definitions. Provider names refer to configured external tools; they do not imply that Atlas includes access, credentials, or API entitlements for those products.
+See Section 15 for normative definitions. Provider names refer to configured external tools; they do not imply that Sigil includes access, credentials, or API entitlements for those products.
 
 ---
 

@@ -1,18 +1,18 @@
-import { writeImmutableArtifactContent } from "@atlas/artifacts";
-import { GateFailedError } from "@atlas/domain";
-import { addArtifactDependency, createArtifactRecord, type ArtifactRecord } from "@atlas/persistence";
-import { contextContentPackSchema, type ContextManifest } from "@atlas/schemas";
-import { readContextDiscoveryConfig } from "@atlas/context-discovery";
-import { redactSecretText } from "@atlas/security";
+import { writeImmutableArtifactContent } from "@sigil/artifacts";
+import { GateFailedError } from "@sigil/domain";
+import { addArtifactDependency, createArtifactRecord, type ArtifactRecord } from "@sigil/persistence";
+import { contextContentPackSchema, type ContextManifest } from "@sigil/schemas";
+import { readContextDiscoveryConfig } from "@sigil/context-discovery";
+import { redactSecretText } from "@sigil/security";
 
 import { readBoundedRepositorySource, readSafeRepositorySource } from "./evidence.js";
 import type { WorkflowGitSnapshot } from "./git-safeguards.js";
-import { newId, type AtlasRuntime } from "./runtime.js";
+import { newId, type SigilRuntime } from "./runtime.js";
 
 const HARD_PACK_LIMIT_BYTES = 200_000;
 
 export function createContextContentPack(input: {
-  readonly runtime: AtlasRuntime;
+  readonly runtime: SigilRuntime;
   readonly sessionId: string;
   readonly taskBrief: ArtifactRecord;
   readonly contextManifest: ArtifactRecord;
@@ -76,7 +76,7 @@ export function createContextContentPack(input: {
     schema_version: input.manifest.schema_version >= 3 ? 3 : 1,
     content_version: input.contentVersion,
     created_at: input.now,
-    producer: { type: "atlas" },
+    producer: { type: "sigil" },
     sensitivity: "confidential",
     parents: [input.taskBrief.artifactId, input.contextManifest.artifactId],
     content_sha256: "0".repeat(64),
@@ -123,7 +123,7 @@ export function createContextContentPack(input: {
     mediaType: "application/json",
     sensitivity: "confidential",
     status: blockingGaps.length === 0 ? "valid" : "rejected",
-    producerType: "atlas",
+    producerType: "sigil",
     createdAt: input.now
   });
   for (const dependsOnArtifactId of pack.parents) {
@@ -145,7 +145,7 @@ export function assertContextManifestFresh(input: {
     input.manifest.discovery_algorithm?.version !== "3.0.0" ||
     input.manifest.invalidation === undefined
   ) {
-    throw new GateFailedError("Legacy context lacks manifest v3 semantic completeness; rerun atlas context build");
+    throw new GateFailedError("Legacy context lacks manifest v3 semantic completeness; rerun sigil context build");
   }
   const snapshot = input.manifest.repository_snapshot;
   const currentConfig = readContextDiscoveryConfig(input.rootPath);

@@ -15,7 +15,7 @@ import {
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-linear-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-linear-"));
   tempRoots.push(root);
   return root;
 }
@@ -36,7 +36,7 @@ describe("Linear adapter", () => {
       url: "https://linear.app/acme/issue/ENG-42/build-intake",
       state: { name: "Todo" },
       priority: { label: "High" },
-      labels: [{ name: "backend" }, { name: "atlas" }],
+      labels: [{ name: "backend" }, { name: "sigil" }],
       assignee: { displayName: "Ada" },
       comments: [{ id: "comment_1", user: { name: "Grace" }, body: "Use the local CLI first." }],
       links: [{ title: "Spec", url: "https://example.test/spec" }]
@@ -50,7 +50,7 @@ describe("Linear adapter", () => {
       priority: "High",
       assignee: "Ada"
     });
-    expect(snapshot.labels).toEqual(["atlas", "backend"]);
+    expect(snapshot.labels).toEqual(["backend", "sigil"]);
     expect(snapshot.comments[0]).toMatchObject({ author: "Grace", body: "Use the local CLI first." });
     expect(snapshot.links[0]).toMatchObject({ title: "Spec", url: "https://example.test/spec" });
   });
@@ -95,7 +95,7 @@ describe("Linear adapter", () => {
                 description: "Create the intake flow.",
                 state: { name: "Todo" },
                 priorityLabel: "High",
-                labels: { nodes: [{ name: "atlas" }] },
+                labels: { nodes: [{ name: "sigil" }] },
                 comments: { nodes: [{ id: "c1", body: "Use CLI.", user: { displayName: "Ada" } }] },
                 attachments: { nodes: [{ title: "Spec", url: "https://example.test/spec" }] }
               }
@@ -107,7 +107,7 @@ describe("Linear adapter", () => {
     });
 
     expect(snapshot).toMatchObject({ issueKey: "ENG-42", title: "Build intake", priority: "High" });
-    expect(snapshot.labels).toEqual(["atlas"]);
+    expect(snapshot.labels).toEqual(["sigil"]);
     expect(calls[0]).toMatchObject({ method: "POST" });
   });
 
@@ -115,11 +115,11 @@ describe("Linear adapter", () => {
     const result = await commentLinearIssue({
       apiKey: "lin_api_key",
       issueId: "issue-id",
-      body: "Atlas completed the run.",
+      body: "Sigil completed the run.",
       fetchImpl: (async (_url, init) => {
         expect(init?.method).toBe("POST");
         expect(init?.headers).toMatchObject({ authorization: "lin_api_key" });
-        expect(String(init?.body)).toContain("Atlas completed the run.");
+        expect(String(init?.body)).toContain("Sigil completed the run.");
         return new Response(
           JSON.stringify({ data: { commentCreate: { success: true, comment: { id: "comment-id" } } } }),
           { status: 200 }

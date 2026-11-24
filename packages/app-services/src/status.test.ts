@@ -8,7 +8,7 @@ import { getStatus, startManualTask } from "./index.js";
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-status-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-status-"));
   tempRoots.push(root);
   return root;
 }
@@ -22,15 +22,15 @@ afterEach(() => {
 describe("status", () => {
   it("recommends start when no session exists", async () => {
     const root = tempRoot();
-    const status = await getStatus({ cwd: join(root, "repo"), env: { ATLAS_HOME: join(root, "home") } });
+    const status = await getStatus({ cwd: join(root, "repo"), env: { SIGIL_HOME: join(root, "home") } });
 
     expect(status.session).toBeUndefined();
-    expect(status.nextCommands[0]).toContain("atlas start --manual");
+    expect(status.nextCommands[0]).toContain("sigil start --manual");
   });
 
   it("reports the latest session and next action", async () => {
     const root = tempRoot();
-    const options = { cwd: join(root, "repo"), env: { ATLAS_HOME: join(root, "home") } };
+    const options = { cwd: join(root, "repo"), env: { SIGIL_HOME: join(root, "home") } };
     const started = await startManualTask({
       ...options,
       title: "Usage",
@@ -43,6 +43,6 @@ describe("status", () => {
     expect(status.session?.sessionId).toBe(started.session.sessionId);
     expect(status.artifactCount).toBe(1);
     expect(status.eventCount).toBe(1);
-    expect(status.nextCommands).toEqual(["atlas context import <file>"]);
+    expect(status.nextCommands).toEqual(["sigil context import <file>"]);
   });
 });

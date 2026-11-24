@@ -43,7 +43,7 @@ CREATE TABLE events (
   event_id TEXT PRIMARY KEY,
   session_id TEXT REFERENCES sessions(session_id),
   event_type TEXT NOT NULL,
-  actor_type TEXT NOT NULL CHECK (actor_type IN ('user', 'atlas', 'adapter', 'agent')),
+  actor_type TEXT NOT NULL CHECK (actor_type IN ('user', 'sigil', 'adapter', 'agent')),
   actor_id TEXT,
   command_id TEXT,
   occurred_at TEXT NOT NULL,
@@ -90,7 +90,7 @@ CREATE TABLE artifacts (
   media_type TEXT NOT NULL,
   sensitivity TEXT NOT NULL CHECK (sensitivity IN ('public', 'internal', 'confidential', 'secret-redacted')),
   status TEXT NOT NULL CHECK (status IN ('draft', 'valid', 'rejected', 'approved', 'superseded', 'stale')),
-  producer_type TEXT NOT NULL CHECK (producer_type IN ('atlas', 'user', 'adapter', 'agent', 'import')),
+  producer_type TEXT NOT NULL CHECK (producer_type IN ('sigil', 'user', 'adapter', 'agent', 'import')),
   producer_id TEXT,
   created_at TEXT NOT NULL,
   approved_at TEXT

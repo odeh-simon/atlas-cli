@@ -4,7 +4,7 @@ import {
   assertCanProgress,
   type LifecycleOverlay,
   type WorkflowState
-} from "@atlas/domain";
+} from "@sigil/domain";
 
 export const transitionCommands = [
   "create_manual_session",

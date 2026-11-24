@@ -4,16 +4,16 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { PNG } from "pngjs";
 
-import { listArtifactsForSession } from "@atlas/persistence";
+import { listArtifactsForSession } from "@sigil/persistence";
 
 import {
   captureVisualPage,
   compareVisualEvidence,
   importFigmaVisualEvidence,
-  openAtlasRuntime,
+  openSigilRuntime,
   startManualTask
 } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
+import { closeSigilRuntime } from "./runtime.js";
 
 const tempRoots: string[] = [];
 
@@ -23,10 +23,10 @@ afterEach(() => {
 
 describe("visual QA evidence", () => {
   it("captures a stable snapshot and compares it with a PNG reference", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-visual-qa-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-visual-qa-"));
     tempRoots.push(root);
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     const referencePath = join(root, "reference.png");
     const png = pngFixture();
     mkdirSync(cwd, { recursive: true });
@@ -56,9 +56,9 @@ describe("visual QA evidence", () => {
       actualArtifactId: captured.snapshotArtifactId,
       allowedDiffRatio: 0
     });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const types = listArtifactsForSession(runtime.db, started.session.sessionId).map((artifact) => artifact.type);
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(captured.captureArtifactId).toMatch(/^art_/);
     expect(captured.snapshotPath).toMatch(/\.png$/);
@@ -76,10 +76,10 @@ describe("visual QA evidence", () => {
   });
 
   it("imports Figma PNG evidence and compares its reference artifact", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-figma-visual-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-figma-visual-"));
     tempRoots.push(root);
     const cwd = join(root, "repo");
-    const env = { ATLAS_HOME: join(root, "home") };
+    const env = { SIGIL_HOME: join(root, "home") };
     const png = pngFixture();
     mkdirSync(cwd, { recursive: true });
     await startManualTask({ cwd, env, title: "Figma evidence", objective: "Compare implementation with design" });

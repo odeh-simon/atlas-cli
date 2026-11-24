@@ -2,7 +2,7 @@
   "status": "valid",
   "objective": {
     "heading": "Objective",
-    "body_markdown": "Validate the Atlas walking skeleton by continuing the manual CLI flow from planning into an approved implementation contract."
+    "body_markdown": "Validate the Sigil walking skeleton by continuing the manual CLI flow from planning into an approved implementation contract."
   },
   "scope": {
     "in_scope": [
@@ -32,7 +32,7 @@
   ],
   "technical_approach": {
     "heading": "Technical Approach",
-    "body_markdown": "Use the existing Atlas CLI commands to import this contract, record explicit approval, and produce the manual implementation package artifact. No source-code changes are required for this test contract."
+    "body_markdown": "Use the existing Sigil CLI commands to import this contract, record explicit approval, and produce the manual implementation package artifact. No source-code changes are required for this test contract."
   },
   "affected_subsystems": [
     "cli",
@@ -50,11 +50,11 @@
   "constraints": [
     "Do not delete or rewrite repository files during this test.",
     "Do not require external app adapters.",
-    "Keep all state local to the configured Atlas data directory."
+    "Keep all state local to the configured Sigil data directory."
   ],
   "data_state_permissions": {
     "heading": "Data State Permissions",
-    "body_markdown": "Atlas may write local artifacts, events, approvals, and session state into its local data store. It must not push to Git remotes or call external services for this test."
+    "body_markdown": "Sigil may write local artifacts, events, approvals, and session state into its local data store. It must not push to Git remotes or call external services for this test."
   },
   "required_states": [
     "loading",
@@ -76,9 +76,9 @@
     "Status reports the next implementation export command after approval."
   ],
   "tests_and_validation": [
-    "Run atlas contract import sample-implementation-contract.json.",
-    "Run atlas approve contract --yes.",
-    "Run atlas status and confirm the next command is atlas implement export --manual."
+    "Run sigil contract import sample-implementation-contract.json.",
+    "Run sigil approve contract --yes.",
+    "Run sigil status and confirm the next command is sigil implement export --manual."
   ],
   "unresolved_questions": [],
   "prohibitions": [

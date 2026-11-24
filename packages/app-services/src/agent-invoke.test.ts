@@ -5,14 +5,14 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { exportManualAgentPackage, getStatus, invokeImplementationAgent, openAtlasRuntime } from "./index.js";
+import { exportManualAgentPackage, getStatus, invokeImplementationAgent, openSigilRuntime } from "./index.js";
 import { prepareApprovedContract } from "./test-support.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 
 describe("invokeImplementationAgent", () => {
   it("invokes an exported implementation package and records an execution report", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-agent-invoke-"));
     const prepared = await prepareApprovedContract(root);
     const exported = await exportManualAgentPackage(prepared);
 
@@ -29,7 +29,7 @@ describe("invokeImplementationAgent", () => {
       processStatus: "failed",
       agentClaimsComplete: false,
       state: "implementation_reconciled",
-      nextCommand: "atlas checks run"
+      nextCommand: "sigil checks run"
     });
     expect(result.agentRunLogArtifactId).toMatch(/^art_/);
     expect(result.executionReportArtifactId).toMatch(/^art_/);
@@ -43,7 +43,7 @@ describe("invokeImplementationAgent", () => {
     ["secret", ".env", "API_TOKEN=sk_abcdefghijklmnop\n"],
     ["binary", "asset.bin", Buffer.from([0, 1, 2, 3])]
   ] as const)("rejects a non-reviewable %s implementation diff without storing its contents", async (_kind, path, content) => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-agent-invoke-"));
     const prepared = await prepareApprovedContract(root);
     await exportManualAgentPackage(prepared);
 
@@ -78,7 +78,7 @@ describe("invokeImplementationAgent", () => {
       })
     ).rejects.toThrow("Implementation diff is not safely reviewable");
 
-    const runtime = await openAtlasRuntime(prepared);
+    const runtime = await openSigilRuntime(prepared);
     try {
       const status = await getStatus(prepared);
       const diffRecord = listArtifactsForSession(runtime.db, status.session?.sessionId ?? "")
@@ -92,12 +92,12 @@ describe("invokeImplementationAgent", () => {
       expect(diff.patch).not.toContain("sk_abcdefghijklmnop");
       expect(diff.has_binary || diff.has_secret_risk).toBe(true);
     } finally {
-      closeAtlasRuntime(runtime, false);
+      closeSigilRuntime(runtime, false);
     }
   });
 
   it("records an agent run log and parses explicit completion reports", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-agent-invoke-"));
     const prepared = await prepareApprovedContract(root);
     const exported = await exportManualAgentPackage(prepared);
 
@@ -115,7 +115,7 @@ describe("invokeImplementationAgent", () => {
           exitCode: 0,
           signal: undefined,
           stdout:
-            'ATLAS_EXECUTION_REPORT_JSON: {"agent_claims_complete":true,"changed_files":["src/table-cell.tsx"],"limitations":[]}',
+            'SIGIL_EXECUTION_REPORT_JSON: {"agent_claims_complete":true,"changed_files":["src/table-cell.tsx"],"limitations":[]}',
           stderr: "",
           timedOut: false,
           startedAt: "2026-07-12T12:00:00.000Z",
@@ -145,7 +145,7 @@ describe("invokeImplementationAgent", () => {
   });
 
   it("fails on a dirty worktree before invoking the implementation agent", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-agent-invoke-"));
     const prepared = await prepareApprovedContract(root);
     await exportManualAgentPackage(prepared);
     writeFileSync(join(prepared.cwd, "unexpected.ts"), "export const unexpected = true;\n");
@@ -163,7 +163,7 @@ describe("invokeImplementationAgent", () => {
   });
 
   it("fails before invocation when the branch changes after package export", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-agent-invoke-"));
     const prepared = await prepareApprovedContract(root);
     await exportManualAgentPackage(prepared);
     execFileSync("git", ["checkout", "-b", "unexpected-branch"], { cwd: prepared.cwd, stdio: "ignore" });
@@ -181,7 +181,7 @@ describe("invokeImplementationAgent", () => {
   });
 
   it("fails before invocation when HEAD changes after package export", async () => {
-    const root = mkdtempSync(join(tmpdir(), "atlas-agent-invoke-"));
+    const root = mkdtempSync(join(tmpdir(), "sigil-agent-invoke-"));
     const prepared = await prepareApprovedContract(root);
     await exportManualAgentPackage(prepared);
     execFileSync("git", ["commit", "--allow-empty", "-m", "unexpected-head"], { cwd: prepared.cwd, stdio: "ignore" });

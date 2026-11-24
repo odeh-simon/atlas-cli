@@ -8,7 +8,7 @@ import { discoverContextSources } from "./index.js";
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-context-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-context-"));
   tempRoots.push(root);
   return root;
 }

@@ -1,6 +1,6 @@
 # ATL-14 Implementation Prompt
 
-You are the implementing agent for Linear issue `ATL-14`, **B3.2 - Implement incremental indexing, invalidation, and historical snapshots**, in the Atlas CLI repository.
+You are the implementing agent for Linear issue `ATL-14`, **B3.2 - Implement incremental indexing, invalidation, and historical snapshots**, in the Sigil CLI repository.
 
 Your job is to finish the existing B3.2 work and produce a review-ready handoff. Do not start B3.3, mark ATL-14 Done, or approve your own implementation.
 
@@ -8,8 +8,8 @@ Your job is to finish the existing B3.2 work and produce a review-ready handoff.
 
 Read these sources before changing code, in this order:
 
-1. `DOCs/Atlas_V1_Product_Requirements_Document.md`, version 2.0, for product behavior and safety requirements.
-2. The Linear document `Atlas Implementation Context and Production-Orchestration Plan`, mirrored at `DOCs/Atlas_Implementation_Context.md`, especially Sections 1, 5, 7, 8 Batch 3, 9, and 10.
+1. `DOCs/Sigil_V1_Product_Requirements_Document.md`, version 2.0, for product behavior and safety requirements.
+2. The Linear document `Sigil Implementation Context and Production-Orchestration Plan`, mirrored at `DOCs/Sigil_Implementation_Context.md`, especially Sections 1, 5, 7, 8 Batch 3, 9, and 10.
 3. Linear issue `ATL-14`, including its outcome, boundaries, acceptance criteria, validation, non-goals, and stop conditions.
 4. The approved B3.1 checkpoint `166563b` and Linear issue `ATL-13`.
 5. `DOCs/M0_Engineering_Design/16_context_manifest_v3_semantic_discovery.md`.
@@ -20,7 +20,7 @@ If these sources conflict materially, stop and report the conflict. Do not silen
 
 ## Current repository state
 
-- Branch: `codex/atlas-production-orchestration`.
+- Branch: `codex/sigil-production-orchestration`.
 - Approved dependency checkpoint: `166563b` (`ATL-13`, B3.1 storage foundation).
 - The worktree already contains substantial uncommitted B3.2 implementation. Treat it as user-owned work and continue from it; do not reset, revert, overwrite, or recreate it wholesale.
 - Existing B3.2 paths include `packages/evidence-index` plus related schema, persistence, migration, workspace, lockfile, test, and design-document changes.

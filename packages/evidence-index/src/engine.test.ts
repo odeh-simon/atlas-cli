@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ArtifactIntegrityError, MigrationError } from "@atlas/domain";
-import { readCurrentIndexSnapshot, saveDatabase } from "@atlas/persistence";
+import { ArtifactIntegrityError, MigrationError } from "@sigil/domain";
+import { readCurrentIndexSnapshot, saveDatabase } from "@sigil/persistence";
 
 import { updateEvidenceIndex } from "./engine.js";
 import {

@@ -1,4 +1,4 @@
-import { StateTransitionError, ValidationError, type FindingStatus } from "@atlas/domain";
+import { StateTransitionError, ValidationError, type FindingStatus } from "@sigil/domain";
 import {
   appendEvent,
   createFindingDisposition,
@@ -7,10 +7,10 @@ import {
   updateFindingStatus,
   updateSessionState,
   type FindingDispositionAction
-} from "@atlas/persistence";
-import { transition } from "@atlas/workflow-engine";
+} from "@sigil/persistence";
+import { transition } from "@sigil/workflow-engine";
 
-import { closeAtlasRuntime, newId, openAtlasRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
+import { closeSigilRuntime, newId, openSigilRuntime, repoIdForPath, type RuntimeOptions } from "./runtime.js";
 
 export interface DisposeFindingInput extends RuntimeOptions {
   readonly findingId: string;
@@ -29,7 +29,7 @@ export interface DisposeFindingResult {
 }
 
 export async function disposeFinding(input: DisposeFindingInput): Promise<DisposeFindingResult> {
-  const runtime = await openAtlasRuntime(input);
+  const runtime = await openSigilRuntime(input);
   try {
     const repoId = repoIdForPath(runtime.paths.cwd);
     const session = listSessionsForRepository(runtime.db, repoId)[0];
@@ -78,10 +78,10 @@ export async function disposeFinding(input: DisposeFindingInput): Promise<Dispos
       findingId: finding.findingId,
       status: nextStatus,
       state: next,
-      nextCommand: "atlas complete --check"
+      nextCommand: "sigil complete --check"
     };
   } finally {
-    closeAtlasRuntime(runtime);
+    closeSigilRuntime(runtime);
   }
 }
 

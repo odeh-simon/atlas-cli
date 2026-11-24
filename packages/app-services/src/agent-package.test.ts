@@ -3,15 +3,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { exportManualAgentPackage, getStatus, openAtlasRuntime } from "./index.js";
-import { closeAtlasRuntime } from "./runtime.js";
-import { listArtifactsForSession } from "@atlas/persistence";
+import { exportManualAgentPackage, getStatus, openSigilRuntime } from "./index.js";
+import { closeSigilRuntime } from "./runtime.js";
+import { listArtifactsForSession } from "@sigil/persistence";
 import { prepareApprovedContract } from "./test-support.js";
 
 const tempRoots: string[] = [];
 
 function tempRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlas-agent-package-"));
+  const root = mkdtempSync(join(tmpdir(), "sigil-agent-package-"));
   tempRoots.push(root);
   return root;
 }
@@ -29,22 +29,22 @@ describe("exportManualAgentPackage", () => {
 
     const result = await exportManualAgentPackage({ cwd, env });
     const status = await getStatus({ cwd, env });
-    const runtime = await openAtlasRuntime({ cwd, env });
+    const runtime = await openSigilRuntime({ cwd, env });
     const artifact = listArtifactsForSession(runtime.db, result.sessionId).find(
       (candidate) => candidate.artifactId === result.packageArtifactId
     );
     const packageContent = JSON.parse(readFileSync(join(runtime.paths.artifactRoot, artifact?.storageUri ?? ""), "utf8")) as Record<string, any>;
     const content = packageContent.instructions_markdown as string;
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
 
     expect(result.state).toBe("implementation_ready");
     expect(status.session?.primaryState).toBe("implementation_ready");
-    expect(status.nextCommands[0]).toBe("atlas execution import <file>");
-    expect(content).toContain("# Atlas Manual Agent Package");
+    expect(status.nextCommands[0]).toBe("sigil execution import <file>");
+    expect(content).toContain("# Sigil Manual Agent Package");
     expect(content).toContain("## Approved Contract (authoritative)");
     expect(content).toContain("Ship walking skeleton.");
     expect(content).toContain("## Resolved Context Evidence");
-    expect(content).toContain("# Atlas test fixture");
+    expect(content).toContain("# Sigil test fixture");
     expect(content).toContain("## Required Validation");
     expect(content).toContain("pnpm test");
     expect(packageContent).toMatchObject({

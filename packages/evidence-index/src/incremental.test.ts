@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { canonicalJson } from "@atlas/domain";
+import { canonicalJson } from "@sigil/domain";
 import {
   getEvidenceFileByUri,
   getEvidenceIndexSnapshotPayload,
@@ -11,7 +11,7 @@ import {
   listEvidenceIndexSnapshots,
   readCurrentIndexSnapshot,
   saveDatabase
-} from "@atlas/persistence";
+} from "@sigil/persistence";
 
 import { git, createCommittedRepo, openEngineDb } from "./test-helpers.js";
 import { updateEvidenceIndex } from "./engine.js";
@@ -19,7 +19,7 @@ import { updateEvidenceIndex } from "./engine.js";
 const tempRoots: string[] = [];
 const NOW = () => new Date("2026-08-02T09:00:00.000Z");
 
-function tempRoot(prefix = "atlas-evidence-incr-"): string {
+function tempRoot(prefix = "sigil-evidence-incr-"): string {
   const root = mkdtempSync(join(tmpdir(), prefix));
   tempRoots.push(root);
   return root;

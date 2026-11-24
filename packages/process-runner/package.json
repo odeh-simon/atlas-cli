@@ -1,5 +1,5 @@
 {
-  "name": "@atlas/process-runner",
+  "name": "@sigil/process-runner",
   "version": "0.0.0",
   "type": "module",
   "private": true,

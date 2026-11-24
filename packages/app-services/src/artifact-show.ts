@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { getArtifactRecord } from "@atlas/persistence";
+import { getArtifactRecord } from "@sigil/persistence";
 
-import { closeAtlasRuntime, openAtlasRuntime } from "./runtime.js";
+import { closeSigilRuntime, openSigilRuntime } from "./runtime.js";
 
 export interface ShowArtifactContentResult {
   readonly artifactId: string;
@@ -16,7 +16,7 @@ export interface ShowArtifactContentResult {
 export async function showArtifactContent(input: {
   readonly artifactId: string;
 }): Promise<ShowArtifactContentResult | undefined> {
-  const runtime = await openAtlasRuntime();
+  const runtime = await openSigilRuntime();
   try {
     const artifact = getArtifactRecord(runtime.db, input.artifactId);
     if (artifact === undefined) {
@@ -34,7 +34,7 @@ export async function showArtifactContent(input: {
       storagePath
     };
   } finally {
-    closeAtlasRuntime(runtime, false);
+    closeSigilRuntime(runtime, false);
   }
 }
 

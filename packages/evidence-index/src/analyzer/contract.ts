@@ -1,4 +1,4 @@
-import type { EvidenceApiEvidence, EvidenceConfigEvidence, EvidenceEdge, EvidenceSymbol, EvidenceTestAssociation, AnalyzerGap, AnalyzerStatus } from "@atlas/schemas";
+import type { EvidenceApiEvidence, EvidenceConfigEvidence, EvidenceEdge, EvidenceSymbol, EvidenceTestAssociation, AnalyzerGap, AnalyzerStatus } from "@sigil/schemas";
 
 export interface AnalyzerIdentity {
   readonly name: string;

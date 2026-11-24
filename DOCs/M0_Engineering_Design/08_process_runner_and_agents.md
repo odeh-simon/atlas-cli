@@ -2,7 +2,7 @@
 
 ## Non-Equivalence Rule
 
-Atlas must always distinguish these facts:
+Sigil must always distinguish these facts:
 
 | Fact | Meaning | Source |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ No single fact implies another.
 - Agent and check commands run from verified repo root or configured subdirectory contained within repo.
 - Environment starts from a minimal inherited allowlist plus explicit configured variables.
 - Secret values enter child environment only when required and are redacted from logs.
-- Atlas-specific variables include `ATLAS_RUN_ID`, `ATLAS_SESSION_ID`, and paths to package/report schema.
+- Sigil-specific variables include `SIGIL_RUN_ID`, `SIGIL_SESSION_ID`, and paths to package/report schema.
 
 ## Argument Arrays and Shell Avoidance
 
@@ -74,7 +74,7 @@ Windows signal semantics are handled by the process runner abstraction and OS-sp
 
 ## Child-Process Ownership and Unexpected Termination
 
-Execution run records store PID, command ID, start time, and heartbeat. If Atlas terminates unexpectedly:
+Execution run records store PID, command ID, start time, and heartbeat. If Sigil terminates unexpectedly:
 
 - On resume, if child is gone, mark run `interrupted` unless logs/report prove final status.
 - If child appears alive and is verifiably owned, show inspect/cancel/reconcile options.
@@ -103,7 +103,7 @@ Run IDs are stable UUID/ULID values. Logs are artifacts with sensitivity `confid
 | non-zero exit | `failed` |
 | killed due to cancel | `cancelled` |
 | timeout grace exhausted | `timeout` |
-| Atlas crash/restart before result | `interrupted` |
+| Sigil crash/restart before result | `interrupted` |
 | inconsistent facts | `unknown` |
 
 ## Agent Completion Report Validation
@@ -132,11 +132,11 @@ When direct agent invocation is unavailable:
 - Print path and optional clipboard content.
 - User runs agent manually.
 - User imports simulated execution result with changed Git state and optional report.
-- Atlas reconciles exactly as direct invocation.
+- Sigil reconciles exactly as direct invocation.
 
 ## Unsupported Agent Version Behavior
 
-Unsupported direct invocation is a hard block for `implement --agent`. Atlas offers:
+Unsupported direct invocation is a hard block for `implement --agent`. Sigil offers:
 
 - install/update guidance;
 - switch adapter if available;
@@ -155,7 +155,7 @@ sequenceDiagram
     participant Agent as Agent Adapter
     participant Run as Process Runner
     participant Git
-    Dev->>CLI: atlas implement --agent codex
+    Dev->>CLI: sigil implement --agent codex
     CLI->>WF: preflight contract/context/git
     WF-->>CLI: agent package path
     CLI->>Agent: health/version/capabilities
