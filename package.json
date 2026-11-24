@@ -4,6 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "description": "Atlas local-first CLI workflow orchestrator",
+  "license": "MIT",
+  "author": "Simon Odeh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/odeh-simon/atlas-cli.git"
+  },
   "bin": {
     "atlas": "./packages/cli/dist/index.js"
   },

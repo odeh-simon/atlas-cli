@@ -24,7 +24,7 @@
 ### Authority and delivery relationship
 
 - This PRD is authoritative for product behavior, safety boundaries, user outcomes, and release requirements.
-- The Linear document [Atlas Implementation Context and Production-Orchestration Plan](https://linear.app/poundz/document/atlas-implementation-context-and-production-orchestration-plan-fe5c5c15918e), mirrored locally at `DOCs/Atlas_Implementation_Context.md`, is authoritative for delivery order, batch boundaries, implementation invariants, promotion gates, and current approved progress.
+- The implementation context and production-orchestration plan, maintained at `DOCs/Atlas_Implementation_Context.md`, is authoritative for delivery order, batch boundaries, implementation invariants, promotion gates, and current approved progress.
 - `DOCs/M0_Engineering_Design/` is authoritative for approved subsystem designs and implemented technical contracts.
 - ATL Linear issues are executable views of the governing plan. A Done state is valid progress evidence only when the required implementation, tests, review packet, independent approval, and checkpoint are traceable.
 - If these sources conflict, implementation stops and the conflict is resolved through an approved document update; an agent must not silently choose one.
