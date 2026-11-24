@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync }
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { tarFlags } from "./lib/release-tools.mjs";
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseDirectory = resolve(readOption("--release-dir") ?? join(workspaceRoot, "release"));
@@ -17,10 +18,7 @@ assertSupportedRuntime();
 verifyChecksum(archivePath, checksumPath);
 
 try {
-  const extractArgs =
-    process.platform === "win32"
-      ? ["-xzf", archivePath.replace(/\\/g, "/"), "-C", temporaryRoot.replace(/\\/g, "/")]
-      : ["--force-local", "-xzf", archivePath.replace(/\\/g, "/"), "-C", temporaryRoot.replace(/\\/g, "/")];
+  const extractArgs = [...tarFlags(), "-xzf", archivePath.replace(/\\/g, "/"), "-C", temporaryRoot.replace(/\\/g, "/")];
   run("tar", extractArgs, workspaceRoot);
   const cliPath = join(temporaryRoot, "dist", "index.js");
   if (!existsSync(cliPath)) throw new Error("Release archive does not contain dist/index.js");

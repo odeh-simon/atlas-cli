@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["packages/**/*.test.ts"],
+    include: ["packages/**/*.test.ts", "scripts/**/*.test.mjs"],
     testTimeout: 30_000,
     hookTimeout: 30_000,
     // Evidence-index fixtures (2,000-file builds, per-test TypeScript

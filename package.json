@@ -23,7 +23,7 @@
     "check": "tsc -b --pretty false",
     "release:bundle": "node scripts/build-release.mjs",
     "release:smoke": "node scripts/release-smoke.mjs",
-    "release:check": "pnpm check && pnpm test && pnpm release:bundle && pnpm release:smoke",
+    "release:check": "node scripts/release-check.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
