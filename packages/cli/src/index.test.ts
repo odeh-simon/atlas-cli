@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -44,7 +44,7 @@ describe("cli", () => {
       const code = await main(["git", "status"]);
 
       expect(code).toBe(0);
-      expect(logs).toContain(`Root: ${repo.replaceAll("\\", "/")}`);
+      expect(logs).toContain(`Root: ${realpathSync(repo).replaceAll("\\", "/")}`);
       expect(logs).toContain("Branch: atlas-test");
       expect(logs.some((line) => /^HEAD: [a-f0-9]{40}$/i.test(line))).toBe(true);
       expect(logs).toContain("Dirty: no");

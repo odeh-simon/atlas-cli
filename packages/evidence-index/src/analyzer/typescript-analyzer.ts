@@ -61,7 +61,16 @@ export function createTypeScriptAnalyzer(): EvidenceAnalyzer {
 
       if (input.signal?.aborted) throw new CancellationError("Analyzer cancelled");
 
-      const root = resolve(input.rootPath);
+      // Use the real root so module resolution (which returns real paths) maps back to repository URIs
+      // when the repository sits behind a symlink, such as macOS /var -> /private/var.
+      const root = (() => {
+        const lexical = resolve(input.rootPath);
+        try {
+          return realpathSync(lexical);
+        } catch {
+          return lexical;
+        }
+      })();
       const limits = input.limits ?? {};
       const maxNodes = limits.maxGraphNodes ?? 500;
       const maxEdges = limits.maxGraphEdges ?? 1500;
