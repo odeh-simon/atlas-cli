@@ -60,7 +60,7 @@ export interface WalkRepositoryOptions {
 }
 
 export function walkRepositoryCandidates(options: WalkRepositoryOptions): RepositoryScanResult {
-  const root = resolve(options.rootPath);
+  const root = resolveRealRoot(options.rootPath);
   const maxDepth = options.limits?.maxDepth ?? Number.POSITIVE_INFINITY;
   const maxFiles = options.limits?.maxFiles ?? Number.POSITIVE_INFINITY;
   const maxBytes = options.limits?.maxBytes ?? Number.POSITIVE_INFINITY;
@@ -147,7 +147,7 @@ export interface HashedFileEvidence {
 }
 
 export function hashAndClassifyFile(rootPath: string, candidate: ScannedFileCandidate): HashedFileEvidence {
-  const root = resolve(rootPath);
+  const root = resolveRealRoot(rootPath);
   const lexical = resolve(candidate.absolutePath);
   assertContained(root, lexical);
   const lstat = lstatSync(lexical);
@@ -229,6 +229,18 @@ function safeContainedRealPath(root: string, path: string): string | undefined {
     return real;
   } catch {
     return undefined;
+  }
+}
+
+// Containment checks compare real paths, so the root must be real too. On macOS, temporary and
+// some user folders sit behind symlinks (for example /var -> /private/var); comparing a lexical
+// root with real file paths would treat every file as escaping the repository.
+function resolveRealRoot(rootPath: string): string {
+  const lexical = resolve(rootPath);
+  try {
+    return realpathSync(lexical);
+  } catch {
+    return lexical;
   }
 }
 

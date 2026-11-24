@@ -8,3 +8,6 @@ coverage/
 atlas.local.json
 .atlas/
 release/
+
+# Local Atlas configuration (copy atlas.config.example.json)
+atlas.config.json

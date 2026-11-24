@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -35,7 +35,7 @@ describe.skipIf(!gitAvailable)("git repository facts", () => {
     const facts = readGitRepositoryFacts({ cwd: join(repo, "src") });
     const after = git(repo, ["rev-parse", "HEAD"]).trim();
 
-    expect(facts.rootPath).toBe(normalize(repo));
+    expect(facts.rootPath).toBe(normalize(realpathSync(repo)));
     expect(facts.branch).toBe("atlas-test");
     expect(facts.headSha).toBe(before);
     expect(facts.detachedHead).toBe(false);

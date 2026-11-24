@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
@@ -388,7 +389,15 @@ function gitCommandSucceeds(input: {
 }
 
 function normalizeGitPath(path: string): string {
-  return resolve(path.trim()).replaceAll("\\", "/");
+  const lexical = resolve(path.trim());
+  // Git reports real paths, so resolve symlinks (such as macOS /var -> /private/var) before comparing.
+  let real = lexical;
+  try {
+    real = realpathSync(lexical);
+  } catch {
+    // Path does not exist yet; keep the lexical form.
+  }
+  return real.replaceAll("\\", "/");
 }
 
 function sha256(value: string): string {
