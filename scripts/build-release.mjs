@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runPnpm, tarFlags } from "./lib/release-tools.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(scriptDirectory, "..");
@@ -30,9 +31,8 @@ const checksumPath = `${archivePath}.sha256`;
 assertSupportedRuntime();
 
 try {
-  if (!process.argv.includes("--skip-build")) run(pnpmCommand(), ["build"], workspaceRoot);
-  run(
-    pnpmCommand(),
+  if (!process.argv.includes("--skip-build")) runPnpm(["build"], workspaceRoot);
+  runPnpm(
     ["--config.node-linker=hoisted", "--filter", "@sigil/cli", "deploy", stageDirectory, "--prod"],
     workspaceRoot
   );
@@ -66,12 +66,7 @@ try {
   mkdirSync(outputDirectory, { recursive: true });
   rmSync(archivePath, { force: true });
   rmSync(checksumPath, { force: true });
-  // --force-local is GNU-tar specific and unsupported by Windows bsdtar.
-  // Only pass it on platforms whose tar implements it.
-  const tarArgs =
-    process.platform === "win32"
-      ? ["-czf", archivePath.replace(/\\/g, "/"), "-C", stageDirectory.replace(/\\/g, "/"), "."]
-      : ["--force-local", "-czf", archivePath.replace(/\\/g, "/"), "-C", stageDirectory.replace(/\\/g, "/"), "."];
+  const tarArgs = [...tarFlags(), "-czf", archivePath.replace(/\\/g, "/"), "-C", stageDirectory.replace(/\\/g, "/"), "."];
   run("tar", tarArgs, workspaceRoot);
   const checksum = createHash("sha256").update(readFileSync(archivePath)).digest("hex");
   writeFileSync(checksumPath, `${checksum}  ${basename(archivePath)}\n`);
@@ -88,16 +83,8 @@ function readOption(name) {
   return index === -1 ? undefined : process.argv[index + 1];
 }
 
-function pnpmCommand() {
-  return process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-}
-
 function run(command, args, cwd) {
-  const executable = process.platform === "win32" && command.endsWith(".cmd")
-    ? process.env.ComSpec ?? "cmd.exe"
-    : command;
-  const executableArgs = executable === command ? args : ["/d", "/s", "/c", command, ...args];
-  const result = spawnSync(executable, executableArgs, { cwd, encoding: "utf8", stdio: "inherit" });
+  const result = spawnSync(command, args, { cwd, encoding: "utf8", stdio: "inherit" });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status}`);
 }
