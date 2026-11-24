@@ -12,7 +12,6 @@ export default defineConfig({
     // any assertion failing. Process isolation plus a bounded worker count
     // keeps heartbeats responsive; no timeout inflation, no retries.
     pool: "forks",
-    minWorkers: 1,
     maxWorkers: 4
   }
 });
